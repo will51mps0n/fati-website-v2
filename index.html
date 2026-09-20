@@ -101,7 +101,7 @@ figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
 /* ---- about ---- */
 html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-wrap{min-height:100vh;display:grid;place-items:center;box-sizing:border-box;padding:14vh 0}
-.manifesto{width:60vw;margin:0;font-size:48px;line-height:1.3;text-align:center}
+.manifesto{width:60vw;margin:0;font-size:clamp(26px,2.9vw,44px);line-height:1.3;text-align:center}
 
 @media (prefers-reduced-motion:reduce){.frame img{transition:none}}
 
@@ -124,7 +124,7 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .xp-note{width:80vw;max-width:80vw;font-size:17px}
   .entry{margin-bottom:28vh}
   .info{width:80vw;max-width:80vw;font-size:17px}
-  .manifesto{width:88vw;font-size:28px}
+  .manifesto{width:88vw}
 }
 </style>
 </head>
@@ -137,7 +137,7 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   <a href="#/portfolio">Portfolio</a>
   <a href="#/experience">Experience</a>
 </nav>
-<a class="ig" href="https://www.instagram.com" target="_blank" rel="noopener" aria-label="Instagram">
+<a class="ig" href="https://instagram.com/fatineux" target="_blank" rel="noopener" aria-label="Instagram">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
     <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.2"/>
     <circle cx="12" cy="12" r="4.4"/>
@@ -158,101 +158,143 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
    w/h lets the frame size itself before the image loads (no reflow);
    plain strings fall back to the image's natural size on load.
    ================================================================ */
+/* Projects carried over from lib/data.ts in fatima-castro-portfolio.
+   NOTE: those six entries are the template's stock placeholders (the
+   image URLs are Unsplash stock), not real built work — replace them.
+
+   Image handling: the artifact sandbox blocks external images, so the
+   preview draws generated stand-ins. The real URLs live in `remote`;
+   flip USE_REMOTE_IMAGES to true when deploying to a normal host and
+   the same data drives the page unchanged. */
+const USE_REMOTE_IMAGES = false;
+function feed(id, remote, kind){
+  return USE_REMOTE_IMAGES ? remote : placeholderImages(id, remote.length, kind);
+}
+const U = 'https://images.unsplash.com/photo-';
+const Q = '?q=80&w=2400&auto=format&fit=crop';
+
 const PROJECTS = [
   {
-    id: 'kestrel-house',
-    name: 'Kestrel House',
-    subtitle: 'A Long Roof Against the Weather',
-    medium: 'photograph',
-    awards: ['Award, AIA Michigan Honor 2024', 'Award, Small Practice Citation 2021'],
-    collections: ['selected'],
-    info: { date: '2017-2024', client: 'Undisclosed', location: 'Leelanau County, Michigan',
-            type: 'Residence', status: 'Complete', aor: 'Field Office Architects',
-            builder: 'North Shore Builders', photography: 'Studio archive' },
-    images: placeholderImages('kestrel-house', 48, 'photo-wide')
-  },
-  {
-    id: 'hillside-sections',
-    name: 'Hillside Sections',
-    subtitle: 'Seven Cuts Through a Slow Slope',
-    medium: 'section drawing',
-    awards: ['Award, Drawing of the Year Shortlist 2023'],
-    collections: ['selected'],
-    info: { date: '2018-Ongoing', client: '', location: 'Driftless Region, Wisconsin',
-            type: 'Terraced House', status: 'Ongoing', aor: 'Field Office Architects',
-            builder: '', photography: '' },
-    images: placeholderImages('hillside-sections', 27, 'drawing')
-  },
-  {
-    id: 'quiet-room',
-    name: 'Quiet Room',
-    subtitle: 'One Window, Held Open All Day',
+    id: 'void-house',
+    name: 'Void House',
+    subtitle: 'A meditation on absence and presence in residential architecture.',
     medium: 'photograph',
     awards: [],
     collections: ['selected'],
-    info: { date: '2021-2023', client: 'Private', location: 'Ann Arbor, Michigan',
-            type: 'Interior', status: 'Complete', aor: '',
-            builder: 'Meridian Joinery', photography: 'Studio archive' },
-    images: placeholderImages('quiet-room', 23, 'photo-room')
+    info: { date: '2023', client: '', location: 'Kyoto, Japan', type: 'Residential',
+            area: '240m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('void-house', [
+      U+'1600607686527-6fb886090705'+Q, U+'1600566753190-17f0baa2a6c3'+Q,
+      U+'1600585154340-be6161a56a0c'+Q, U+'1600573472550-8090b5e0745e'+Q,
+      U+'1600596542815-ffad4c1539a9'+Q, U+'1600585154526-990dced4db0d'+Q
+    ], 'photo-room')
   },
   {
-    id: 'ledger-objects',
-    name: 'Ledger Objects',
-    subtitle: 'Furniture for Counting and Keeping',
+    id: 'mono-tower',
+    name: 'Mono Tower',
+    subtitle: 'Redefining the commercial skyline with monolithic simplicity.',
     medium: 'photograph',
-    awards: ['Award, Object Prize 2024'],
+    awards: [],
     collections: ['selected'],
-    info: { date: '2024', client: 'Undisclosed', location: '',
-            type: 'Furniture', status: 'Complete', aor: '',
-            builder: 'Studio workshop', photography: 'Studio archive' },
-    images: placeholderImages('ledger-objects', 20, 'photo-object')
+    info: { date: '2022', client: '', location: 'Berlin, Germany', type: 'Commercial',
+            area: '12,500m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('mono-tower', [
+      U+'1486718448742-163732cd1544'+Q, U+'1545324418-cc1a3fa10c00'+Q,
+      U+'1464938050520-ef2571f44b27'+Q, U+'1448630360428-65456885c650'+Q,
+      U+'1487958449943-2429e8be8625'+Q, U+'1479839672679-a46483c0e7c8'+Q
+    ], 'photo-wide')
   },
   {
-    id: 'salt-chapel',
-    name: 'Salt Chapel',
-    subtitle: 'A Cold Room for Warm Voices',
+    id: 'gallery-x',
+    name: 'Gallery X',
+    subtitle: 'A cultural space where art and architecture become one.',
     medium: 'photograph',
-    awards: ['Award, Sacred Space Medal 2022', 'Award, Timber Construction Citation 2023'],
+    awards: [],
     collections: ['selected'],
-    info: { date: '2019-2022', client: '', location: 'Door County, Wisconsin',
-            type: 'Chapel', status: 'Complete', aor: 'Field Office Architects',
-            builder: 'Peninsula Timberworks', photography: 'Studio archive' },
-    images: placeholderImages('salt-chapel', 29, 'photo-wide')
+    info: { date: '2024', client: '', location: 'Copenhagen, Denmark', type: 'Cultural',
+            area: '1,200m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('gallery-x', [
+      U+'1518640467707-6811f4a6ab73'+Q, U+'1577720643272-265f09367456'+Q,
+      U+'1565060169194-19fabf2d1ece'+Q, U+'1572947650440-e8a97ef053b2'+Q,
+      U+'1554907984-15263bfd63bd'+Q,  U+'1558618666-fcd25c85cd64'+Q
+    ], 'photo-room')
   },
   {
-    id: 'standing-figures',
-    name: 'Standing Figures',
-    subtitle: 'Low Fidelity Entasis',
-    medium: 'drawing',
+    id: 'desert-pavilion',
+    name: 'Desert Pavilion',
+    subtitle: 'Embracing the stark beauty of the desert landscape.',
+    medium: 'photograph',
+    awards: [],
+    collections: ['selected'],
+    info: { date: '2021', client: '', location: 'Joshua Tree, USA', type: 'Public',
+            area: '450m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('desert-pavilion', [
+      U+'1506126335919-80d23d11fca6'+Q, U+'1518780664697-55e3ad937233'+Q,
+      U+'1512917774080-9991f1c4c750'+Q, U+'1493809842364-78817add7ffb'+Q,
+      U+'1502005229762-cf1b2da7c5d6'+Q, U+'1416331108676-a22ccb276e35'+Q
+    ], 'photo-wide')
+  },
+  {
+    id: 'concrete-villa',
+    name: 'Concrete Villa',
+    subtitle: 'Raw concrete meets refined living in the Swiss Alps.',
+    medium: 'photograph',
     awards: [],
     collections: [],
-    info: { date: '2020', client: '', location: '',
-            type: 'Speculative Study', status: 'Study', aor: '',
-            builder: '', photography: '' },
-    images: placeholderImages('standing-figures', 6, 'drawing')
+    info: { date: '2023', client: '', location: 'Zurich, Switzerland', type: 'Residential',
+            area: '680m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('concrete-villa', [
+      U+'1628611225249-6c0580a9324c'+Q, U+'1600047509807-ba8f99d2cdde'+Q,
+      U+'1600566753376-12c8ab7fb75b'+Q, U+'1600210492493-0946911123ea'+Q,
+      U+'1600566752355-35792bedcfea'+Q, U+'1600585154363-67eb9e2e2099'+Q
+    ], 'photo-room')
+  },
+  {
+    id: 'harbor-office',
+    name: 'Harbor Office',
+    subtitle: 'Where work meets water in Nordic design tradition.',
+    medium: 'photograph',
+    awards: [],
+    collections: [],
+    info: { date: '2022', client: '', location: 'Oslo, Norway', type: 'Workspace',
+            area: '3,400m\u00B2', status: '', aor: '', builder: '', photography: '' },
+    images: feed('harbor-office', [
+      U+'1497366216548-37526070297c'+Q, U+'1497366811353-6870744d04b2'+Q,
+      U+'1497215842964-222b430dc094'+Q, U+'1504384308090-c894fdcc538d'+Q,
+      U+'1497366754035-f200968a6e72'+Q, U+'1524758631624-e2822e304c36'+Q
+    ], 'photo-wide')
   }
 ];
 
-/* PLACEHOLDER — replace with Fatima's own words. Deliberately left as
-   an unfilled statement rather than invented biography. */
-const MANIFESTO = 'Fatima Castro is a [discipline] working in [place]. [Replace this paragraph with your own statement — what the work is about, how it is made, and who it is for. Roughly ninety to a hundred and ten words reads best at this size, breaking across five or six ragged lines.]';
+const MANIFESTO = "Fatima Castro is a Master of Architecture candidate at Rice University in Houston, and holds a degree in Environmental Design from Texas A&M. She has interned at Perkins Eastman in Dallas, volunteered with Habitat for Humanity in Bryan, Texas, and taught at Kyushu University's LSPA Winter School. At Texas A&M she served as Freedom by Design Chair and Marketing Officer for the American Institute of Architecture Students. Her work treats architecture as both a technical discipline and a tool for positive social impact \u2014 precise in its drawing, collaborative in its making, and measured by what it returns to the people who use it.";
 
-/* PLACEHOLDER — every field here is a blank to fill in. Groups render
-   in order; add, remove or rename them freely. */
+/* Drawn from the About and Contact pages of fatima-castro-portfolio.
+   Dates that repo did not record are left as [Year] to be filled in
+   rather than guessed. */
 const EXPERIENCE = [
   { title: 'Practice', entries: [
-    { period: '2024-Present', role: '[Role]', org: '[Organization], [City]',
-      note: '[One or two lines on the work itself.]' },
-    { period: '2022-2024', role: '[Role]', org: '[Organization], [City]', note: '' },
-    { period: '2021-2022', role: '[Role]', org: '[Organization], [City]', note: '' }
+    { period: '[Year]', role: 'Architectural Intern', org: 'Perkins Eastman, Dallas',
+      note: 'AutoCAD and Enscape across a range of commercial projects.' },
+    { period: '[Year]', role: 'Support Assistant, Volunteer', org: 'Habitat for Humanity, Bryan, Texas',
+      note: 'Residential construction and community-focused design.' }
+  ]},
+  { title: 'Teaching', entries: [
+    { period: '[Year]', role: 'Teaching Assistant', org: 'Kyushu University, LSPA Winter School',
+      note: 'International design approaches and educational methodology.' }
   ]},
   { title: 'Education', entries: [
-    { period: '[Year]-[Year]', role: '[Degree]', org: '[Institution], [City]', note: '' }
+    { period: '2024-2026', role: 'Master of Architecture, Candidate', org: 'Rice University, Houston', note: '' },
+    { period: '2024', role: 'Bachelor of Environmental Design', org: 'Texas A&M University', note: '' }
   ]},
-  { title: 'Exhibitions & Recognition', entries: [
-    { period: '[Year]', role: '[Title of work or award]', org: '[Venue or awarding body], [City]', note: '' }
+  { title: 'Service', entries: [
+    { period: '[Year]', role: 'Freedom by Design Chair',
+      org: 'American Institute of Architecture Students, Texas A&M', note: '' },
+    { period: '[Year]', role: 'Marketing Officer',
+      org: 'American Institute of Architecture Students, Texas A&M', note: '' }
   ]}
 ];
+
+const CONTACT = { email: 'fatimaiiicastro@gmail.com', location: 'Houston, Texas' };
 
 /* Each collection's feed is derived from PROJECTS, in declaration order. */
 const COLLECTIONS = { selected: [], portfolio: [] };
@@ -264,7 +306,8 @@ const BY_ID = Object.fromEntries(PROJECTS.map(p => [p.id, p]));
 
 const INFO_FIELDS = [
   ['date','Date'], ['client','Client'], ['location','Location'], ['type','Type'],
-  ['status','Status'], ['aor','AOR'], ['builder','Builder'], ['photography','Photography']
+  ['area','Area'], ['status','Status'], ['aor','AOR'], ['builder','Builder'],
+  ['photography','Photography']
 ];
 
 /* ================================================================
@@ -415,7 +458,15 @@ function experienceHTML(){
         +   `<div>${e.org}</div>`
         +   (e.note ? `<p class="xp-note">${e.note}</p>` : '')
         + `</div>`).join('')
-    + `</section>`).join('') + `</div>`;
+    + `</section>`).join('')
+    + `<section class="xp-group">`
+    +   `<div class="xp-group-title">Contact</div>`
+    +   `<div class="xp">`
+    +     `<div><a href="mailto:${CONTACT.email}">${CONTACT.email}</a></div>`
+    +     `<div>${CONTACT.location}</div>`
+    +   `</div>`
+    + `</section>`
+    + `</div>`;
 }
 
 function render(){
