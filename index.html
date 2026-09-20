@@ -5,7 +5,7 @@
 <title>Fati Architects</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="description" content="Fati Architects — a small studio working between building, drawing, and repair. Selected buildings, objects, and rooms.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap">
 <style>
 :root{--bg:#FCFBF9;--fg:#111111}
 html.about{--bg:#080808;--fg:#F5F3EF}
@@ -15,7 +15,7 @@ body{
   background:var(--bg);
   color:var(--fg);
   font-family:"EB Garamond","Adobe Garamond Pro",Garamond,Georgia,serif;
-  font-weight:500;
+  font-weight:550;
   font-variant-numeric:oldstyle-nums;
   font-feature-settings:"onum" 1,"liga" 1;
   -webkit-font-smoothing:antialiased;
@@ -28,10 +28,8 @@ a{color:inherit;text-decoration:none}
 .info-toggle{font:inherit;font-variant-numeric:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 a:focus-visible,.info-toggle:focus-visible{outline:none}
 a:hover,a:focus-visible,
-.info-toggle:hover,.info-toggle:focus-visible,
-.nav a[aria-current="page"],
 .about-link.active,
-.info-toggle[aria-expanded="true"]{
+.info-toggle{
   text-decoration:underline;
   text-underline-offset:.14em;
   text-decoration-thickness:1px;
@@ -85,10 +83,10 @@ a:hover,a:focus-visible,
 .arrow svg{width:22px;height:22px;display:block}
 .arrow:focus-visible{outline:none}
 
-figcaption{margin-top:26px;text-align:center;font-size:19px;line-height:1.42}
+figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
 .cap-name,.cap-award{font-style:italic}
 .awards{margin-top:1.42em}
-.info{margin:.2em auto 0;width:30vw;max-width:30vw;font-size:17px;line-height:1.5}
+.info{margin:1.42em auto;width:30vw;max-width:30vw;font-size:20px;line-height:1.5}
 
 /* ---- about ---- */
 html.about #main{width:auto;max-width:none;min-width:0;padding:0}
@@ -110,9 +108,9 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .arrow{width:50%}
   .arrow.prev{left:0;padding-left:10px}
   .arrow.next{right:0;padding-right:10px}
-  figcaption{font-size:16px}
+  figcaption{font-size:19px}
   .entry{margin-bottom:28vh}
-  .info{width:80vw;max-width:80vw;font-size:15px}
+  .info{width:80vw;max-width:80vw;font-size:17px}
   .manifesto{width:88vw;font-size:28px}
 }
 </style>
@@ -397,8 +395,8 @@ function render(){
         +   (p.awards.length
               ? `<div class="awards">${p.awards.map(a=>`<div class="cap-award">${a}</div>`).join('')}</div>`
               : '')
-        +   `<div><button class="info-toggle" type="button" aria-expanded="false">Info</button></div>`
         +   `<div class="info" hidden>${infoLines(p)}</div>`
+        +   `<div><button class="info-toggle" type="button" aria-expanded="false">Info</button></div>`
         + `</figcaption>`
         + `</figure>`;
   }
@@ -444,9 +442,10 @@ main.addEventListener('click',e=>{
   if(arrow){step(arrow.closest('.entry'),arrow.classList.contains('next')?1:-1);return}
   const btn=e.target.closest('.info-toggle');
   if(!btn) return;
-  const info=btn.parentElement.nextElementSibling;
+  const info=btn.parentElement.previousElementSibling;
   const open=info.hidden;
   info.hidden=!open;
+  btn.textContent=open?'Close':'Info';
   btn.setAttribute('aria-expanded',String(open));
 });
 
