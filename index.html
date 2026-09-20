@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Fati Architects</title>
+<title>Fatima Castro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="description" content="Fati Architects — a small studio working between building, drawing, and repair. Selected buildings, objects, and rooms.">
+<meta name="description" content="Fatima Castro — selected work, portfolio, and experience.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap">
 <style>
 :root{--bg:#FCFBF9;--fg:#111111}
@@ -88,6 +88,16 @@ figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
 .awards{margin-top:1.42em}
 .info{margin:1.42em auto;width:30vw;max-width:30vw;font-size:20px;line-height:1.5}
 
+/* ---- experience: text only, same centred column ---- */
+.experience{text-align:center;font-size:22px;line-height:1.42}
+.xp-group{margin-bottom:16vh}
+.xp-group:last-child{margin-bottom:0}
+.xp-group-title{font-style:italic;margin-bottom:3.2em}
+.xp{margin-bottom:4.4em}
+.xp:last-child{margin-bottom:0}
+.xp-role{font-style:italic}
+.xp-note{width:30vw;max-width:30vw;margin:1.42em auto 0;font-size:20px;line-height:1.5}
+
 /* ---- about ---- */
 html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-wrap{min-height:100vh;display:grid;place-items:center;box-sizing:border-box;padding:14vh 0}
@@ -109,6 +119,9 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .arrow.prev{left:0;padding-left:10px}
   .arrow.next{right:0;padding-right:10px}
   figcaption{font-size:19px}
+  .experience{font-size:19px}
+  .xp-group{margin-bottom:12vh}
+  .xp-note{width:80vw;max-width:80vw;font-size:17px}
   .entry{margin-bottom:28vh}
   .info{width:80vw;max-width:80vw;font-size:17px}
   .manifesto{width:88vw;font-size:28px}
@@ -117,13 +130,12 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 </head>
 <body>
 
-<a class="wordmark" href="#/selected">FATI ARCHITECTS</a>
+<a class="wordmark" href="#/selected">FATIMA CASTRO</a>
 <a class="about-link" href="#/about">About</a>
-<nav class="nav" aria-label="Collections">
+<nav class="nav" aria-label="Sections">
   <a href="#/selected">Selected</a>
-  <a href="#/buildings">Buildings</a>
-  <a href="#/objects">Objects</a>
-  <a href="#/rooms">Rooms</a>
+  <a href="#/portfolio">Portfolio</a>
+  <a href="#/experience">Experience</a>
 </nav>
 <a class="ig" href="https://www.instagram.com" target="_blank" rel="noopener" aria-label="Instagram">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -153,7 +165,7 @@ const PROJECTS = [
     subtitle: 'A Long Roof Against the Weather',
     medium: 'photograph',
     awards: ['Award, AIA Michigan Honor 2024', 'Award, Small Practice Citation 2021'],
-    collections: ['selected', 'buildings'],
+    collections: ['selected'],
     info: { date: '2017-2024', client: 'Undisclosed', location: 'Leelanau County, Michigan',
             type: 'Residence', status: 'Complete', aor: 'Field Office Architects',
             builder: 'North Shore Builders', photography: 'Studio archive' },
@@ -165,7 +177,7 @@ const PROJECTS = [
     subtitle: 'Seven Cuts Through a Slow Slope',
     medium: 'section drawing',
     awards: ['Award, Drawing of the Year Shortlist 2023'],
-    collections: ['selected', 'buildings'],
+    collections: ['selected'],
     info: { date: '2018-Ongoing', client: '', location: 'Driftless Region, Wisconsin',
             type: 'Terraced House', status: 'Ongoing', aor: 'Field Office Architects',
             builder: '', photography: '' },
@@ -177,7 +189,7 @@ const PROJECTS = [
     subtitle: 'One Window, Held Open All Day',
     medium: 'photograph',
     awards: [],
-    collections: ['selected', 'rooms'],
+    collections: ['selected'],
     info: { date: '2021-2023', client: 'Private', location: 'Ann Arbor, Michigan',
             type: 'Interior', status: 'Complete', aor: '',
             builder: 'Meridian Joinery', photography: 'Studio archive' },
@@ -189,7 +201,7 @@ const PROJECTS = [
     subtitle: 'Furniture for Counting and Keeping',
     medium: 'photograph',
     awards: ['Award, Object Prize 2024'],
-    collections: ['selected', 'objects'],
+    collections: ['selected'],
     info: { date: '2024', client: 'Undisclosed', location: '',
             type: 'Furniture', status: 'Complete', aor: '',
             builder: 'Studio workshop', photography: 'Studio archive' },
@@ -201,7 +213,7 @@ const PROJECTS = [
     subtitle: 'A Cold Room for Warm Voices',
     medium: 'photograph',
     awards: ['Award, Sacred Space Medal 2022', 'Award, Timber Construction Citation 2023'],
-    collections: ['selected', 'buildings', 'rooms'],
+    collections: ['selected'],
     info: { date: '2019-2022', client: '', location: 'Door County, Wisconsin',
             type: 'Chapel', status: 'Complete', aor: 'Field Office Architects',
             builder: 'Peninsula Timberworks', photography: 'Studio archive' },
@@ -213,7 +225,7 @@ const PROJECTS = [
     subtitle: 'Low Fidelity Entasis',
     medium: 'drawing',
     awards: [],
-    collections: ['selected', 'objects'],
+    collections: [],
     info: { date: '2020', client: '', location: '',
             type: 'Speculative Study', status: 'Study', aor: '',
             builder: '', photography: '' },
@@ -221,11 +233,33 @@ const PROJECTS = [
   }
 ];
 
-const MANIFESTO = 'Fati Architects is a small studio working between building, drawing, and repair. We begin with what a place already holds — its weather, its debris, its habits of light — and we build slowly from there. We prefer one good room to many adequate ones, a long roof to a tall wall, the measured drawing to the rendering. Our work is finished by the people who live in it and by the seasons that pass over it. We keep the studio small on purpose, taking few projects and staying with each of them for years, from first survey to final photograph.';
+/* PLACEHOLDER — replace with Fatima's own words. Deliberately left as
+   an unfilled statement rather than invented biography. */
+const MANIFESTO = 'Fatima Castro is a [discipline] working in [place]. [Replace this paragraph with your own statement — what the work is about, how it is made, and who it is for. Roughly ninety to a hundred and ten words reads best at this size, breaking across five or six ragged lines.]';
+
+/* PLACEHOLDER — every field here is a blank to fill in. Groups render
+   in order; add, remove or rename them freely. */
+const EXPERIENCE = [
+  { title: 'Practice', entries: [
+    { period: '2024-Present', role: '[Role]', org: '[Organization], [City]',
+      note: '[One or two lines on the work itself.]' },
+    { period: '2022-2024', role: '[Role]', org: '[Organization], [City]', note: '' },
+    { period: '2021-2022', role: '[Role]', org: '[Organization], [City]', note: '' }
+  ]},
+  { title: 'Education', entries: [
+    { period: '[Year]-[Year]', role: '[Degree]', org: '[Institution], [City]', note: '' }
+  ]},
+  { title: 'Exhibitions & Recognition', entries: [
+    { period: '[Year]', role: '[Title of work or award]', org: '[Venue or awarding body], [City]', note: '' }
+  ]}
+];
 
 /* Each collection's feed is derived from PROJECTS, in declaration order. */
-const COLLECTIONS = { selected: [], buildings: [], objects: [], rooms: [] };
-for (const p of PROJECTS) for (const c of p.collections) if (COLLECTIONS[c]) COLLECTIONS[c].push(p.id);
+const COLLECTIONS = { selected: [], portfolio: [] };
+for (const p of PROJECTS) {
+  COLLECTIONS.portfolio.push(p.id);                      /* Portfolio is the full body of work */
+  if (p.collections.includes('selected')) COLLECTIONS.selected.push(p.id);   /* Selected is the curated cut */
+}
 const BY_ID = Object.fromEntries(PROJECTS.map(p => [p.id, p]));
 
 const INFO_FIELDS = [
@@ -347,7 +381,7 @@ function shot(p,i){const v=p.images[i];return typeof v==='string'?{src:v,w:0,h:0
 /* ================================================================
    Routing and rendering
    ================================================================ */
-const ROUTES=['selected','buildings','objects','rooms','about'];
+const ROUTES=['selected','portfolio','experience','about'];
 const ARROW_L='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="21" y1="12" x2="4" y2="12"/><polyline points="10.5,5.5 4,12 10.5,18.5"/></svg>';
 const ARROW_R='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="3" y1="12" x2="20" y2="12"/><polyline points="13.5,5.5 20,12 13.5,18.5"/></svg>';
 let current=null;
@@ -370,11 +404,29 @@ function updateChrome(){
   document.querySelector('.about-link').classList.toggle('active',current==='about');
 }
 
+function experienceHTML(){
+  return `<div class="experience">` + EXPERIENCE.map(g =>
+      `<section class="xp-group">`
+    +   `<div class="xp-group-title">${g.title}</div>`
+    +   g.entries.map(e =>
+          `<div class="xp">`
+        +   `<div>${e.period}</div>`
+        +   `<div class="xp-role">${e.role}</div>`
+        +   `<div>${e.org}</div>`
+        +   (e.note ? `<p class="xp-note">${e.note}</p>` : '')
+        + `</div>`).join('')
+    + `</section>`).join('') + `</div>`;
+}
+
 function render(){
   document.documentElement.classList.toggle('about',current==='about');
   updateChrome();
   if(current==='about'){
     main.innerHTML=`<div class="about-wrap"><p class="manifesto">${MANIFESTO}</p></div>`;
+    return;
+  }
+  if(current==='experience'){
+    main.innerHTML=experienceHTML();
     return;
   }
   let html='';
@@ -455,7 +507,7 @@ main.addEventListener('click',e=>{
 
 /* Arrow keys drive whichever project is nearest the middle of the screen. */
 addEventListener('keydown',e=>{
-  if(current==='about') return;
+  if(current==='about'||current==='experience') return;
   if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
   const mid=innerHeight/2;
   let best=null,bestD=Infinity;
