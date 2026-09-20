@@ -101,7 +101,11 @@ figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
 /* ---- about ---- */
 html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-wrap{min-height:100vh;display:grid;place-items:center;box-sizing:border-box;padding:14vh 0}
-.manifesto{width:60vw;margin:0;font-size:clamp(26px,2.9vw,44px);line-height:1.3;text-align:center}
+.about-col{width:60vw;margin:0 auto;text-align:center}
+.about-lead{font-size:clamp(25px,2.7vw,40px);line-height:1.25;margin:0 0 1.4em}
+.about-col p{font-size:clamp(18px,1.5vw,23px);line-height:1.55;margin:0 0 1.55em}
+.about-col p:last-of-type{margin-bottom:0}
+.about-facts{margin-top:3.4em;font-size:clamp(16px,1.3vw,20px);line-height:1.7}
 
 @media (prefers-reduced-motion:reduce){.frame img{transition:none}}
 
@@ -124,7 +128,7 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .xp-note{width:80vw;max-width:80vw;font-size:17px}
   .entry{margin-bottom:28vh}
   .info{width:80vw;max-width:80vw;font-size:17px}
-  .manifesto{width:88vw}
+  .about-col{width:88vw}
 }
 </style>
 </head>
@@ -266,7 +270,16 @@ const PROJECTS = [
   }
 ];
 
-const MANIFESTO = "I'm Fati. I studied Environmental Design at Texas A&M \u2014 gig 'em \u2014 and I'm finishing a Master of Architecture at Rice, in Houston. I've drawn commercial work at Perkins Eastman in Dallas, volunteered with Habitat for Humanity in Bryan, and taught at Kyushu University's winter school. At A&M I chaired Freedom by Design for the AIAS. I think architecture is a technical discipline and a tool for social good at once, and I'd rather show that than argue it. I run most mornings. I live with a cat named Cider.";
+const ABOUT = {
+  lead: 'M.Arch Rice Candidate',
+  paragraphs: [
+    "During my internship at Perkins Eastman in Dallas, I developed skills in AutoCAD and Enscape while working on diverse commercial projects. This experience taught me the importance of technical precision and collaborative design processes in professional practice.",
+    "My volunteer work as a Support Assistant with Habitat for Humanity in Bryan, Texas, provided meaningful exposure to residential construction and community-focused design. Additionally, serving as a Teaching Assistant at Kyushu University's LSPA Winter School expanded my perspective on international design approaches and educational methodologies.",
+    "At Texas A&M University, I served as Freedom by Design Chair and Marketing Officer for the American Institute of Architecture Students, where I led initiatives connecting design students with community service projects and developed communication strategies for student engagement.",
+    "These experiences have shaped my understanding of architecture as both a technical discipline and a tool for positive social impact, informing my current studies as I pursue my Master of Architecture at Rice University."
+  ],
+  facts: [['Education','Rice'],['Experience','Perkins Eastman'],['Focus','Environmental'],['Location','Houston']]
+};
 
 /* Drawn from the About and Contact pages of fatima-castro-portfolio.
    Dates that repo did not record are left as [Year] to be filled in
@@ -473,7 +486,11 @@ function render(){
   document.documentElement.classList.toggle('about',current==='about');
   updateChrome();
   if(current==='about'){
-    main.innerHTML=`<div class="about-wrap"><p class="manifesto">${MANIFESTO}</p></div>`;
+    main.innerHTML=`<div class="about-wrap"><div class="about-col">`
+      + `<div class="about-lead">${ABOUT.lead}</div>`
+      + ABOUT.paragraphs.map(t=>`<p>${t}</p>`).join('')
+      + `<div class="about-facts">${ABOUT.facts.map(([k,v])=>`<div>${k}: ${v}</div>`).join('')}</div>`
+      + `</div></div>`;
     return;
   }
   if(current==='experience'){
