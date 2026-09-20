@@ -65,11 +65,13 @@ a:hover,a:focus-visible,
 .entry{margin:0 0 45vh}
 .entry:last-child{margin-bottom:0}
 
+.stage{position:relative;width:100%}
 .frame{position:relative;margin:0 auto}
 .frame img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .4s ease}
 .frame img.loaded{opacity:1}
 
-/* carousel arrows — appear on hover, just outside the image */
+/* carousel arrows — appear on hover, pinned just outside the column
+   (the widest a frame can be), so they never move between images */
 .arrow{
   position:absolute;top:0;bottom:0;width:calc(50% + 72px);
   display:flex;align-items:center;
@@ -501,8 +503,10 @@ function render(){
   for(const pid of COLLECTIONS[current]){
     const p=BY_ID[pid], total=p.images.length, s=shot(p,0);
     html+=`<figure class="entry" data-pid="${pid}" data-i="0">`
-        + `<div class="frame">`
-        +   `<img src="${s.src}" data-w="${s.w}" data-h="${s.h}" loading="lazy" alt="${p.name} — ${p.medium} 1 of ${total}">`
+        + `<div class="stage">`
+        +   `<div class="frame">`
+        +     `<img src="${s.src}" data-w="${s.w}" data-h="${s.h}" loading="lazy" alt="${p.name} — ${p.medium} 1 of ${total}">`
+        +   `</div>`
         +   (total>1
               ? `<button class="arrow prev" type="button" aria-label="Previous image of ${p.name}">${ARROW_L}</button>`
                 + `<button class="arrow next" type="button" aria-label="Next image of ${p.name}">${ARROW_R}</button>`
