@@ -530,19 +530,25 @@ function render(){
   });
 }
 
-/* Every image on the page is given the SAME height, so a project's
-   varying aspect ratios change only the width and nothing below the
-   image ever shifts. The frame hugs the painted image, which also
-   keeps the arrows on its real edges rather than the column's. */
-const FRAME_H = { wide: 0.52, narrow: 0.34 };   /* fraction of viewport height */
+/* Every image is given the SAME height and is never allowed past the
+   column's width, so nothing below the image shifts as a project's
+   carousel advances and nothing can overflow the centred column.
+   (An explicit width wider than its container cannot be centred by
+   `margin: 0 auto` — the auto margins resolve to zero and the box
+   spills to one side, which is why the cap matters here.)
+   The height is set so a 3:2 frame fills the column exactly; only
+   genuinely panoramic images give back a little height to stay
+   inside it. */
+const FRAME_H = { wide: 0.49, narrow: 0.32 };   /* fraction of viewport height */
 function sizeFrame(entry){
   const img=entry.querySelector('img');
   const frame=entry.querySelector('.frame');
   const nw=+img.dataset.w||img.naturalWidth;
   const nh=+img.dataset.h||img.naturalHeight;
   if(!nw||!nh){frame.style.width='';frame.style.height='';return}
+  const colW=entry.clientWidth||main.clientWidth;
   const h=Math.round(innerHeight*(innerWidth<=900?FRAME_H.narrow:FRAME_H.wide));
-  const w=Math.min(Math.round(nw*h/nh),Math.round(innerWidth*0.92));
+  const w=Math.min(Math.round(nw*h/nh),colW);
   frame.style.height=h+'px';
   frame.style.width=w+'px';
 }
