@@ -5,20 +5,21 @@
 <title>Fati Architects</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="description" content="Fati Architects — a small studio working between building, drawing, and repair. Selected buildings, objects, and rooms.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
 <style>
-html{scroll-behavior:auto}
+:root{--bg:#FCFBF9;--fg:#111111}
+html.about{--bg:#080808;--fg:#F5F3EF}
+html{background:var(--bg);scroll-behavior:auto}
 html,body{margin:0;padding:0}
 body{
-  background:#FCFBF9;
-  color:#111111;
+  background:var(--bg);
+  color:var(--fg);
   font-family:"EB Garamond","Adobe Garamond Pro",Garamond,Georgia,serif;
-  font-weight:400;
+  font-weight:500;
   font-variant-numeric:oldstyle-nums;
   font-feature-settings:"onum" 1,"liga" 1;
   -webkit-font-smoothing:antialiased;
 }
-body.about{background:#080808;color:#F5F3EF}
 [hidden]{display:none!important}
 img{max-width:100%}
 
@@ -61,23 +62,40 @@ a:hover,a:focus-visible,
 }
 .ig svg{width:26px;height:26px;display:block}
 
-/* ---- image column ---- */
-#main{width:46vw;max-width:1040px;min-width:520px;margin:0 auto;padding:22vh 0 45vh}
-.entry{margin:0 0 50vh}
+/* ---- the column: one entry per project ---- */
+#main{width:46vw;max-width:1040px;min-width:520px;margin:0 auto;padding:18vh 0 42vh}
+.entry{margin:0 0 45vh}
 .entry:last-child{margin-bottom:0}
-.entry img{display:block;width:100%;height:auto;max-height:78vh;object-fit:contain;opacity:0;transition:opacity .4s ease}
-.entry img.loaded{opacity:1}
+
+.frame{position:relative;margin:0 auto}
+.frame img{display:block;width:100%;height:auto;opacity:0;transition:opacity .4s ease}
+.frame img.loaded{opacity:1}
+
+/* carousel arrows — appear on hover, just outside the image */
+.arrow{
+  position:absolute;top:0;bottom:0;width:calc(50% + 72px);
+  display:flex;align-items:center;
+  background:none;border:0;margin:0;padding:0;
+  color:inherit;cursor:pointer;opacity:0;transition:opacity 80ms linear;
+}
+.arrow.prev{left:-72px;justify-content:flex-start;padding-left:18px}
+.arrow.next{right:-72px;justify-content:flex-end;padding-right:18px}
+.arrow:hover,.arrow:focus-visible{opacity:1;transition-duration:80ms}
+.arrow:not(:hover){transition-duration:0s}
+.arrow svg{width:22px;height:22px;display:block}
+.arrow:focus-visible{outline:none}
+
 figcaption{margin-top:26px;text-align:center;font-size:19px;line-height:1.42}
 .cap-name,.cap-award{font-style:italic}
-.cap-meta{margin-top:1.42em}
+.awards{margin-top:1.42em}
 .info{margin:.2em auto 0;width:30vw;max-width:30vw;font-size:17px;line-height:1.5}
 
 /* ---- about ---- */
-body.about #main{width:auto;max-width:none;min-width:0;padding:0}
+html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-wrap{min-height:100vh;display:grid;place-items:center;box-sizing:border-box;padding:14vh 0}
 .manifesto{width:60vw;margin:0;font-size:48px;line-height:1.3;text-align:center}
 
-@media (prefers-reduced-motion:reduce){.entry img{transition:none}}
+@media (prefers-reduced-motion:reduce){.frame img{transition:none}}
 
 /* ---- below 900px ---- */
 @media (max-width:900px){
@@ -89,6 +107,9 @@ body.about #main{width:auto;max-width:none;min-width:0;padding:0}
        left:calc(20px + env(safe-area-inset-left,0px));
        bottom:calc(62px + env(safe-area-inset-bottom,0px))}
   .ig{right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  .arrow{width:50%}
+  .arrow.prev{left:0;padding-left:10px}
+  .arrow.next{right:0;padding-right:10px}
   figcaption{font-size:16px}
   .entry{margin-bottom:28vh}
   .info{width:80vw;max-width:80vw;font-size:15px}
@@ -114,14 +135,18 @@ body.about #main{width:auto;max-width:none;min-width:0;padding:0}
   </svg>
 </a>
 
-<main id="main" class="col"></main>
+<main id="main"></main>
 
 <script>
 /* ================================================================
-   DATA — edit projects here. `images` is any array of URLs; the
-   placeholderImages() call generates deterministic inline SVG
-   placeholders (a seeded, self-contained "placeholder service"),
-   so swapping in real photographs is just replacing the arrays.
+   DATA — edit projects here.
+   Each project is ONE slot in the vertical feed; its images are a
+   horizontal carousel inside that slot. The caption counter reads
+   "{n} of {images.length}" and restarts at the next project.
+
+   `images` accepts either a plain URL string or {src, w, h}. Giving
+   w/h lets the frame size itself before the image loads (no reflow);
+   plain strings fall back to the image's natural size on load.
    ================================================================ */
 const PROJECTS = [
   {
@@ -129,7 +154,7 @@ const PROJECTS = [
     name: 'Kestrel House',
     subtitle: 'A Long Roof Against the Weather',
     medium: 'photograph',
-    awards: ['Award, AIA Michigan Honor 2024'],
+    awards: ['Award, AIA Michigan Honor 2024', 'Award, Small Practice Citation 2021'],
     collections: ['selected', 'buildings'],
     info: { date: '2017-2024', client: 'Undisclosed', location: 'Leelanau County, Michigan',
             type: 'Residence', status: 'Complete', aor: 'Field Office Architects',
@@ -185,16 +210,16 @@ const PROJECTS = [
     images: placeholderImages('salt-chapel', 29, 'photo-wide')
   },
   {
-    id: 'unbuilt-studies',
-    name: 'Unbuilt Studies',
-    subtitle: 'Plans for Houses Nobody Asked For',
+    id: 'standing-figures',
+    name: 'Standing Figures',
+    subtitle: 'Low Fidelity Entasis',
     medium: 'drawing',
     awards: [],
     collections: ['selected', 'objects'],
     info: { date: '2020', client: '', location: '',
             type: 'Speculative Study', status: 'Study', aor: '',
             builder: '', photography: '' },
-    images: placeholderImages('unbuilt-studies', 20, 'drawing')
+    images: placeholderImages('standing-figures', 6, 'drawing')
   }
 ];
 
@@ -254,7 +279,7 @@ function photoSVG(id,i,kind){
   }
   s+=`<rect y="${horizon-1}" width="${W}" height="2" fill="${g(40)}" opacity="0.5"/>`;
   s+='</svg>';
-  return svgURI(s);
+  return {src:svgURI(s),w:W,h:H};
 }
 
 /* Black line drawings — plan/section style, transparent ground. */
@@ -315,13 +340,18 @@ function drawingSVG(id,i){
     for(const y of [top,ground]) s+=`<line x1="${tx-7}" y1="${y+7}" x2="${tx+7}" y2="${y-7}" stroke-width="1.2"/>`;
   }
   s+='</g></svg>';
-  return svgURI(s);
+  return {src:svgURI(s),w:W,h:H};
 }
+
+/* Accept either 'url' or {src,w,h} in the data. */
+function shot(p,i){const v=p.images[i];return typeof v==='string'?{src:v,w:0,h:0}:v}
 
 /* ================================================================
    Routing and rendering
    ================================================================ */
 const ROUTES=['selected','buildings','objects','rooms','about'];
+const ARROW_L='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="21" y1="12" x2="4" y2="12"/><polyline points="10.5,5.5 4,12 10.5,18.5"/></svg>';
+const ARROW_R='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="3" y1="12" x2="20" y2="12"/><polyline points="13.5,5.5 20,12 13.5,18.5"/></svg>';
 let current=null;
 const main=document.getElementById('main');
 
@@ -343,7 +373,7 @@ function updateChrome(){
 }
 
 function render(){
-  document.body.classList.toggle('about',current==='about');
+  document.documentElement.classList.toggle('about',current==='about');
   updateChrome();
   if(current==='about'){
     main.innerHTML=`<div class="about-wrap"><p class="manifesto">${MANIFESTO}</p></div>`;
@@ -351,52 +381,107 @@ function render(){
   }
   let html='';
   for(const pid of COLLECTIONS[current]){
-    const p=BY_ID[pid], total=p.images.length;
-    p.images.forEach((src,i)=>{
-      html+=`<figure class="entry">`
-          + `<img src="${src}" loading="lazy" alt="${p.name} — ${p.medium} ${i+1} of ${total}">`
-          + `<figcaption>`
-          +   `<div>${i+1} of ${total}</div>`
-          +   `<div class="cap-name">${p.name}</div>`
-          +   `<div>${p.subtitle}</div>`
-          +   `<div class="cap-meta">`
-          +     p.awards.map(a=>`<div class="cap-award">${a}</div>`).join('')
-          +     `<button class="info-toggle" type="button" aria-expanded="false">Info</button>`
-          +     `<div class="info" hidden>${infoLines(p)}</div>`
-          +   `</div>`
-          + `</figcaption>`
-          + `</figure>`;
-    });
+    const p=BY_ID[pid], total=p.images.length, s=shot(p,0);
+    html+=`<figure class="entry" data-pid="${pid}" data-i="0">`
+        + `<div class="frame">`
+        +   `<img src="${s.src}" data-w="${s.w}" data-h="${s.h}" loading="lazy" alt="${p.name} — ${p.medium} 1 of ${total}">`
+        +   (total>1
+              ? `<button class="arrow prev" type="button" aria-label="Previous image of ${p.name}">${ARROW_L}</button>`
+                + `<button class="arrow next" type="button" aria-label="Next image of ${p.name}">${ARROW_R}</button>`
+              : '')
+        + `</div>`
+        + `<figcaption>`
+        +   `<div class="counter">1 of ${total}</div>`
+        +   `<div class="cap-name">${p.name}</div>`
+        +   `<div>${p.subtitle}</div>`
+        +   (p.awards.length
+              ? `<div class="awards">${p.awards.map(a=>`<div class="cap-award">${a}</div>`).join('')}</div>`
+              : '')
+        +   `<div><button class="info-toggle" type="button" aria-expanded="false">Info</button></div>`
+        +   `<div class="info" hidden>${infoLines(p)}</div>`
+        + `</figcaption>`
+        + `</figure>`;
   }
   main.innerHTML=html;
-  main.querySelectorAll('img').forEach(img=>{
+  main.querySelectorAll('.entry').forEach(entry=>{
+    sizeFrame(entry);
+    const img=entry.querySelector('img');
     const done=()=>img.classList.add('loaded');
     if(img.complete&&img.naturalWidth) requestAnimationFrame(done);
     else img.addEventListener('load',()=>{(img.decode?img.decode().catch(()=>{}):Promise.resolve()).then(done)},{once:true});
   });
 }
 
-/* Info expands in place, instantly. */
+/* The frame hugs the painted image, so the arrows sit just outside
+   its real edges rather than the column's. */
+function sizeFrame(entry){
+  const img=entry.querySelector('img');
+  const frame=entry.querySelector('.frame');
+  const nw=+img.dataset.w||img.naturalWidth;
+  const nh=+img.dataset.h||img.naturalHeight;
+  if(!nw||!nh){frame.style.width='';return}
+  const colW=entry.clientWidth||main.clientWidth;
+  const scale=Math.min(colW/nw,(window.innerHeight*0.78)/nh);
+  frame.style.width=Math.round(nw*scale)+'px';
+}
+
+/* Move within one project's carousel; the counter is scoped to it. */
+function step(entry,delta){
+  const p=BY_ID[entry.dataset.pid], total=p.images.length;
+  const i=(+entry.dataset.i+delta+total)%total;
+  entry.dataset.i=i;
+  const s=shot(p,i), img=entry.querySelector('img');
+  img.dataset.w=s.w; img.dataset.h=s.h;
+  img.src=s.src;
+  img.alt=`${p.name} — ${p.medium} ${i+1} of ${total}`;
+  img.classList.add('loaded');
+  entry.querySelector('.counter').textContent=`${i+1} of ${total}`;
+  sizeFrame(entry);
+}
+
 main.addEventListener('click',e=>{
+  const arrow=e.target.closest('.arrow');
+  if(arrow){step(arrow.closest('.entry'),arrow.classList.contains('next')?1:-1);return}
   const btn=e.target.closest('.info-toggle');
   if(!btn) return;
-  const info=btn.nextElementSibling;
+  const info=btn.parentElement.nextElementSibling;
   const open=info.hidden;
   info.hidden=!open;
   btn.setAttribute('aria-expanded',String(open));
 });
 
+/* Arrow keys drive whichever project is nearest the middle of the screen. */
+addEventListener('keydown',e=>{
+  if(current==='about') return;
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
+  const mid=innerHeight/2;
+  let best=null,bestD=Infinity;
+  for(const entry of main.querySelectorAll('.entry')){
+    const r=entry.querySelector('.frame').getBoundingClientRect();
+    const d=Math.abs((r.top+r.bottom)/2-mid);
+    if(d<bestD){bestD=d;best=entry}
+  }
+  if(best){step(best,e.key==='ArrowRight'?1:-1);e.preventDefault()}
+});
+
+let resizeQueued=false;
+addEventListener('resize',()=>{
+  if(resizeQueued) return;
+  resizeQueued=true;
+  requestAnimationFrame(()=>{resizeQueued=false;main.querySelectorAll('.entry').forEach(sizeFrame)});
+});
+
 /* Re-clicking the active route (or the wordmark on it) jumps to top. */
 document.querySelectorAll('a[href^="#/"]').forEach(a=>{
   a.addEventListener('click',()=>{
-    if(a.getAttribute('href').slice(2)===current) window.scrollTo(0,0);
+    if(a.getAttribute('href').slice(2)===current) scrollTo(0,0);
   });
 });
 
-window.addEventListener('hashchange',()=>{
+addEventListener('hashchange',()=>{
   const r=routeFromHash();
   if(r!==current){current=r;render()}
-  window.scrollTo(0,0);
+  scrollTo(0,0);
 });
 
 if(!location.hash) history.replaceState(null,'','#/selected');
