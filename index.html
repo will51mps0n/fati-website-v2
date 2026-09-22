@@ -47,8 +47,16 @@ a:hover,a:focus-visible,
 
 /* ---- fixed chrome ---- */
 .wordmark,.about-link,.nav,.ig{position:fixed;z-index:10}
-/* the wordmark, the About link and the section nav; nothing else */
-.wordmark,.about-link,.nav{
+/* Helvetica Bold carries the titling: the fixed corners, the Experience
+   section headers, the About lead, and the portfolio's cover, contents and
+   project title pages. Body copy, figure captions, spread legends and
+   project metadata stay Garamond. Only a 700 face is supplied, so each of
+   these is set to 700 rather than inheriting the 550 body weight. */
+.wordmark,.about-link,.nav,
+.xp-group-title,
+.about-lead,
+.sp-sw,.sp-ctitle,.sp-cnum,.sp-centry,
+.sp-h1,.sp-num,.sp-sub{
   font-family:"Helvetica","Helvetica Neue",Arial,sans-serif;
   font-weight:700;
   font-variant-numeric:normal;
