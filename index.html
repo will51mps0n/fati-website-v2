@@ -62,13 +62,11 @@ a:hover,a:focus-visible,
 
 /* ---- fixed chrome ---- */
 .wordmark,.about-link,.nav,.ig{position:fixed;z-index:10}
-/* Helvetica Bold carries the titling: the fixed corners, the Experience
-   section headers, the About lead, and the portfolio's cover, contents and
-   project title pages. Body copy, figure captions, spread legends and
-   project metadata stay Garamond. Only a 700 face is supplied, so each of
-   these is set to 700 rather than inheriting the 550 body weight. */
+/* Helvetica Bold carries the fixed corners and the portfolio's cover,
+   contents and project title pages. Everything else the reader reads stays
+   Garamond. Only a 700 face is supplied, so each of these is set to 700
+   rather than inheriting the 550 body weight. */
 .wordmark,.about-link,.nav,
-.about-h,
 .sp-sw,.sp-ctitle,.sp-cnum,.sp-centry,
 .sp-h1,.sp-num,.sp-sub{
   font-family:"Helvetica","Helvetica Neue",Arial,sans-serif;
@@ -125,9 +123,9 @@ a:hover,a:focus-visible,
 .arrow svg{width:22px;height:22px;display:block}
 .arrow:focus-visible{outline:none}
 
-figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
+figcaption{margin-top:26px;text-align:center;font-size:20px;line-height:1.26}
 .cap-name{font-style:italic}
-.info{margin:1.42em auto;width:30vw;max-width:30vw;font-size:20px;line-height:1.5}
+.info{margin:.85em auto 0;width:30vw;max-width:30vw;font-size:18px;line-height:1.34}
 
 /* ---- Portfolio: composed two-page spreads, laid out like the book ---- */
 .pf-cover{margin:0 auto 16vh}
@@ -168,11 +166,11 @@ figcaption{margin-top:26px;text-align:center;font-size:22px;line-height:1.42}
 .sp-legend-t{font-style:italic;margin-bottom:.55em}
 
 /* ---- Experience: text only, same centred column ---- */
-.experience{text-align:center;font-size:22px;line-height:1.42}
-.xp-group{margin-bottom:7vh}
+.experience{text-align:center;font-size:20px;line-height:1.26}
+.xp-group{margin-bottom:5vh}
 .xp-group:last-child{margin-bottom:0}
-.xp-group-title{font-style:italic;font-weight:700;font-size:1.14em;margin-bottom:1.8em}
-.xp{margin-bottom:2em}
+.xp-group-title{font-style:italic;font-weight:700;font-size:1.25em;margin-bottom:1.25em}
+.xp{margin-bottom:1.45em}
 .xp:last-child{margin-bottom:0}
 .xp-role{font-style:italic}
 
@@ -191,11 +189,12 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 /* the page is meant to be read at a glance, so the type and the rhythm
    answer to the window's height as well as its width: min() lets a short
    window shrink them where a vw-only clamp could not */
-.about-sec + .about-sec{margin-top:clamp(1.1em,3.1vh,2.2em)}
-.about-h{font-size:clamp(15px,min(1.45vw,2.3vh),25px);line-height:1.25;margin:0 0 .55em}
-.about-col p{font-size:clamp(14px,min(1.3vw,2.05vh),23px);line-height:1.45;margin:0 0 .85em}
+.about-sec + .about-sec{margin-top:clamp(1em,2.6vh,1.9em)}
+.about-h{font-style:italic;font-weight:700;
+  font-size:clamp(15px,min(1.45vw,2.3vh),25px);line-height:1.2;margin:0 0 .45em}
+.about-col p{font-size:clamp(13px,min(1.2vw,1.88vh),21px);line-height:1.3;margin:0 0 .7em}
 .about-col p:last-of-type{margin-bottom:0}
-.about-list{font-size:clamp(12px,min(1.1vw,1.72vh),20px);line-height:1.52}
+.about-list{font-size:clamp(11px,min(1vw,1.56vh),18px);line-height:1.36}
 
 @media (prefers-reduced-motion:reduce){.frame img,.pf-fig img{transition:none}}
 
@@ -215,15 +214,16 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .arrow{width:50%}
   .arrow.prev{left:0;padding-left:10px}
   .arrow.next{right:0;padding-right:10px}
-  figcaption,.pf-cap{font-size:19px}
+  figcaption{font-size:17px}
+  .pf-cap{font-size:19px}
   .entry{margin-bottom:28vh}
-  .info{width:80vw;max-width:80vw;font-size:17px}
+  .info{width:80vw;max-width:80vw;font-size:15px}
   html.portfolio #main{padding:12vh 2vw 14vh}
   .spread{margin-bottom:6vh;gap:4vh}
   .pf-cover{margin-bottom:12vh}
   .pf-cover figcaption{font-size:19px}
-  .experience{font-size:19px}
-  .xp-group{margin-bottom:6vh}
+  .experience{font-size:17px}
+  .xp-group{margin-bottom:4.5vh}
   .about-col{width:88vw}
 }
 
