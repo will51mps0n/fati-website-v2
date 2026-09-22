@@ -502,7 +502,10 @@ function render(){
   if(current==='about')      { main.innerHTML = aboutHTML();      return; }
   if(current==='experience') { main.innerHTML = experienceHTML(); return; }
   main.innerHTML = current==='portfolio' ? portfolioHTML() : carouselHTML(current);
-  main.querySelectorAll('.entry').forEach(entry => { sizeFrame(entry); fadeIn(entry.querySelector('img')); });
+  main.querySelectorAll('.entry').forEach(entry => {
+    sizeFrame(entry); fadeIn(entry.querySelector('img'));
+    entry.addEventListener('pointerenter', () => preloadAround(entry));
+  });
   main.querySelectorAll('.sp-img').forEach(fadeIn);
   watchDarkPages();
 }
@@ -529,17 +532,58 @@ function sizeFrame(entry){
   img.style.transform = sc ? `scale(${sc})` : '';
 }
 
+/* Advancing used to point the img at the next file and resize the frame in
+   the same breath. The browser keeps painting the old picture until the new
+   one decodes, so for that stretch the old image sat letterboxed inside a
+   frame cut for the new one, then snapped: the small-then-jolt. And with
+   nothing fetched ahead, every click waited on the network.
+
+   So: neighbours are warmed in the background, and the frame and the
+   picture change together, once the file can actually be painted. */
+const warmed = new Set();
+function warm(src){
+  if(!src || warmed.has(src)) return;
+  warmed.add(src);
+  new Image().src = src;
+}
+function preloadAround(entry){
+  const p = BY_ID[entry.dataset.pid], total = p.peek.length;
+  if(total < 2) return;
+  const i = +entry.dataset.i;
+  warm(IMG[p.peek[(i+1) % total]].src);          // where they are going
+  warm(IMG[p.peek[(i+2) % total]].src);          // and the one after, for a quick second click
+  warm(IMG[p.peek[(i-1+total) % total]].src);    // and back, once
+}
+
 function step(entry, delta){
   const p = BY_ID[entry.dataset.pid], total = p.peek.length;
   const i = (+entry.dataset.i + delta + total) % total;
   entry.dataset.i = i;
   const s = IMG[p.peek[i]], img = entry.querySelector('img');
-  img.dataset.w = s.w; img.dataset.h = s.h;
-  img.src = s.src;
-  img.alt = `${p.name}, image ${i+1} of ${total}`;
-  img.classList.add('loaded');
+
+  /* the counter answers at once, so the click never feels dropped */
   entry.querySelector('.counter').textContent = `${i+1} of ${total}`;
-  sizeFrame(entry);
+  img.alt = `${p.name}, image ${i+1} of ${total}`;
+
+  const token = entry._step = (entry._step || 0) + 1;
+  const show = () => {
+    if(entry._step !== token) return;   // a later click already won
+    img.dataset.w = s.w; img.dataset.h = s.h;
+    img.src = s.src;
+    img.classList.add('loaded');
+    sizeFrame(entry);
+    preloadAround(entry);
+  };
+  /* drop the loader the last click started: assigning src on the img used
+     to cancel it for free, and without this nine quick clicks would leave
+     nine files racing for the same pipe and the newest arriving last */
+  if(entry._pre){ entry._pre.onload = entry._pre.onerror = null; entry._pre.src = ''; }
+  warmed.add(s.src);
+  const pre = entry._pre = new Image();
+  pre.src = s.src;
+  if(pre.decode) pre.decode().then(show, show);
+  else if(pre.complete) show();
+  else { pre.onload = show; pre.onerror = show; }
 }
 
 main.addEventListener('click', e => {
