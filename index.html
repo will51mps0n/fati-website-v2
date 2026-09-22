@@ -234,6 +234,12 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .wordmark,.about-link{font-size:22px}
 }
 </style>
+<!-- GoatCounter. no_onload because every section of this site is one page
+     with a different fragment, so the counter would only ever see the first:
+     the router reports each route itself, below. Cookieless, so no banner. -->
+<script>window.goatcounter = {no_onload:true};</script>
+<script id="goatcounter" data-goatcounter="https://fatimacastro.goatcounter.com/count"
+        async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -572,9 +578,32 @@ document.querySelectorAll('a[href^="#/"]').forEach(a => {
   a.addEventListener('click', () => { if(a.getAttribute('href').slice(2)===current) scrollTo(0,0); });
 });
 
+/* Each route counts as its own page, under a clean path rather than the
+   raw fragment, so the dashboard reads /portfolio and not /#/portfolio.
+   The counter loads async and may be blocked outright, so a view raised
+   before it arrives waits here, and nothing on the page depends on it. */
+const GC_PATH = {projects:'/', installations:'/installations',
+                 portfolio:'/portfolio', experience:'/experience', about:'/about'};
+let gcPending = null, gcLast = null;
+function countView(){
+  const path = GC_PATH[current] || '/';
+  if(path === gcLast) return;
+  gcLast = path;
+  try{
+    if(window.goatcounter && window.goatcounter.count) window.goatcounter.count({path});
+    else gcPending = path;
+  }catch(e){}
+}
+document.getElementById('goatcounter').addEventListener('load', () => {
+  if(!gcPending) return;
+  try{ window.goatcounter.count({path:gcPending}); }catch(e){}
+  gcPending = null;
+});
+
 addEventListener('hashchange', () => {
   const r = routeFromHash();
   if(r!==current){ current=r; render(); }
+  countView();
   scrollTo(0,0);
 });
 
@@ -587,6 +616,7 @@ function goHome(e){
   e.preventDefault();
   if(location.hash) history.pushState(null, '', bareURL());
   if(current !== 'projects'){ current = 'projects'; render(); }
+  countView();
   scrollTo(0,0);
 }
 document.querySelectorAll('a[href="#/projects"]')
@@ -596,6 +626,7 @@ if(location.hash && routeFromHash()==='projects')
   history.replaceState(null, '', bareURL());
 current = routeFromHash();
 render();
+countView();
 </script>
 
 </body>
