@@ -519,7 +519,22 @@ addEventListener('hashchange', () => {
   scrollTo(0,0);
 });
 
-if(!location.hash) history.replaceState(null,'','#/projects');
+/* Projects is the home route: it renders at the bare URL with no fragment,
+   so the site's address is fatimacastro.com rather than
+   fatimacastro.com/#/projects. An explicit #/projects still works, for
+   links already out in the world, and is normalised away on arrival. */
+const bareURL = () => location.pathname + location.search;
+function goHome(e){
+  e.preventDefault();
+  if(location.hash) history.pushState(null, '', bareURL());
+  if(current !== 'projects'){ current = 'projects'; render(); }
+  scrollTo(0,0);
+}
+document.querySelectorAll('a[href="#/projects"]')
+  .forEach(a => a.addEventListener('click', goHome));
+
+if(location.hash && routeFromHash()==='projects')
+  history.replaceState(null, '', bareURL());
 current = routeFromHash();
 render();
 </script>
