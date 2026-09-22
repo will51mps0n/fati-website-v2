@@ -7,8 +7,23 @@
 <meta name="description" content="Fatima Castro — projects, portfolio, and experience. Master of Architecture candidate, Rice University.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap">
 <style>
-:root{--bg:#FFFFFF;--fg:#111111}
+:root{--bg:#FFFFFF;--fg:#111111;
+  /* the pointer is a small dot in the page's own ink; pressing hollows it
+     out, which is the only moment the site answers a click */
+  --cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23111111'/%3E%3C/svg%3E") 10 10, auto;
+  --cur-down:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23FFFFFF' stroke='%23111111' stroke-width='1.25'/%3E%3C/svg%3E") 10 10, auto}
 html.about{--bg:#080808;--fg:#F5F3EF}
+/* wherever the ground turns dark, the dot inverts so it never disappears:
+   the whole About page, and the portfolio's black spreads, which already
+   flip the fixed corners by the same signal */
+html.about,html.on-dark{
+  --cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23F5F3EF'/%3E%3C/svg%3E") 10 10, auto;
+  --cur-down:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23080808' stroke='%23F5F3EF' stroke-width='1.25'/%3E%3C/svg%3E") 10 10, auto}
+/* the descendant selectors are needed: the browser's own sheet puts
+   pointer on links and default on buttons, which would beat inheritance
+   exactly where the pointer spends its time */
+html,html *{cursor:var(--cur)}
+html:active,html:active *{cursor:var(--cur-down)}
 html{background:var(--bg);scroll-behavior:auto}
 html,body{margin:0;padding:0}
 body{
@@ -35,7 +50,7 @@ img{max-width:100%}
 
 /* ---- the only affordance ---- */
 a{color:inherit;text-decoration:none}
-.info-toggle{font:inherit;font-variant-numeric:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.info-toggle{font:inherit;font-variant-numeric:inherit;color:inherit;background:none;border:0;padding:0}
 a:focus-visible,.info-toggle:focus-visible{outline:none}
 a:hover,a:focus-visible,
 .about-link.active,
@@ -101,7 +116,7 @@ a:hover,a:focus-visible,
   position:absolute;top:0;bottom:0;width:calc(50% + 72px);
   display:flex;align-items:center;
   background:none;border:0;margin:0;padding:0;
-  color:inherit;cursor:pointer;opacity:0;transition:opacity 80ms linear;
+  color:inherit;opacity:0;transition:opacity 80ms linear;
 }
 .arrow.prev{left:-72px;justify-content:flex-start;padding-left:18px}
 .arrow.next{right:-72px;justify-content:flex-end;padding-right:18px}
