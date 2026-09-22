@@ -401,7 +401,7 @@ function experienceHTML(){
           `<div class="xp">`
         +   `<div>${esc(e.period)}</div>`
         +   `<div class="xp-role">${esc(e.role)}</div>`
-        +   (e.minor ? `<div>${esc(e.minor)}</div>` : '')
+        +   (e.minor ? `<div class="xp-role">${esc(e.minor)}</div>` : '')
         +   `<div>${esc(e.org)}</div>`
         + `</div>`).join('')
     + `</section>`).join('')
