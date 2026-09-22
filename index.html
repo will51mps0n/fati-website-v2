@@ -20,6 +20,16 @@ body{
   font-feature-settings:"onum" 1,"liga" 1;
   -webkit-font-smoothing:antialiased;
 }
+/* Helvetica Bold, self-hosted and subset to Latin, for the fixed corners
+   only. The page text stays EB Garamond. */
+@font-face{
+  font-family:"Helvetica";
+  src:url("fonts/helvetica-bold.woff2") format("woff2");
+  font-weight:700;
+  font-style:normal;
+  font-display:swap;
+}
+
 [hidden]{display:none!important}
 img{max-width:100%}
 
@@ -37,6 +47,13 @@ a:hover,a:focus-visible,
 
 /* ---- fixed chrome ---- */
 .wordmark,.about-link,.nav,.ig{position:fixed;z-index:10}
+/* the wordmark, the About link and the section nav; nothing else */
+.wordmark,.about-link,.nav{
+  font-family:"Helvetica","Helvetica Neue",Arial,sans-serif;
+  font-weight:700;
+  font-variant-numeric:normal;
+  font-feature-settings:normal;
+}
 .wordmark{
   top:calc(34px + env(safe-area-inset-top,0px));
   left:calc(34px + env(safe-area-inset-left,0px));
@@ -181,6 +198,13 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
   .experience{font-size:19px}
   .xp-group{margin-bottom:6vh}
   .about-col{width:88vw}
+}
+
+/* Helvetica Bold sets wider than the Garamond it replaced, so on the
+   narrowest phones the wordmark and the About link need a step down to
+   stay off each other */
+@media (max-width:400px){
+  .wordmark,.about-link{font-size:22px}
 }
 </style>
 </head>
