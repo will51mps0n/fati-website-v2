@@ -184,12 +184,15 @@ html.on-dark .wordmark,html.on-dark .about-link,html.on-dark .nav a,html.on-dark
 /* ---- About ---- */
 html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-wrap{min-height:100vh;display:grid;place-items:center;box-sizing:border-box;
-  padding:clamp(28px,5vh,80px) 0}
-/* two columns: the writing takes two thirds, the portrait one. Both are
-   centred on the page's middle, and the portrait is capped against the
-   window's height as well as its column, so the page never scrolls. */
+  padding:clamp(28px,5vh,80px) clamp(40px,4vw,80px) clamp(28px,5vh,80px)
+          clamp(300px,17vw,344px)}
+/* two columns: the writing takes two thirds, the portrait one. The left
+   inset above keeps the pair in a corridor of its own, clear of the column
+   of links in the bottom corner, so no line of the writing ever runs back
+   under them. The portrait is capped against the window's height as well
+   as its column, so the page never scrolls. */
 .about-grid{display:grid;grid-template-columns:2fr 1fr;align-items:center;
-  gap:clamp(20px,3vw,60px);width:min(88vw,1580px);margin:0 auto}
+  gap:clamp(20px,3vw,60px);width:min(100%,1580px);margin:0 auto}
 .about-col{text-align:center;min-width:0}
 .about-portrait{margin:0;display:flex;justify-content:center;align-items:center}
 .about-portrait img{display:block;width:auto;height:auto;
@@ -205,6 +208,14 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-list{font-size:clamp(11px,min(1vw,1.56vh),18px);line-height:1.36}
 
 @media (prefers-reduced-motion:reduce){.frame img,.pf-fig img{transition:none}}
+
+/* ---- 901-1180px: the corridor still holds, but the portrait gives up
+   some of its share so the writing keeps a readable measure ---- */
+@media (max-width:1180px){
+  .about-wrap{padding:clamp(24px,4vh,64px) clamp(24px,2.5vw,40px)
+              clamp(24px,4vh,64px) 292px}
+  .about-grid{grid-template-columns:2.6fr 1fr;gap:clamp(16px,2vw,28px)}
+}
 
 /* ---- below 900px ---- */
 @media (max-width:900px){
