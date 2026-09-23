@@ -24,6 +24,13 @@ html.about,html.on-dark{
    exactly where the pointer spends its time */
 html,html *{cursor:var(--cur)}
 html:active,html:active *{cursor:var(--cur-down)}
+/* holding the mouse down on the About portrait swaps the dot for a spinning
+   cat. A GIF set as a CSS cursor only ever shows its first frame, so the cat
+   is a picture that follows the pointer while the dot is hidden */
+.cat-cursor{position:fixed;left:0;top:0;width:84px;height:84px;margin:-42px 0 0 -42px;
+  pointer-events:none;z-index:50;display:none}
+html.cat-on .cat-cursor{display:block}
+html.cat-on .about-portrait,html.cat-on .about-portrait *{cursor:none}
 /* selection: a quiet gray instead of the browser's blue. Light on the white
    pages, a dark gray on the black About page so it stays subtle there. The
    pictures take no tint at all, so a sweep across a page never washes the
@@ -538,11 +545,45 @@ function fadeIn(img){
   }, {once:true});
 }
 
+/* the cat only lives while the button is held over the portrait: letting
+   go, sliding off it, or leaving the page all put the dot back */
+let catImg = null;
+function catOff(){ document.documentElement.classList.remove('cat-on'); }
+function wireCat(){
+  const photo = main.querySelector('.about-portrait img');
+  if(!photo) return;
+  if(!catImg){
+    catImg = document.createElement('img');
+    catImg.className = 'cat-cursor';
+    catImg.alt = '';
+    catImg.src = 'images/cat.gif';
+    document.body.appendChild(catImg);
+  }
+  const place = e => { catImg.style.transform = `translate(${e.clientX}px,${e.clientY}px)`; };
+  photo.draggable = false;   // otherwise a held button starts dragging the photo
+  photo.addEventListener('pointerdown', e => {
+    if(e.pointerType !== 'mouse' || e.button !== 0) return;
+    e.preventDefault();       // no text selection starting under the cat
+    place(e);
+    document.documentElement.classList.add('cat-on');
+  });
+  photo.addEventListener('pointermove', e => {
+    if(!document.documentElement.classList.contains('cat-on')) return;
+    if(e.buttons & 1) place(e); else catOff();
+  });
+  photo.addEventListener('pointerup', catOff);
+  photo.addEventListener('pointerleave', catOff);
+  photo.addEventListener('pointercancel', catOff);
+}
+addEventListener('pointerup', catOff);
+addEventListener('blur', catOff);
+
 function render(){
   document.documentElement.classList.toggle('about', current==='about');
   document.documentElement.classList.toggle('portfolio', current==='portfolio');
   updateChrome();
-  if(current==='about')      { main.innerHTML = aboutHTML();      return; }
+  catOff();
+  if(current==='about')      { main.innerHTML = aboutHTML(); wireCat(); return; }
   if(current==='experience') { main.innerHTML = experienceHTML(); return; }
   main.innerHTML = current==='portfolio' ? portfolioHTML() : carouselHTML(current);
   main.querySelectorAll('.entry').forEach(entry => {
