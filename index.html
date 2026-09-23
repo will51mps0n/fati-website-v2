@@ -24,6 +24,13 @@ html.about,html.on-dark{
    exactly where the pointer spends its time */
 html,html *{cursor:var(--cur)}
 html:active,html:active *{cursor:var(--cur-down)}
+/* selection: a quiet gray instead of the browser's blue. Light on the white
+   pages, a dark gray on the black About page so it stays subtle there. The
+   pictures take no tint at all, so a sweep across a page never washes the
+   work in colour */
+::selection{background:#DEDEDE;color:#111111}
+html.about ::selection{background:#3A3A3A;color:#F5F3EF}
+img::selection,html.about img::selection{background:transparent}
 html{background:var(--bg);scroll-behavior:auto}
 html,body{margin:0;padding:0}
 body{
