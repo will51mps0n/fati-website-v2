@@ -111,20 +111,22 @@ a:hover,a:focus-visible,
 .entry{margin:0 0 45vh}
 .entry:last-child{margin-bottom:0}
 .stage{position:relative;width:100%}
-.frame{position:relative;margin:0 auto}
+.frame{position:relative;margin:0 auto;z-index:1}
+/* a horizontal swipe belongs to the carousel; vertical still scrolls */
+.stage{touch-action:pan-y pinch-zoom}
 .frame img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .4s ease}
 .frame img.loaded{opacity:1}
 
 /* carousel arrows — on hover, pinned just outside the column (the widest
    a frame can be) so they hold one position for every image */
 .arrow{
-  position:absolute;top:0;bottom:0;width:calc(50% + 72px);
+  position:absolute;top:0;bottom:0;width:calc(50% + 96px);
   display:flex;align-items:center;
   background:none;border:0;margin:0;padding:0;
   color:inherit;opacity:0;transition:opacity 80ms linear;
 }
-.arrow.prev{left:-72px;justify-content:flex-start;padding-left:18px}
-.arrow.next{right:-72px;justify-content:flex-end;padding-right:18px}
+.arrow.prev{left:-96px;justify-content:flex-start;padding-left:42px}
+.arrow.next{right:-96px;justify-content:flex-end;padding-right:42px}
 .arrow:hover,.arrow:focus-visible{opacity:1;transition-duration:80ms}
 .arrow:not(:hover){transition-duration:0s}
 .arrow svg{width:22px;height:22px;display:block}
@@ -222,7 +224,37 @@ html.about #main{width:auto;max-width:none;min-width:0;padding:0}
 .about-col p:last-of-type{margin-bottom:0}
 .about-list{font-size:clamp(11px,min(1vw,1.56vh),18px);line-height:1.36}
 
-@media (prefers-reduced-motion:reduce){.frame img,.pf-fig img{transition:none}}
+/* ---- an image, enlarged ----
+   The picture lifts from where it sits on the page to the middle of the
+   screen over the page's own white, and settles back on close. */
+.lb{position:fixed;inset:0;z-index:50;color:var(--fg);touch-action:pinch-zoom;outline:none}
+/* only the white ground fades: the picture stays solid the whole way */
+.lb::before{content:"";position:absolute;inset:0;background:var(--bg);
+  opacity:0;transition:opacity .32s ease}
+.lb.on::before{opacity:1}
+.lb-img{position:absolute;display:block;max-width:none;transform-origin:0 0;
+  transition:transform .44s cubic-bezier(.2,.75,.2,1),opacity .14s ease;
+  user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.lb-btn{position:absolute;top:0;bottom:0;width:max(6vw,64px);display:flex;
+  align-items:center;justify-content:center;background:none;border:0;margin:0;
+  padding:0;color:inherit;opacity:0;transition:opacity 80ms linear}
+.lb-btn:hover,.lb-btn:focus-visible{opacity:1;outline:none}
+.lb-prev{left:0}.lb-next{right:0}
+.lb-btn svg{width:22px;height:22px;display:block}
+.lb-cap{position:absolute;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  text-align:center;font-size:18px;line-height:1.26;pointer-events:none;
+  opacity:0;transition:opacity .32s ease}
+.lb.on .lb-cap{opacity:1}
+.lb-name{font-style:italic}
+/* touch screens page through by swiping, so the edge buttons stay out */
+@media (hover:none){.lb-btn{display:none}}
+@media (max-width:900px){.lb-cap{font-size:16px}}
+/* the overlay is white even over a black spread, so the dot is the light
+   page's dot while it is open */
+html.lb-open{--cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23111111' stroke='%23FFFFFF' stroke-width='1'/%3E%3C/svg%3E") 10 10, auto;
+  --cur-down:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='4' fill='%23FFFFFF' stroke='%23111111' stroke-width='1.25'/%3E%3C/svg%3E") 10 10, auto}
+
+@media (prefers-reduced-motion:reduce){.frame img,.pf-fig img,.lb::before,.lb-cap,.lb-img{transition:none}}
 
 /* ---- 901-1180px: the corridor still holds, but the portrait gives up
    some of its share so the writing keeps a readable measure ---- */
@@ -414,7 +446,7 @@ function itemHTML(it){
             + (it.h != null ? `height:${it.h}%;` : '');
   if(it.fig){
     const im = IMG[it.fig];
-    return `<img class="sp-img" style="${pos}object-fit:${it.fit||'contain'};object-position:center"`
+    return `<img class="sp-img" data-k="${it.fig}" style="${pos}object-fit:${it.fit||'contain'};object-position:center"`
          + ` src="${im.src}" loading="lazy" alt="${esc(it.alt||'')}">`;
   }
   const style = pos + (it.size ? `font-size:${it.size}cqw;` : '')
@@ -551,6 +583,7 @@ function fadeIn(img){
 }
 
 function render(){
+  lbKill();
   document.documentElement.classList.toggle('about', current==='about');
   document.documentElement.classList.toggle('portfolio', current==='portfolio');
   updateChrome();
@@ -642,8 +675,13 @@ function step(entry, delta){
 }
 
 main.addEventListener('click', e => {
+  if(performance.now() < swipedUntil) return;
   const arrow = e.target.closest('.arrow');
   if(arrow){ step(arrow.closest('.entry'), arrow.classList.contains('next') ? 1 : -1); return; }
+  const frame = e.target.closest('.frame');
+  if(frame){ if(frame.querySelector('img').classList.contains('loaded')) openCarousel(frame.closest('.entry')); return; }
+  const plate = e.target.closest('.sp-img');
+  if(plate){ if(plate.classList.contains('loaded')) openPlate(plate); return; }
   const btn = e.target.closest('.info-toggle');
   if(!btn) return;
   const info = btn.parentElement.previousElementSibling;
@@ -654,7 +692,7 @@ main.addEventListener('click', e => {
 });
 
 addEventListener('keydown', e => {
-  if(current!=='projects') return;
+  if(!CAROUSELS.includes(current)) return;
   if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
   const mid = innerHeight/2;
   let best=null, bestD=Infinity;
@@ -666,11 +704,219 @@ addEventListener('keydown', e => {
   if(best){ step(best, e.key==='ArrowRight' ? 1 : -1); e.preventDefault(); }
 });
 
+/* ---- click an image to see it large ----
+   The picture lifts from its place on the page to the middle of the screen
+   and settles back into the same place on close, so the page never seems to
+   change underneath it. A carousel pages through its own set in here and
+   leaves the page on the image you closed on; the Portfolio pages through
+   its plates in order. */
+const LB = { el:null };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+function fitRect(l, t, w, h, nw, nh, mode){
+  let s = mode==='cover' ? Math.max(w/nw, h/nh) : Math.min(w/nw, h/nh);
+  if(mode > 0) s = Math.min(s, mode);          // a numeric mode caps upscaling
+  return { l: l + (w - nw*s)/2, t: t + (h - nh*s)/2, w: nw*s, h: nh*s };
+}
+function lbBox(){
+  const narrow = innerWidth <= 900;
+  const side = narrow ? 12 : Math.max(innerWidth*0.06, 64) + 12;
+  const top  = narrow ? 20 : Math.max(innerHeight*0.04, 24);
+  const bot  = LB.cap ? (narrow ? 80 : 96) : top;
+  return [side, top, innerWidth - 2*side, innerHeight - top - bot];
+}
+const flip = (a, b) => `translate(${a.l-b.l}px,${a.t-b.t}px) scale(${a.w/b.w},${a.h/b.h})`;
+
+function lbPlace(it, i){
+  const r = fitRect(...lbBox(), it.w, it.h, 1.5);
+  const img = LB.img;
+  if(img.getAttribute('src') !== it.src) img.src = it.src;
+  img.alt = it.alt || '';
+  Object.assign(img.style, { left:r.l+'px', top:r.t+'px', width:r.w+'px', height:r.h+'px' });
+  LB.rect = r; LB.shown = i;
+}
+function lbCaption(){
+  if(!LB.cap) return;
+  LB.el.querySelector('.lb-count').textContent = `${LB.i+1} of ${LB.o.n}`;
+  LB.el.querySelector('.lb-name').textContent = LB.o.name;
+}
+function lbWarm(){
+  const o = LB.o; if(o.n < 2) return;
+  warm(o.item((LB.i+1) % o.n).src);
+  warm(o.item((LB.i-1+o.n) % o.n).src);
+}
+
+function lbOpen(o){
+  if(LB.el){ if(LB.closing) lbKill(); else return; }   // a click while one settles
+  const lb = document.createElement('div');
+  lb.className = 'lb';
+  lb.tabIndex = -1;
+  lb.setAttribute('role', 'dialog');
+  lb.setAttribute('aria-modal', 'true');
+  lb.setAttribute('aria-label', 'Enlarged image');
+  lb.innerHTML = `<img class="lb-img" alt="" draggable="false">`
+    + (o.n > 1 ? `<button class="lb-btn lb-prev" type="button" aria-label="Previous image">${ARROW_L}</button>`
+               + `<button class="lb-btn lb-next" type="button" aria-label="Next image">${ARROW_R}</button>` : '')
+    + (o.name ? `<div class="lb-cap"><div class="lb-count"></div><div class="lb-name"></div></div>` : '');
+  Object.assign(LB, { el:lb, o, img:lb.querySelector('.lb-img'), cap:!!o.name,
+                      i:o.i, closing:false, tok:0, focus:document.activeElement });
+  document.body.appendChild(lb);
+  lbPlace(o.item(o.i), o.i);
+  lbCaption();
+  LB.hidden = o.pageEl(o.i);
+  const from = o.pageRect(o.i);
+  LB.img.style.transition = 'none';
+  LB.img.style.transform = flip(from, LB.rect);
+  LB.hidden.style.visibility = 'hidden';
+  document.documentElement.classList.add('lb-open');
+  lb.offsetWidth;                                  // commit the start pose
+  requestAnimationFrame(() => {
+    LB.img.style.transition = '';
+    LB.img.style.transform = 'none';
+    lb.classList.add('on');
+  });
+  lb.focus({ preventScroll:true });
+  lbWarm();
+
+  lb.addEventListener('click', e => {
+    if(performance.now() < LB.swipedUntil) return;
+    const b = e.target.closest('.lb-btn');
+    if(b) lbGo(b.classList.contains('lb-next') ? 1 : -1);
+    else lbClose();
+  });
+  lb.addEventListener('wheel', e => e.preventDefault(), { passive:false });
+  lb.addEventListener('touchmove', e => { if(e.touches.length < 2) e.preventDefault(); }, { passive:false });
+  let t0 = null;
+  lb.addEventListener('touchstart', e => {
+    t0 = e.touches.length === 1 ? { x:e.touches[0].clientX, y:e.touches[0].clientY } : null;
+  }, { passive:true });
+  lb.addEventListener('touchend', e => {
+    if(!t0) return;
+    const t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y;
+    if(Math.abs(dx) > 45 && Math.abs(dx) > 1.3*Math.abs(dy)){
+      lbGo(dx < 0 ? 1 : -1);
+      LB.swipedUntil = performance.now() + 400;
+    }
+    t0 = null;
+  }, { passive:true });
+}
+
+function lbGo(d){
+  if(!LB.el || LB.closing || LB.o.n < 2) return;
+  const o = LB.o, i = (LB.i + d + o.n) % o.n, it = o.item(i), tok = ++LB.tok;
+  LB.i = i;
+  lbCaption();                                     // the counter answers at once
+  LB.img.style.opacity = '0';
+  const pre = new Image(), t0 = performance.now();
+  pre.src = it.src;
+  (pre.decode ? pre.decode() : Promise.resolve()).catch(()=>{}).then(() => {
+    setTimeout(() => {
+      if(tok !== LB.tok || !LB.el || LB.closing) return;
+      lbPlace(it, i);
+      LB.img.style.opacity = '1';
+      lbWarm();
+    }, Math.max(0, 140 - (performance.now() - t0)));
+  });
+}
+
+function lbClose(){
+  if(!LB.el || LB.closing) return;
+  LB.closing = true; LB.tok++;
+  const o = LB.o, i = LB.i;
+  if(LB.shown !== i) lbPlace(o.item(i), i);       // a page turn still in flight
+  LB.img.style.opacity = '1';
+  o.sync(i);
+  const target = o.pageEl(i);
+  if(target !== LB.hidden){ LB.hidden.style.visibility = ''; target.style.visibility = 'hidden'; LB.hidden = target; }
+  if(reduceMotion.matches){ lbKill(); return; }
+  LB.el.style.pointerEvents = 'none';              // clicks fall through to the page
+  LB.img.style.transform = flip(o.pageRect(i), LB.rect);
+  LB.el.classList.remove('on');
+  const el = LB.el, end = () => { if(LB.el === el) lbKill(); };   // never a later one
+  LB.img.addEventListener('transitionend', e => { if(e.propertyName === 'transform') end(); });
+  setTimeout(end, 560);
+}
+
+function lbKill(){
+  if(!LB.el) return;
+  LB.el.remove();
+  if(LB.hidden) LB.hidden.style.visibility = '';
+  document.documentElement.classList.remove('lb-open');
+  if(LB.focus && LB.focus.focus) LB.focus.focus({ preventScroll:true });
+  LB.el = LB.hidden = null;
+}
+
+addEventListener('keydown', e => {
+  if(!LB.el) return;
+  if(e.key === 'Escape') lbClose();
+  else if(e.key === 'ArrowRight') lbGo(1);
+  else if(e.key === 'ArrowLeft')  lbGo(-1);
+  else if(![' ','PageUp','PageDown','Home','End','ArrowUp','ArrowDown'].includes(e.key)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+
+/* where a carousel image sits on the page, for any image of its set: the
+   frame keeps its height, takes the image's width up to the column, and
+   centres; the picture is contained in it, and an image with its own
+   scale shrinks about the centre, exactly as sizeFrame lays it out */
+function carouselRect(entry, k){
+  const p = BY_ID[entry.dataset.pid], s = IMG[p.peek[k]];
+  const fr = entry.querySelector('.frame').getBoundingClientRect();
+  const st = entry.querySelector('.stage').getBoundingClientRect();
+  const w = Math.min(Math.round(s.w*fr.height/s.h), entry.clientWidth);
+  let box = { l: st.left + (st.width - w)/2, t: fr.top, w, h: fr.height };
+  if(s.sc) box = { l: box.l + box.w*(1-s.sc)/2, t: box.t + box.h*(1-s.sc)/2, w: box.w*s.sc, h: box.h*s.sc };
+  return fitRect(box.l, box.t, box.w, box.h, s.w, s.h);
+}
+function openCarousel(entry){
+  const p = BY_ID[entry.dataset.pid], n = p.peek.length, img = entry.querySelector('.frame img');
+  lbOpen({ n, i:+entry.dataset.i, name:p.name,
+    item: k => { const s = IMG[p.peek[k]]; return { src:s.src, w:s.w, h:s.h, alt:`${p.name}, image ${k+1} of ${n}` }; },
+    pageEl: () => img,
+    pageRect: k => carouselRect(entry, k),
+    sync: k => { const c = +entry.dataset.i; if(k !== c) step(entry, k - c); } });
+}
+function openPlate(el){
+  const list = [...main.querySelectorAll('.sp-img')];
+  const dims = e => IMG[e.dataset.k] || { w:e.naturalWidth, h:e.naturalHeight };
+  lbOpen({ n:list.length, i:list.indexOf(el), name:'',
+    item: k => { const e = list[k], d = dims(e); return { src:e.getAttribute('src'), w:d.w, h:d.h, alt:e.alt }; },
+    pageEl: k => list[k],
+    pageRect: k => {
+      const e = list[k], r = e.getBoundingClientRect(), d = dims(e);
+      return fitRect(r.left, r.top, r.width, r.height, d.w, d.h,
+                     getComputedStyle(e).objectFit === 'cover' ? 'cover' : undefined);
+    },
+    sync: k => {
+      const r = list[k].getBoundingClientRect();
+      if(r.bottom < 0 || r.top > innerHeight) list[k].scrollIntoView({ block:'center' });
+    } });
+}
+
+/* on a phone the frame fills the width, so a sideways swipe pages the
+   carousel and a tap is left to enlarge */
+let swipe = null, swipedUntil = 0;
+main.addEventListener('touchstart', e => {
+  const st = e.target.closest('.stage');
+  swipe = st && e.touches.length === 1 ? { st, x:e.touches[0].clientX, y:e.touches[0].clientY } : null;
+}, { passive:true });
+main.addEventListener('touchend', e => {
+  if(!swipe) return;
+  const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  if(Math.abs(dx) > 45 && Math.abs(dx) > 1.3*Math.abs(dy)){
+    step(swipe.st.closest('.entry'), dx < 0 ? 1 : -1);
+    swipedUntil = performance.now() + 400;
+  }
+  swipe = null;
+}, { passive:true });
+
 let resizeQueued = false;
 addEventListener('resize', () => {
   if(resizeQueued) return;
   resizeQueued = true;
-  requestAnimationFrame(() => { resizeQueued=false; main.querySelectorAll('.entry').forEach(sizeFrame); });
+  requestAnimationFrame(() => {
+    resizeQueued=false; main.querySelectorAll('.entry').forEach(sizeFrame);
+    if(LB.el && !LB.closing) lbPlace(LB.o.item(LB.shown), LB.shown);
+  });
 });
 
 document.querySelectorAll('a[href^="#/"]').forEach(a => {
