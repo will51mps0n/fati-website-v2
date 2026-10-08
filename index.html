@@ -136,7 +136,9 @@ figcaption{margin-top:26px;text-align:center;font-size:20px;line-height:1.26}
    the reader scrolls down through them. None is ever taller than the
    window, so the square cover sits whole on screen; spreads take the
    full width. A click opens any page large enough to read. */
-.pf{display:flex;flex-direction:column;align-items:center;gap:9vh}
+.pf{display:flex;flex-direction:column;align-items:center;gap:3vh}
+/* each page carries its own white margins, so the gap between them stays
+   small and the book reads as one continuous run */
 .pf-img{display:block;width:auto;height:auto;max-width:100%;max-height:84vh;
   opacity:0;transition:opacity .4s ease}
 .pf-img.loaded{opacity:1}
@@ -151,10 +153,11 @@ figcaption{margin-top:26px;text-align:center;font-size:20px;line-height:1.26}
 .xp-role{font-style:italic}
 
 /* the book keeps to the corridor between the column of links on the left
-   and the icons on the right, the same lane the About page holds, and sits
-   centred in it */
+   and the About link and icons on the right, the lane the About page
+   holds: it starts clear of the links and runs out to the right edge's
+   own furniture, rather than mirroring the links' width there */
 html.portfolio #main{width:auto;max-width:none;min-width:0;
-  padding:13vh clamp(300px,17vw,344px) 16vh}
+  padding:13vh clamp(170px,10vw,220px) 16vh clamp(300px,17vw,344px)}
 @media (max-width:1180px){
   html.portfolio #main{padding:13vh clamp(124px,9vw,150px) 16vh 292px}
 }
