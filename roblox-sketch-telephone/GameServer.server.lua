@@ -19,10 +19,19 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 
-local Config = require(ReplicatedStorage:WaitForChild("Config"))
-
 -- No avatars: this is a one-screen game.
 Players.CharacterAutoLoads = false
+print("[SketchTelephone] GameServer started")
+
+local function findModule(name)
+	local module = ReplicatedStorage:WaitForChild(name, 5)
+	if not module then
+		error("[SketchTelephone] Missing ModuleScript '" .. name .. "' in ReplicatedStorage (check the spelling)")
+	end
+	return require(module)
+end
+
+local Config = findModule("Config")
 
 ---------------------------------------------------------------- Remotes
 local remotes = Instance.new("Folder")
@@ -366,6 +375,7 @@ Players.PlayerRemoving:Connect(function()
 	end
 end)
 
+print("[SketchTelephone] Server ready, waiting for players")
 while true do
 	runLobby()
 	runGame()

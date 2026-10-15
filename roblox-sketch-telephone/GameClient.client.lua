@@ -13,10 +13,19 @@ local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
 local StarterGui = game:GetService("StarterGui")
 
-local Config = require(ReplicatedStorage:WaitForChild("Config"))
-local Renderer = require(ReplicatedStorage:WaitForChild("DrawingRenderer"))
+print("[SketchTelephone] GameClient started")
 
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local function waitFor(name, hint)
+	local child = ReplicatedStorage:WaitForChild(name, 10)
+	if not child then
+		error("[SketchTelephone] Can't find '" .. name .. "' in ReplicatedStorage. " .. hint)
+	end
+	return child
+end
+
+local Config = require(waitFor("Config", "Add the Config ModuleScript."))
+local Renderer = require(waitFor("DrawingRenderer", "Add the DrawingRenderer ModuleScript."))
+local remotes = waitFor("Remotes", "The GameServer Script in ServerScriptService isn't running.")
 local StateEvent = remotes:WaitForChild("State")
 local TaskEvent = remotes:WaitForChild("Task")
 local RevealEvent = remotes:WaitForChild("Reveal")
@@ -598,6 +607,7 @@ StateEvent.OnClientEvent:Connect(function(newState)
 		resetDrawing()
 		lobbyMessage.Text = newState.message
 		showPanel("Lobby")
+print("[SketchTelephone] UI ready")
 	elseif newState.phase == "Playing" then
 		if not newState.playing then
 			waitLabel.Text = "A game is in progress — you're spectating!\nYou'll join next round. Stick around for the reveal."
@@ -653,3 +663,4 @@ RunService.RenderStepped:Connect(function()
 end)
 
 showPanel("Lobby")
+print("[SketchTelephone] UI ready")
