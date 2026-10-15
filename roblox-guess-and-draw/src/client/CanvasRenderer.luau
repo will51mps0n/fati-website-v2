@@ -2,7 +2,7 @@
 -- Points are normalised: x and y both run 0..1 across the canvas.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local Config = require(ReplicatedStorage:WaitForChild("GuessAndDraw"):WaitForChild("Config"))
 
 -- Canvas height measured in canvas widths, so lengths are the same in both axes.
 local HEIGHT_IN_WIDTHS = 1 / Config.CANVAS_ASPECT

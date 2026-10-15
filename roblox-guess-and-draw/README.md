@@ -24,30 +24,31 @@ Players who join partway through a round can start guessing straight away and ge
 - 14 basic colours
 - 4 brush sizes
 - Pen, eraser, undo (removes the last stroke) and clear
-- A brush-size preview that follows the cursor
+- Over the canvas, the mouse pointer becomes a dot the size and colour of the brush, centred exactly where the line is drawn
 
 The drawer's strokes stream to the server every 0.05s, and the server relays them to everyone else. Anyone who joins mid-turn receives the whole drawing so far.
 
-## Running it
+## Installing it
 
-**Quickest:** open `GuessAndDraw.rbxl` in Roblox Studio. To try a full match, go to the **Test** tab, set **Clients and Servers** to 2 players, and click **Start**.
+1. In Roblox Studio, open a place (a new Baseplate is fine) and turn on the command bar with **View → Command Bar**.
+2. Open `CommandBar.lua`, copy the whole thing (it's one long line), paste it into the command bar and press **Enter**. The Output window prints `Guess & Draw installed!`.
+3. To try a full match, go to the **Test** tab, set **Clients and Servers** to 2 players, and click **Start**.
 
-**With Rojo (for editing the code):**
+The command creates three folders, all named `GuessAndDraw`: one in ReplicatedStorage, one in ServerScriptService and one in StarterPlayer → StarterPlayerScripts. Running it again replaces those folders with a fresh copy and leaves the rest of the place alone.
 
-```sh
-rojo serve          # then connect from the Rojo plugin in Studio
-rojo build default.project.json -o GuessAndDraw.rbxl   # rebuild the place file
-```
+After editing anything in `src/`, rebuild the command with `python3 tools/make_command_bar.py`.
 
 ## Files
 
 | Path | Ends up in | What it does |
 | --- | --- | --- |
-| `src/shared/Config.luau` | ReplicatedStorage.Shared | All tunable settings: timings, rounds, scoring, colours, brush sizes, limits |
-| `src/shared/Words.luau` | ReplicatedStorage.Shared | The word list |
-| `src/server/GameServer.server.luau` | ServerScriptService.Server | Game loop, scoring, guess checking, text filtering, stroke relay and validation |
-| `src/client/Main.client.luau` | StarterPlayerScripts.Client | The whole UI, drawing input and live canvas updates |
-| `src/client/CanvasRenderer.luau` | StarterPlayerScripts.Client | Turns stroke points into on-screen line segments |
+| `CommandBar.lua` | — | The generated install command (don't edit by hand) |
+| `tools/make_command_bar.py` | — | Rebuilds `CommandBar.lua` from `src/` |
+| `src/shared/Config.luau` | ReplicatedStorage.GuessAndDraw | All tunable settings: timings, rounds, scoring, colours, brush sizes, limits |
+| `src/shared/Words.luau` | ReplicatedStorage.GuessAndDraw | The word list |
+| `src/server/GameServer.server.luau` | ServerScriptService.GuessAndDraw | Game loop, scoring, guess checking, text filtering, stroke relay and validation |
+| `src/client/Main.client.luau` | StarterPlayerScripts.GuessAndDraw | The whole UI, drawing input and live canvas updates |
+| `src/client/CanvasRenderer.luau` | StarterPlayerScripts.GuessAndDraw | Turns stroke points into on-screen line segments |
 
 ## Notes
 

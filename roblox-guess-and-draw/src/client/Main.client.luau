@@ -1,16 +1,17 @@
 -- Builds the game screen, lets the drawer draw (streaming strokes to the server),
 -- shows everyone else the drawing live, and handles guessing/chat.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
-local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local Config = require(ReplicatedStorage:WaitForChild("GuessAndDraw"):WaitForChild("Config"))
 local CanvasRenderer = require(script.Parent:WaitForChild("CanvasRenderer"))
 
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Remotes = ReplicatedStorage:WaitForChild("GuessAndDrawRemotes")
 local StateEvent = Remotes:WaitForChild("State") :: RemoteEvent
 local DrawEvent = Remotes:WaitForChild("Draw") :: RemoteEvent
 local CanvasEvent = Remotes:WaitForChild("Canvas") :: RemoteEvent
@@ -120,7 +121,9 @@ end
 local screen = make("ScreenGui", {
 	Name = "GuessAndDraw",
 	ResetOnSpawn = false,
-	IgnoreGuiInset = false, -- keeps InputObject.Position and AbsolutePosition in the same space
+	-- Lay out in full-window pixels, the same space as GetMouseLocation(), so the
+	-- pointer maps onto the canvas with no topbar offset.
+	IgnoreGuiInset = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	Parent = player:WaitForChild("PlayerGui"),
 })
@@ -130,6 +133,9 @@ local root = make("Frame", {
 	BackgroundColor3 = Theme.background,
 	BorderSizePixel = 0,
 	Parent = screen,
+}, {
+	-- Keep the panels clear of Roblox's topbar buttons.
+	make("UIPadding", { PaddingTop = UDim.new(0, GuiService:GetGuiInset().Y) }),
 })
 
 -- Top bar: round, word, timer
@@ -214,15 +220,30 @@ local canvas = make("CanvasGroup", {
 	corner(12),
 })
 
-local brushPreview = make("Frame", {
+-- Replaces the mouse pointer over the canvas: a dot the size and colour of the brush,
+-- centred exactly where the line will be drawn. It sits on its own layer so moving
+-- it doesn't make the CanvasGroup re-render every stroke.
+local cursorLayer = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
+	ClipsDescendants = true,
+	ZIndex = 5,
+	Parent = canvasArea,
+}, {
+	make("UIAspectRatioConstraint", { AspectRatio = Config.CANVAS_ASPECT }),
+})
+
+local cursorDot = make("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BorderSizePixel = 0,
 	Visible = false,
-	ZIndex = 100000,
-	Parent = canvas,
+	Parent = cursorLayer,
 }, {
 	make("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
-	make("UIStroke", { Color = Theme.muted, Thickness = 1 }),
+	make("UIStroke", { Color = Color3.fromRGB(90, 90, 90), Thickness = 1 }),
+	make("UISizeConstraint", { MinSize = Vector2.new(5, 5) }),
 })
 
 local renderer = CanvasRenderer.new(canvas)
@@ -572,9 +593,20 @@ local function canDraw(): boolean
 	return snapshot ~= nil and snapshot.canDraw == true
 end
 
-local function toCanvas(position: Vector3): (number, number)
-	local relative = (Vector2.new(position.X, position.Y) - canvas.AbsolutePosition) / canvas.AbsoluteSize
-	return math.clamp(relative.X, 0, 1), math.clamp(relative.Y, 0, 1)
+-- Pointer position in full-window pixels, the space the ScreenGui is laid out in.
+local function pointerPosition(input: InputObject?): Vector2
+	if input and input.UserInputType == Enum.UserInputType.Touch then
+		-- Touch positions are measured from below the topbar; shift them into window space.
+		return Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
+	end
+	return UserInputService:GetMouseLocation()
+end
+
+-- Returns the point as canvas fractions (clamped to the canvas) and whether it is inside it.
+local function toCanvas(position: Vector2): (number, number, boolean)
+	local relative = (position - canvas.AbsolutePosition) / canvas.AbsoluteSize
+	local inside = relative.X >= 0 and relative.X <= 1 and relative.Y >= 0 and relative.Y <= 1
+	return math.clamp(relative.X, 0, 1), math.clamp(relative.Y, 0, 1), inside
 end
 
 local function flush()
@@ -610,8 +642,14 @@ local function isPress(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end
 
-canvas.InputBegan:Connect(function(input)
+-- Listening on UserInputService (not the canvas) means the cursor layer on top
+-- can never swallow the press.
+UserInputService.InputBegan:Connect(function(input)
 	if activeStroke or not canDraw() or not isPress(input) then
+		return
+	end
+	local x, y, inside = toCanvas(pointerPosition(input))
+	if not inside then
 		return
 	end
 	strokeCounter += 1
@@ -620,32 +658,25 @@ canvas.InputBegan:Connect(function(input)
 		id = strokeCounter,
 		c = if erasing then 0 else selectedColor,
 		s = selectedSize,
-		lastX = 0,
-		lastY = 0,
+		lastX = x,
+		lastY = y,
 	}
 	pending = {}
-	local x, y = toCanvas(input.Position)
 	addPoint(x, y)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	local isMove = input.UserInputType == Enum.UserInputType.MouseMovement
-		or (input.UserInputType == Enum.UserInputType.Touch and input == activeInput)
-	if not isMove then
-		return
-	end
-
-	local x, y = toCanvas(input.Position)
-	if canDraw() then
-		local size = Config.BRUSH_SIZES[selectedSize]
-		brushPreview.Position = UDim2.fromScale(x, y)
-		brushPreview.Size = UDim2.fromScale(size, size * Config.CANVAS_ASPECT)
-	end
-
 	local stroke = activeStroke
 	if not stroke then
 		return
 	end
+	local isMouseDrag = input.UserInputType == Enum.UserInputType.MouseMovement
+		and (activeInput :: InputObject).UserInputType == Enum.UserInputType.MouseButton1
+	if not isMouseDrag and input ~= activeInput then
+		return
+	end
+
+	local x, y = toCanvas(pointerPosition(input))
 	local dx = x - stroke.lastX
 	local dy = (y - stroke.lastY) / Config.CANVAS_ASPECT
 	if dx * dx + dy * dy >= Config.MIN_POINT_DISTANCE * Config.MIN_POINT_DISTANCE then
@@ -654,19 +685,35 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-	if not activeStroke then
+	local stroke = activeStroke
+	if not stroke or not (input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeInput) then
 		return
 	end
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeInput then
-		endStroke()
+	-- Finish exactly where the pointer was released.
+	local x, y = toCanvas(pointerPosition(input))
+	if x ~= stroke.lastX or y ~= stroke.lastY then
+		addPoint(x, y)
 	end
+	endStroke()
 end)
 
-canvas.MouseEnter:Connect(function()
-	brushPreview.Visible = canDraw()
-end)
-canvas.MouseLeave:Connect(function()
-	brushPreview.Visible = false
+local mouseHidden = false
+
+RunService.RenderStepped:Connect(function()
+	local x, y, inside = toCanvas(UserInputService:GetMouseLocation())
+	local showDot = canDraw() and UserInputService.MouseEnabled and (inside or activeStroke ~= nil)
+
+	if showDot ~= mouseHidden then
+		mouseHidden = showDot
+		UserInputService.MouseIconEnabled = not showDot
+	end
+	cursorDot.Visible = showDot
+	if showDot then
+		local size = Config.BRUSH_SIZES[selectedSize]
+		cursorDot.Position = UDim2.fromScale(x, y)
+		cursorDot.Size = UDim2.fromScale(size, size * Config.CANVAS_ASPECT)
+		cursorDot.BackgroundColor3 = if erasing then Config.BACKGROUND_COLOR else Config.COLORS[selectedColor].color
+	end
 end)
 
 RunService.Heartbeat:Connect(function(dt)
@@ -916,7 +963,6 @@ local function render()
 
 	local drawing = s.phase == "Drawing"
 	toolbar.Visible = s.canDraw
-	brushPreview.Visible = brushPreview.Visible and s.canDraw
 	if not s.canDraw and activeStroke then
 		endStroke()
 	end

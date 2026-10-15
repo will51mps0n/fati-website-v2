@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Shared = ReplicatedStorage:WaitForChild("GuessAndDraw")
 local Config = require(Shared:WaitForChild("Config"))
 local Words = require(Shared:WaitForChild("Words"))
 
@@ -14,7 +14,7 @@ Players.CharacterAutoLoads = Config.SPAWN_CHARACTERS
 -- Remotes ----------------------------------------------------------------------
 
 local remotes = Instance.new("Folder")
-remotes.Name = "Remotes"
+remotes.Name = "GuessAndDrawRemotes"
 
 local function makeRemote(name: string): RemoteEvent
 	local remote = Instance.new("RemoteEvent")

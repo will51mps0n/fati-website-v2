@@ -60,7 +60,7 @@ Config.DEFAULT_BRUSH_SIZE = 2
 -- Networking -------------------------------------------------------------------
 
 Config.SEND_INTERVAL = 0.05 -- how often the drawer streams new points
-Config.MIN_POINT_DISTANCE = 0.003 -- skip points closer than this (canvas widths)
+Config.MIN_POINT_DISTANCE = 0.002 -- skip points closer than this (canvas widths)
 Config.MAX_NUMBERS_PER_PACKET = 600 -- x,y pairs count as two numbers
 Config.MAX_PACKETS_PER_SECOND = 40
 Config.MAX_STROKES = 3000
