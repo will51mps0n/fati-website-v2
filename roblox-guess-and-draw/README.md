@@ -24,7 +24,7 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
   - DataStores only work in a published game. To test them in Studio, switch on **Game Settings → Security → Enable Studio Access to API Services**.
   - Without a DataStore, wins only count for the current server.
 
-**Thumbs up / down:** while someone draws, everyone else gets 👍 and 👎 buttons under the canvas, one vote per drawing. Chat shows "X liked the drawing!" or "X disliked the drawing!", and a thumb floats up over the canvas.
+**Thumbs up / down:** while someone draws, everyone else gets a thumbs up and a thumbs down in the canvas's top-right corner, like skribbl.io, one vote per drawing. The pixel-art thumbs are `assets/thumbs-up.png` and `assets/thumbs-down.png` (set in `Config.THUMBS_UP_IMAGE` / `THUMBS_DOWN_IMAGE`); until they're uploaded, emoji stand in. Chat shows "X liked the drawing!" or "X disliked the drawing!", and a thumb floats up over the canvas.
 
 **Vote to kick:** click another player in the list and choose **👢 Vote to kick**. Chat shows "X is voting to kick Y (1/2)".
 - The kick happens once 60% of the other players have voted (`VOTE_KICK_SHARE`), with at least 2 votes (`VOTE_KICK_MIN`), so 2 players can't kick each other.
@@ -103,7 +103,7 @@ Scripts can only use images and sounds that have been uploaded to Roblox, by the
 | `WordsCommand.lua` | — | The generated words-only update command |
 | `tools/make_command_bar.py` | — | Rebuilds `CommandBar.lua` from `src/` |
 | `tools/make_sounds.py` | — | Synthesises the sound effects into `assets/sounds/` |
-| `assets/` | Upload to Roblox | The seamless background tile and the sound effects |
+| `assets/` | Upload to Roblox | The seamless background tile, the thumbs and the sound effects |
 | `src/shared/Config.luau` | ReplicatedStorage.GuessAndDraw | All tunable settings: timings, rounds, scoring, colours, brush sizes, limits |
 | `src/shared/Words.luau` | ReplicatedStorage.GuessAndDraw | The word list |
 | `src/server/GameServer.server.luau` | ServerScriptService.GuessAndDraw | Game loop, scoring, guess checking, text filtering, stroke relay and validation |

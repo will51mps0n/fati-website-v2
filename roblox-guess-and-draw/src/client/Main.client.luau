@@ -584,26 +584,48 @@ local toolbar = make("Frame", {
 	}),
 })
 
--- Guessers get a thumbs up and a thumbs down in the toolbar's place, one vote per drawing.
+-- Like skribbl.io, guessers get a thumbs up and a thumbs down in the canvas's
+-- top-right corner, one vote per drawing.
 local rateBar = make("Frame", {
-	Position = toolbarPosition,
-	Size = toolbarSize,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -10, 0, 8),
+	Size = UDim2.fromOffset(176, 82),
 	BackgroundTransparency = 1,
 	Visible = false,
-	Parent = game_,
+	Parent = canvasLayer("Frame", { Name = "Rating", ZIndex = 4 }),
 }, {
 	make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 14),
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
 	}),
 })
 local ratedThisTurn = false
 local render: () -> () -- defined further down
-for order, vote in { { kind = "like", icon = "👍" }, { kind = "dislike", icon = "👎" } } do
-	local button = Ui.toolButton({ LayoutOrder = order, Parent = rateBar })
-	label({ Size = UDim2.fromScale(1, 1), Text = vote.icon, Parent = button }, { Ui.pad(10) })
+local RATINGS = {
+	{ kind = "like", image = Config.THUMBS_UP_IMAGE, icon = "👍" },
+	{ kind = "dislike", image = Config.THUMBS_DOWN_IMAGE, icon = "👎" },
+}
+for order, vote in RATINGS do
+	local button = if vote.image ~= ""
+		then make("ImageButton", {
+			Size = UDim2.fromOffset(82, 82),
+			BackgroundTransparency = 1,
+			Image = vote.image,
+			ScaleType = Enum.ScaleType.Fit,
+			LayoutOrder = order,
+			Parent = rateBar,
+		})
+		else make("TextButton", {
+			Size = UDim2.fromOffset(82, 82),
+			BackgroundTransparency = 1,
+			Text = vote.icon,
+			TextScaled = true,
+			LayoutOrder = order,
+			Parent = rateBar,
+		}, { Ui.pad(6) })
+	Ui.hoverable(button)
 	button.Activated:Connect(function()
 		if ratedThisTurn then
 			return
