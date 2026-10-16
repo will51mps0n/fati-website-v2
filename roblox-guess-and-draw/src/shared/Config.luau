@@ -21,6 +21,11 @@ Config.WORD_CHOICES = 3
 -- (once per turn). The password itself lives in the server script, out of players' reach.
 Config.CUSTOM_WORD_TIME = 25
 
+-- Vote to kick: a player is kicked once this share of the other players vote for
+-- it (and never with fewer than VOTE_KICK_MIN votes, so 2 players can't kick each other).
+Config.VOTE_KICK_SHARE = 0.6
+Config.VOTE_KICK_MIN = 2
+
 -- A letter of the word is revealed once this fraction of the draw time has passed.
 Config.HINT_FRACTIONS = { 0.5, 0.75 }
 

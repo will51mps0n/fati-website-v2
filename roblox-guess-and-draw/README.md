@@ -24,6 +24,13 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
   - DataStores only work in a published game. To test them in Studio, switch on **Game Settings → Security → Enable Studio Access to API Services**.
   - Without a DataStore, wins only count for the current server.
 
+**Thumbs up / down:** while someone draws, everyone else gets 👍 and 👎 buttons under the canvas, one vote per drawing. Chat shows "X liked the drawing!" or "X disliked the drawing!", and a thumb floats up over the canvas.
+
+**Vote to kick:** click another player in the list and choose **👢 Vote to kick**. Chat shows "X is voting to kick Y (1/2)".
+- The kick happens once 60% of the other players have voted (`VOTE_KICK_SHARE`), with at least 2 votes (`VOTE_KICK_MIN`), so 2 players can't kick each other.
+- A kicked player can't rejoin that server.
+- Votes from or against someone who leaves stop counting.
+
 Players who join partway through a round can start guessing straight away and get their first turn to draw in the next round. If the server drops below 2 players, the match is cancelled and the game goes back to waiting.
 
 ## Look & feel

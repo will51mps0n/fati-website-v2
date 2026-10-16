@@ -30,6 +30,7 @@ local CanvasEvent = makeRemote("Canvas") -- C->S: undo/clear/ready; S->C: undo/c
 local ChatEvent = makeRemote("Chat") -- S->C: chat and system lines
 local GuessEvent = makeRemote("Guess") -- C->S: a guess or chat message
 local WordChoiceEvent = makeRemote("WordChoice") -- S->C: options or an error; C->S: index, "custom" or a custom word
+local VoteEvent = makeRemote("Vote") -- C->S: "like", "dislike", or "kick" plus a user ID
 remotes.Parent = ReplicatedStorage
 
 -- State ------------------------------------------------------------------------
@@ -42,6 +43,7 @@ local state = {
 	word = nil :: string?,
 	wordOptions = nil :: { string }?,
 	customTimeGiven = false, -- the drawer already got extra time for a custom word
+	rated = {} :: { [Player]: boolean }, -- who already gave this drawing a thumbs up or down
 	revealed = {} :: { [number]: boolean },
 	turnStartedAt = 0,
 	guessed = {} :: { [Player]: boolean },
@@ -636,6 +638,7 @@ local function runTurn(drawer: Player)
 	state.drawer = drawer
 	state.word = nil
 	state.customTimeGiven = false
+	state.rated = {}
 	state.revealed = {}
 	state.guessed = {}
 	state.guessCount = 0
@@ -818,9 +821,65 @@ task.spawn(function()
 	end
 end)
 
+-- Thumbs up / down and vote kick ------------------------------------------------------
+
+-- kickVotes[target][voter] = true. Kicked players can't come back to this server.
+local kickVotes: { [Player]: { [Player]: boolean } } = {}
+local kickedUserIds: { [number]: boolean } = {}
+
+local function kickVotesNeeded(): number
+	local others = #Players:GetPlayers() - 1
+	return math.max(Config.VOTE_KICK_MIN, math.ceil(others * Config.VOTE_KICK_SHARE))
+end
+
+VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId)
+	if kind == "like" or kind == "dislike" then
+		-- Everyone but the drawer can rate each drawing once.
+		if state.phase ~= "Drawing" or player == state.drawer or state.rated[player] then
+			return
+		end
+		state.rated[player] = true
+		systemMessage(
+			if kind == "like" then `{player.DisplayName} liked the drawing!` else `{player.DisplayName} disliked the drawing!`,
+			kind
+		)
+		return
+	end
+
+	if kind == "kick" and typeof(targetUserId) == "number" then
+		local target = Players:GetPlayerByUserId(targetUserId)
+		if not target or target == player then
+			return
+		end
+		local votes = kickVotes[target] or {}
+		kickVotes[target] = votes
+		if votes[player] then
+			return
+		end
+		votes[player] = true
+		local count = 0
+		for voter in votes do
+			if voter.Parent == Players then
+				count += 1
+			end
+		end
+		local needed = kickVotesNeeded()
+		systemMessage(`{player.DisplayName} is voting to kick {target.DisplayName} ({count}/{needed})`, "kick")
+		if count >= needed then
+			kickedUserIds[target.UserId] = true
+			systemMessage(`{target.DisplayName} was kicked!`, "kick")
+			target:Kick("You were vote-kicked from this server.")
+		end
+	end
+end)
+
 -- Players ----------------------------------------------------------------------------
 
 local function onPlayerAdded(player: Player)
+	if kickedUserIds[player.UserId] then
+		player:Kick("You were vote-kicked from this server.")
+		return
+	end
 	local stats = Instance.new("Folder")
 	stats.Name = "leaderstats"
 	local score = Instance.new("IntValue")
@@ -844,6 +903,9 @@ for _, player in Players:GetPlayers() do
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	if scores[player] == nil then
+		return -- turned away on joining (vote-kicked earlier), so never really joined
+	end
 	systemMessage(`{player.DisplayName} left the room!`, "leave")
 	scores[player] = nil
 	allTimeWins[player] = nil
@@ -851,6 +913,12 @@ Players.PlayerRemoving:Connect(function(player)
 	drawRate[player] = nil
 	lastFillAt[player] = nil
 	passwordFailures[player] = nil
+	state.rated[player] = nil
+	-- Votes against or by a player who leaves no longer count.
+	kickVotes[player] = nil
+	for _, votes in kickVotes do
+		votes[player] = nil
+	end
 	lastGuessAt[player] = nil
 	state.guessed[player] = nil
 	state.turnPoints[player] = nil

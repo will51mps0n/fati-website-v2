@@ -27,6 +27,7 @@ local CanvasEvent = Remotes:WaitForChild("Canvas") :: RemoteEvent
 local ChatEvent = Remotes:WaitForChild("Chat") :: RemoteEvent
 local GuessEvent = Remotes:WaitForChild("Guess") :: RemoteEvent
 local WordChoiceEvent = Remotes:WaitForChild("WordChoice") :: RemoteEvent
+local VoteEvent = Remotes:WaitForChild("Vote") :: RemoteEvent
 
 local player = Players.LocalPlayer
 
@@ -583,6 +584,36 @@ local toolbar = make("Frame", {
 	}),
 })
 
+-- Guessers get a thumbs up and a thumbs down in the toolbar's place, one vote per drawing.
+local rateBar = make("Frame", {
+	Position = toolbarPosition,
+	Size = toolbarSize,
+	BackgroundTransparency = 1,
+	Visible = false,
+	Parent = game_,
+}, {
+	make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 14),
+	}),
+})
+local ratedThisTurn = false
+local render: () -> () -- defined further down
+for order, vote in { { kind = "like", icon = "👍" }, { kind = "dislike", icon = "👎" } } do
+	local button = Ui.toolButton({ LayoutOrder = order, Parent = rateBar })
+	label({ Size = UDim2.fromScale(1, 1), Text = vote.icon, Parent = button }, { Ui.pad(10) })
+	button.Activated:Connect(function()
+		if ratedThisTurn then
+			return
+		end
+		ratedThisTurn = true
+		VoteEvent:FireServer(vote.kind)
+		render()
+	end)
+end
+
 -- Right: chat ----------------------------------------------------------------------------------
 
 local chatPosition, chatSize = box(1442, MAIN_TOP, 428, CANVAS_HEIGHT)
@@ -656,6 +687,9 @@ local CHAT_STYLES = {
 	leave = { text = Theme.orange, bold = true },
 	correct = { text = Theme.green, bg = Theme.greenBg, bold = true },
 	close = { text = Theme.closeText, bg = Theme.closeBg, bold = true },
+	like = { text = Theme.green, bold = true },
+	dislike = { text = Theme.orange, bold = true },
+	kick = { text = Theme.orange, bold = true },
 }
 
 local function addChatLine(message)
@@ -685,6 +719,12 @@ local function addChatLine(message)
 
 	if message.kind == "close" then
 		Sounds.play("tick")
+	elseif message.kind == "like" or message.kind == "dislike" then
+		-- A thumb pops up over the bottom of the canvas for everyone.
+		local x = canvas.AbsolutePosition.X + canvas.AbsoluteSize.X * (0.3 + math.random() * 0.4)
+		local y = canvas.AbsolutePosition.Y + canvas.AbsoluteSize.Y * 0.85
+		Effects.floatText(if message.kind == "like" then "👍" else "👎", Theme.white, Vector2.new(x, y), 48)
+		Sounds.play("click", 0.5)
 	end
 
 	local lines = {}
@@ -1053,12 +1093,83 @@ end)
 
 -- Players list ------------------------------------------------------------------------------------
 
+-- Clicking someone in the player list opens this little menu to vote to kick them.
+local kickMenu = Ui.panel({
+	Size = UDim2.fromOffset(270, 120),
+	Visible = false,
+	ZIndex = 20,
+	Parent = game_,
+}, { Ui.border(2, Theme.border) })
+local kickMenuName = label({
+	Position = UDim2.fromOffset(12, 10),
+	Size = UDim2.new(1, -56, 0, 30),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	TextScaled = false,
+	TextSize = 22,
+	Text = "",
+	Parent = kickMenu,
+})
+local kickMenuClose = make("TextButton", {
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -8, 0, 8),
+	Size = UDim2.fromOffset(32, 32),
+	BackgroundTransparency = 1,
+	Text = "✕",
+	TextScaled = true,
+	FontFace = Theme.heavy,
+	TextColor3 = Theme.muted,
+	Parent = kickMenu,
+}, { Ui.pad(6) })
+local kickButton = make("TextButton", {
+	Position = UDim2.fromOffset(12, 56),
+	Size = UDim2.new(1, -24, 0, 50),
+	BackgroundColor3 = Theme.red,
+	AutoButtonColor = false,
+	Text = "👢 Vote to kick",
+	TextScaled = true,
+	FontFace = Theme.heavy,
+	TextColor3 = Theme.white,
+	Parent = kickMenu,
+}, { Ui.corner(8), Ui.pad(10, 8) })
+Ui.hoverable(kickButton)
+local kickTarget: number? = nil
+
+local function closeKickMenu()
+	kickMenu.Visible = false
+	kickTarget = nil
+end
+
+local function openKickMenu(userId: number, name: string, row: GuiObject)
+	if kickTarget == userId then
+		closeKickMenu()
+		return
+	end
+	kickTarget = userId
+	kickMenuName.Text = name
+	-- Beside the player's row, in the game area's own (unzoomed) units.
+	local y = (row.AbsolutePosition.Y - game_.AbsolutePosition.Y) / gameScale.Scale
+	kickMenu.Position = UDim2.fromOffset(292, math.clamp(y, 0, DESIGN.Y - 130))
+	kickMenu.Visible = true
+	Ui.pop(kickMenu, 0.6, 0.25)
+end
+
+kickMenuClose.Activated:Connect(closeKickMenu)
+kickButton.Activated:Connect(function()
+	if kickTarget then
+		VoteEvent:FireServer("kick", kickTarget)
+		Sounds.play("click")
+	end
+	closeKickMenu()
+end)
+
 type Row = {
 	frame: Frame,
 	rank: TextLabel,
 	name: TextLabel,
 	score: TextLabel,
 	pencil: Frame,
+	entry: any, -- the latest player info, for the kick menu
 }
 
 local rows: { [number]: Row } = {}
@@ -1115,7 +1226,23 @@ local function createRow(entry): Row
 		Parent = frame,
 	})
 	Ui.pop(frame, 0.7, 0.3)
-	return { frame = frame, rank = rank, name = name, score = score, pencil = pencil }
+	local row = { frame = frame, rank = rank, name = name, score = score, pencil = pencil, entry = entry }
+	-- Click anyone else's row to vote to kick them.
+	local clickArea = make("TextButton", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 5,
+		Parent = frame,
+	})
+	clickArea.Activated:Connect(function()
+		local current = row.entry
+		if current.userId ~= player.UserId then
+			Sounds.play("click", 0.5)
+			openKickMenu(current.userId, current.name, frame)
+		end
+	end)
+	return row
 end
 
 local function renderPlayers(list)
@@ -1124,6 +1251,7 @@ local function renderPlayers(list)
 		seen[entry.userId] = true
 		local row = rows[entry.userId] or createRow(entry)
 		rows[entry.userId] = row
+		row.entry = entry
 		local isMe = entry.userId == player.UserId
 		row.frame.LayoutOrder = position
 		row.rank.Text = `#{position}`
@@ -1155,7 +1283,6 @@ end
 -- Overlay screens -----------------------------------------------------------------------------------
 
 local countdownLabel: TextLabel? = nil
-local render: () -> () -- defined below; the word choice screens call it
 
 local function overlayHeader(titleText: string, subtitleText: string?)
 	overlayTitle.Text = titleText
@@ -1603,6 +1730,17 @@ function render()
 
 	renderPlayers(s.players)
 
+	local canRate = s.phase == "Drawing" and not s.isDrawer and not ratedThisTurn
+	if canRate ~= rateBar.Visible then
+		rateBar.Visible = canRate
+		if canRate then
+			Ui.pop(rateBar, 0.7, 0.3)
+		end
+	end
+	if kickTarget and not rows[kickTarget] then
+		closeKickMenu() -- they left
+	end
+
 	if s.canDraw ~= toolbarShown then
 		toolbarShown = s.canDraw
 		toolbar.Visible = s.canDraw
@@ -1689,6 +1827,9 @@ StateEvent.OnClientEvent:Connect(function(newSnapshot)
 		wordChoices = nil
 		chosenWord = nil
 		customForm = false
+	end
+	if newSnapshot.phase ~= "Drawing" then
+		ratedThisTurn = false
 	end
 	render()
 	-- Wait a frame so freshly reordered rows have their final positions.
