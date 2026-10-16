@@ -181,6 +181,27 @@ pcall(function()
 end)
 fitToScreen()
 
+-- Roblox's automatic sizing (AutomaticCanvasSize / AutomaticSize) miscounts inside
+-- the zoomed game area, which left the newest chat messages below the bottom of
+-- the scroll area, out of sight. So scrolling lists are sized by hand: measure the
+-- content, undo the zoom, and set the size. `onSized` runs after each resize.
+local function sizeToContent(layout: UIListLayout, target: GuiObject, extra: number, onSized: ((number) -> ())?)
+	local function update()
+		local height = layout.AbsoluteContentSize.Y / gameScale.Scale + extra
+		if target:IsA("ScrollingFrame") then
+			target.CanvasSize = UDim2.fromOffset(0, height)
+		else
+			target.Size = UDim2.new(1, 0, 0, height)
+		end
+		if onSized then
+			onSized(height)
+		end
+	end
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(update)
+	gameScale:GetPropertyChangedSignal("Scale"):Connect(update)
+	task.defer(update)
+end
+
 local function box(x: number, y: number, width: number, height: number): (UDim2, UDim2)
 	return UDim2.fromScale(x / DESIGN.X, y / DESIGN.Y), UDim2.fromScale(width / DESIGN.X, height / DESIGN.Y)
 end
@@ -434,19 +455,22 @@ local playersScroller = make("ScrollingFrame", {
 	BorderSizePixel = 0,
 	ScrollBarThickness = 4,
 	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	Parent = game_,
 })
 -- Like skribbl.io's, the list is one white card with rounded corners, only as tall
 -- as its rows (the small padding keeps the rows inside the rounded corners).
+local playersLayout = make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder })
 local playersList = Ui.panel({
 	Size = UDim2.fromScale(1, 0),
-	AutomaticSize = Enum.AutomaticSize.Y,
 	Parent = playersScroller,
 }, {
-	make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
+	playersLayout,
 	make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }),
 })
+-- The card is as tall as its rows (plus its padding), and the scroller fits the card.
+sizeToContent(playersLayout, playersList, 10, function(height)
+	playersScroller.CanvasSize = UDim2.fromOffset(0, height)
+end)
 playersList:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 7)
 
 -- Centre: canvas and toolbar ------------------------------------------------------------------
@@ -570,15 +594,18 @@ local chatLog = make("ScrollingFrame", {
 	BorderSizePixel = 0,
 	ScrollBarThickness = 4,
 	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	Parent = chatPanel,
-}, {
-	-- New messages stack up from the bottom, like skribbl.io.
-	make("UIListLayout", {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-	}),
 })
+-- New messages stack up from the bottom, like skribbl.io.
+local chatLayout = make("UIListLayout", {
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	VerticalAlignment = Enum.VerticalAlignment.Bottom,
+	Parent = chatLog,
+})
+-- Keep the newest message in view as the log grows.
+sizeToContent(chatLayout, chatLog, 0, function(height)
+	chatLog.CanvasPosition = Vector2.new(0, math.max(0, height - chatLog.AbsoluteWindowSize.Y / gameScale.Scale))
+end)
 
 local guessBorder = Ui.border(1, Theme.border)
 local guessBox = make("TextBox", {
@@ -675,9 +702,6 @@ local function addChatLine(message)
 		end
 	end
 
-	task.defer(function()
-		chatLog.CanvasPosition = Vector2.new(0, chatLog.AbsoluteCanvasSize.Y)
-	end)
 end
 
 ChatEvent.OnClientEvent:Connect(addChatLine)
