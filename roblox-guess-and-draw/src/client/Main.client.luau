@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage:WaitForChild("GuessAndDraw"):WaitForChild("Config"))
 local CanvasRenderer = require(script.Parent:WaitForChild("CanvasRenderer"))
+local ColorPicker = require(script.Parent:WaitForChild("ColorPicker"))
 local Effects = require(script.Parent:WaitForChild("Effects"))
 local Sounds = require(script.Parent:WaitForChild("Sounds"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
@@ -126,9 +127,6 @@ local root = make("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 1,
 	Parent = screen,
-}, {
-	-- Keep the game clear of Roblox's topbar buttons.
-	make("UIPadding", { PaddingTop = UDim.new(0, GuiService:GetGuiInset().Y) }),
 })
 
 local effectsLayer = make("Frame", {
@@ -141,21 +139,44 @@ local effectsLayer = make("Frame", {
 Effects.init(effectsLayer)
 
 -- Like skribbl.io's fixed-width page, the whole game sits in one centred box. It is
--- designed at 1500x889 pixels and shrinks to fit smaller screens; `box` turns
--- design-pixel rectangles into positions and sizes inside it.
+-- designed at 1500x889 pixels and zoomed out as a whole to fit smaller windows, so
+-- everything keeps its proportions. `box` turns design-pixel rectangles into
+-- positions and sizes inside it.
 local DESIGN = Vector2.new(1500, 889)
+local MARGIN = 12
 
 local game_ = make("Frame", {
 	Name = "Game",
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.new(1, -24, 1, -16),
+	Size = UDim2.fromOffset(DESIGN.X, DESIGN.Y),
 	BackgroundTransparency = 1,
 	Parent = root,
-}, {
-	make("UIAspectRatioConstraint", { AspectRatio = DESIGN.X / DESIGN.Y }),
-	make("UISizeConstraint", { MaxSize = DESIGN }),
 })
+local gameScale = make("UIScale", { Parent = game_ })
+
+-- Height of Roblox's topbar (menu buttons). It can be 0 for a moment while the
+-- game loads, so this is re-checked whenever it changes.
+local function topInset(): number
+	local inset = GuiService:GetGuiInset().Y
+	pcall(function()
+		inset = math.max(inset, GuiService.TopbarInset.Height)
+	end)
+	return inset
+end
+
+local function fitToScreen()
+	local inset = topInset()
+	local available = screen.AbsoluteSize - Vector2.new(MARGIN * 2, inset + MARGIN * 2)
+	gameScale.Scale = math.clamp(math.min(available.X / DESIGN.X, available.Y / DESIGN.Y), 0.1, 1)
+	-- Centred in the space below the topbar.
+	game_.Position = UDim2.new(0.5, 0, 0.5, inset / 2)
+end
+
+screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitToScreen)
+pcall(function()
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(fitToScreen)
+end)
+fitToScreen()
 
 local function box(x: number, y: number, width: number, height: number): (UDim2, UDim2)
 	return UDim2.fromScale(x / DESIGN.X, y / DESIGN.Y), UDim2.fromScale(width / DESIGN.X, height / DESIGN.Y)
@@ -377,7 +398,7 @@ local renderer = CanvasRenderer.new(canvas)
 local overlay = canvasLayer("Frame", {
 	Name = "Overlay",
 	BackgroundColor3 = Theme.overlay,
-	BackgroundTransparency = 0.2,
+	BackgroundTransparency = Theme.overlayTransparency,
 	ClipsDescendants = true,
 	ZIndex = 3,
 }, { Ui.corner(4) })
@@ -411,7 +432,7 @@ local overlayBody = make("Frame", {
 })
 
 -- Below the canvas: the drawing tools, shown only to the drawer.
-local toolbarPosition, toolbarSize = box(238, MAIN_TOP + CANVAS_HEIGHT + 8, 900, 64)
+local toolbarPosition, toolbarSize = box(238, MAIN_TOP + CANVAS_HEIGHT + 10, 900, 56)
 local toolbar = make("Frame", {
 	Position = toolbarPosition,
 	Size = toolbarSize,
@@ -423,7 +444,7 @@ local toolbar = make("Frame", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 8),
+		Padding = UDim.new(0, 6),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}),
 })
@@ -477,9 +498,9 @@ local snapshot: any = nil
 local wordChoices: { string }? = nil
 local chosenWord: string? = nil
 
-local selectedColor = 1
+local selectedColor: Color3 = Config.COLORS[1].color
 local selectedSize = Config.DEFAULT_BRUSH_SIZE
-local erasing = false
+local tool = "pen" -- "pen", "eraser" or "fill"
 
 -- Chat -------------------------------------------------------------------------------------------
 
@@ -567,15 +588,44 @@ end)
 
 -- Toolbar ----------------------------------------------------------------------------------------
 
-local currentColor = make("Frame", {
-	Size = UDim2.fromScale(1, 1),
-	LayoutOrder = 1,
-	Parent = toolbar,
-}, { Ui.square(), Ui.corner(6), Ui.border(3, Theme.white) })
+-- The colour being painted with: the eraser paints the canvas background.
+local function paintColor(): Color3
+	return if tool == "eraser" then Config.BACKGROUND_COLOR else selectedColor
+end
+
+local refreshToolbar: () -> ()
+
+-- The colour wheel pops up just above the toolbar, from the current-colour square.
+local pickerPosition, pickerSize = box(238, MAIN_TOP + CANVAS_HEIGHT - 318, 250, 310)
+local picker = ColorPicker.new({ Position = pickerPosition, Size = pickerSize, Parent = game_ }, function(color)
+	selectedColor = color
+	if tool == "eraser" then
+		tool = "pen"
+	end
+	refreshToolbar()
+end)
+
+-- Shows the current colour; click it to open the colour wheel.
+local currentColor = Ui.toolButton({ LayoutOrder = 1, Parent = toolbar })
+Ui.border(3, Theme.white).Parent = currentColor
+label({
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.fromScale(1.15, 1.15),
+	Size = UDim2.fromScale(0.55, 0.55),
+	Text = "🎨",
+	Parent = currentColor,
+})
+currentColor.Activated:Connect(function()
+	if picker:isOpen() then
+		picker:close()
+	else
+		picker:open(selectedColor)
+	end
+end)
 
 -- 7 x 2 palette squares packed edge to edge.
 local palette = make("Frame", {
-	Size = UDim2.fromScale(7 * 32 / 900, 1),
+	Size = UDim2.fromScale(7 * 28 / 900, 1),
 	BackgroundTransparency = 1,
 	LayoutOrder = 2,
 	Parent = toolbar,
@@ -586,8 +636,6 @@ local palette = make("Frame", {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}),
 })
-
-local refreshToolbar: () -> ()
 
 local swatchMarks: { [number]: Frame } = {}
 for index, entry in Config.COLORS do
@@ -618,8 +666,11 @@ for index, entry in Config.COLORS do
 		swatch.BackgroundColor3 = entry.color
 	end)
 	swatch.Activated:Connect(function()
-		selectedColor = index
-		erasing = false
+		selectedColor = entry.color
+		if tool == "eraser" then
+			tool = "pen"
+		end
+		picker:close()
 		Sounds.play("click", 0.5)
 		refreshToolbar()
 	end)
@@ -645,40 +696,39 @@ end
 
 local function iconButton(icon: string, order: number): TextButton
 	local button = Ui.toolButton({ LayoutOrder = 10 + order, Parent = toolbar })
-	label({ Size = UDim2.fromScale(1, 1), Text = icon, Parent = button }, { Ui.pad(10) })
+	label({ Size = UDim2.fromScale(1, 1), Text = icon, Parent = button }, { Ui.pad(9) })
 	return button
 end
 
-local penButton = iconButton("✏️", 1)
-local eraserButton = iconButton("🧽", 2)
-local undoButton = iconButton("↩️", 3)
-local clearButton = iconButton("🗑️", 4)
-
-penButton.Activated:Connect(function()
-	erasing = false
-	refreshToolbar()
-end)
-eraserButton.Activated:Connect(function()
-	erasing = true
-	refreshToolbar()
-end)
-undoButton.Activated:Connect(function()
+local toolButtons: { [string]: TextButton } = {
+	pen = iconButton("✏️", 1),
+	eraser = iconButton("🧽", 2),
+	fill = iconButton("🪣", 3),
+}
+for name, button in toolButtons do
+	button.Activated:Connect(function()
+		tool = name
+		refreshToolbar()
+	end)
+end
+iconButton("↩️", 4).Activated:Connect(function()
 	CanvasEvent:FireServer("undo")
 end)
-clearButton.Activated:Connect(function()
+iconButton("🗑️", 5).Activated:Connect(function()
 	CanvasEvent:FireServer("clear")
 end)
 
 function refreshToolbar()
-	currentColor.BackgroundColor3 = if erasing then Config.BACKGROUND_COLOR else Config.COLORS[selectedColor].color
+	currentColor.BackgroundColor3 = paintColor()
 	for index, mark in swatchMarks do
-		mark.Visible = not erasing and index == selectedColor
+		mark.Visible = tool ~= "eraser" and Config.COLORS[index].color == selectedColor
 	end
 	for index, sizeButton in sizeButtons do
 		sizeButton.BackgroundColor3 = if index == selectedSize then Theme.selected else Theme.white
 	end
-	penButton.BackgroundColor3 = if erasing then Theme.white else Theme.selected
-	eraserButton.BackgroundColor3 = if erasing then Theme.selected else Theme.white
+	for name, button in toolButtons do
+		button.BackgroundColor3 = if tool == name then Theme.selected else Theme.white
+	end
 end
 
 refreshToolbar()
@@ -690,18 +740,12 @@ local activeStroke: { id: number, c: number, s: number, lastX: number, lastY: nu
 local activeInput: InputObject? = nil
 local pending: { number } = {}
 local sendTimer = 0
+-- Slightly slower than the server allows, so a fill it would reject is never sent.
+local FILL_INTERVAL = Config.MIN_FILL_INTERVAL + 0.05
+local lastFillAt = -math.huge
 
 local function canDraw(): boolean
 	return snapshot ~= nil and snapshot.canDraw == true
-end
-
--- Pointer position in full-window pixels, the space the ScreenGui is laid out in.
-local function pointerPosition(input: InputObject?): Vector2
-	if input and input.UserInputType == Enum.UserInputType.Touch then
-		-- Touch positions are measured from below the topbar; shift them into window space.
-		return Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
-	end
-	return UserInputService:GetMouseLocation()
 end
 
 -- Returns the point as canvas fractions (clamped to the canvas) and whether it is inside it.
@@ -740,29 +784,39 @@ local function endStroke()
 	activeInput = nil
 end
 
-local function isPress(input: InputObject): boolean
-	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
-end
-
 -- Listening on UserInputService (not the canvas) means the layers on top of the
 -- canvas can never swallow the press.
 UserInputService.InputBegan:Connect(function(input)
-	if activeStroke or not canDraw() or not isPress(input) then
+	if activeStroke or not canDraw() or not Ui.isPress(input) then
 		return
 	end
-	local x, y, inside = toCanvas(pointerPosition(input))
+	local point = Ui.pointerPosition(input)
+	if picker:contains(point) then
+		return
+	end
+	local x, y, inside = toCanvas(point)
 	if not inside then
 		return
 	end
+	picker:close()
+	local colorInt = CanvasRenderer.toInt(paintColor())
+
+	if tool == "fill" then
+		local now = os.clock()
+		if now - lastFillAt < FILL_INTERVAL then
+			return
+		end
+		lastFillAt = now
+		strokeCounter += 1
+		renderer:fill(strokeCounter, colorInt, x, y)
+		DrawEvent:FireServer({ id = strokeCounter, c = colorInt, f = { x, y } })
+		Sounds.play("click", 0.5)
+		return
+	end
+
 	strokeCounter += 1
 	activeInput = input
-	activeStroke = {
-		id = strokeCounter,
-		c = if erasing then 0 else selectedColor,
-		s = selectedSize,
-		lastX = x,
-		lastY = y,
-	}
+	activeStroke = { id = strokeCounter, c = colorInt, s = selectedSize, lastX = x, lastY = y }
 	pending = {}
 	addPoint(x, y)
 end)
@@ -778,7 +832,7 @@ UserInputService.InputChanged:Connect(function(input)
 		return
 	end
 
-	local x, y = toCanvas(pointerPosition(input))
+	local x, y = toCanvas(Ui.pointerPosition(input))
 	local dx = x - stroke.lastX
 	local dy = (y - stroke.lastY) / Config.CANVAS_ASPECT
 	if dx * dx + dy * dy >= Config.MIN_POINT_DISTANCE * Config.MIN_POINT_DISTANCE then
@@ -792,29 +846,45 @@ UserInputService.InputEnded:Connect(function(input)
 		return
 	end
 	-- Finish exactly where the pointer was released.
-	local x, y = toCanvas(pointerPosition(input))
+	local x, y = toCanvas(Ui.pointerPosition(input))
 	if x ~= stroke.lastX or y ~= stroke.lastY then
 		addPoint(x, y)
 	end
 	endStroke()
 end)
 
+-- With the bucket, a paint-bucket icon sits next to the dot.
+local cursorBucket = label({
+	AnchorPoint = Vector2.new(0, 1),
+	Size = UDim2.fromOffset(30, 30),
+	Text = "🪣",
+	Visible = false,
+	Parent = cursorLayer,
+})
+
+local BUCKET_DOT = 0.008 -- canvas widths
 local mouseHidden = false
 
 RunService.RenderStepped:Connect(function()
-	local x, y, inside = toCanvas(UserInputService:GetMouseLocation())
-	local showDot = canDraw() and UserInputService.MouseEnabled and (inside or activeStroke ~= nil)
+	local point = UserInputService:GetMouseLocation()
+	local x, y, inside = toCanvas(point)
+	local overCanvas = canDraw()
+		and UserInputService.MouseEnabled
+		and (inside or activeStroke ~= nil)
+		and not picker:contains(point)
 
-	if showDot ~= mouseHidden then
-		mouseHidden = showDot
-		UserInputService.MouseIconEnabled = not showDot
+	if overCanvas ~= mouseHidden then
+		mouseHidden = overCanvas
+		UserInputService.MouseIconEnabled = not overCanvas
 	end
-	cursorDot.Visible = showDot
-	if showDot then
-		local size = Config.BRUSH_SIZES[selectedSize]
+	cursorDot.Visible = overCanvas
+	cursorBucket.Visible = overCanvas and tool == "fill"
+	if overCanvas then
+		local size = if tool == "fill" then BUCKET_DOT else Config.BRUSH_SIZES[selectedSize]
 		cursorDot.Position = UDim2.fromScale(x, y)
 		cursorDot.Size = UDim2.fromScale(size, size * Config.CANVAS_ASPECT)
-		cursorDot.BackgroundColor3 = if erasing then Config.BACKGROUND_COLOR else Config.COLORS[selectedColor].color
+		cursorDot.BackgroundColor3 = paintColor()
+		cursorBucket.Position = UDim2.new(x, 4, y, -2)
 	end
 end)
 
@@ -830,14 +900,18 @@ end)
 -- Canvas updates from the server ----------------------------------------------------------------
 
 DrawEvent.OnClientEvent:Connect(function(packet)
-	renderer:addPoints(packet.id, packet.c, packet.s, packet.p)
+	if packet.f then
+		renderer:fill(packet.id, packet.c, packet.f[1], packet.f[2])
+	else
+		renderer:addPoints(packet.id, packet.c, packet.s, packet.p)
+	end
 end)
 
 CanvasEvent.OnClientEvent:Connect(function(action, id)
 	if action == "clear" then
 		renderer:clear()
 	elseif action == "undo" then
-		renderer:removeStroke(id)
+		renderer:remove(id)
 	end
 end)
 
@@ -1019,7 +1093,7 @@ local function renderTurnResults(lastTurn)
 	})
 
 	if #lastTurn.results == 0 then
-		local nobody = title({ Size = UDim2.fromScale(1, 0.14), Text = "Nobody guessed it!", TextColor3 = Theme.red, Parent = list }, { Ui.maxText(26) })
+		local nobody = title({ Size = UDim2.fromScale(1, 0.14), Text = "Nobody guessed it!", TextColor3 = Theme.overlayText, Parent = list }, { Ui.maxText(26) })
 		popLater(nobody, 0.3)
 		return
 	end
@@ -1044,7 +1118,7 @@ local function renderTurnResults(lastTurn)
 			Position = UDim2.fromScale(1, 0),
 			Size = UDim2.fromScale(0.3, 1),
 			Text = `+{result.points}`,
-			TextColor3 = Theme.green,
+			TextColor3 = Theme.yellow,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Parent = resultRow,
 		}, { Ui.maxText(24) })
@@ -1167,7 +1241,7 @@ local function setOverlayShown(show: boolean)
 	if show then
 		overlay.Visible = true
 		overlay.BackgroundTransparency = 1
-		Ui.tween(overlay, 0.25, { BackgroundTransparency = 0.2 })
+		Ui.tween(overlay, 0.25, { BackgroundTransparency = Theme.overlayTransparency })
 	else
 		Ui.tween(overlay, 0.25, { BackgroundTransparency = 1 })
 		Ui.tween(overlayContent, 0.25, { Position = UDim2.fromScale(0, -1) }, Enum.EasingStyle.Back, Enum.EasingDirection.In).Completed:Connect(
@@ -1314,8 +1388,11 @@ local function render()
 			Ui.pop(toolbar, 0.7, 0.3)
 		end
 	end
-	if not s.canDraw and activeStroke then
-		endStroke()
+	if not s.canDraw then
+		picker:close()
+		if activeStroke then
+			endStroke()
+		end
 	end
 	guessBox.PlaceholderText = if s.phase == "Drawing" and (s.isDrawer or s.wordIsFull)
 		then "Chat (only players who guessed see this)"

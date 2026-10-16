@@ -20,6 +20,7 @@ SCRIPTS = [
     ("client", "Sounds", "ModuleScript", "src/client/Sounds.luau"),
     ("client", "Ui", "ModuleScript", "src/client/Ui.luau"),
     ("client", "Effects", "ModuleScript", "src/client/Effects.luau"),
+    ("client", "ColorPicker", "ModuleScript", "src/client/ColorPicker.luau"),
 ]
 
 

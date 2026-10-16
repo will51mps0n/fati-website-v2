@@ -1,7 +1,9 @@
 -- Building blocks for the UI (flat skribbl.io-style panels, text, buttons, avatars)
 -- and the small tween animations used everywhere.
 
+local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 local Sounds = require(script.Parent:WaitForChild("Sounds"))
@@ -93,6 +95,25 @@ function Ui.panel(props: { [string]: any }, children: { Instance }?): Frame
 	local list = children or {}
 	table.insert(list, Ui.corner(4))
 	return make("Frame", merge({ BackgroundColor3 = Theme.panel, BorderSizePixel = 0 }, props), list)
+end
+
+-- Pointer position in full-window pixels, the space our ScreenGui is laid out in
+-- (it ignores the topbar inset), so it compares directly with AbsolutePosition.
+function Ui.pointerPosition(input: InputObject?): Vector2
+	if input and input.UserInputType == Enum.UserInputType.Touch then
+		-- Touch positions are measured from below the topbar; shift them into window space.
+		return Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
+	end
+	return UserInputService:GetMouseLocation()
+end
+
+function Ui.isPress(input: InputObject): boolean
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+function Ui.contains(gui: GuiObject, point: Vector2): boolean
+	local relative = point - gui.AbsolutePosition
+	return relative.X >= 0 and relative.Y >= 0 and relative.X <= gui.AbsoluteSize.X and relative.Y <= gui.AbsoluteSize.Y
 end
 
 -- Animation --------------------------------------------------------------------------

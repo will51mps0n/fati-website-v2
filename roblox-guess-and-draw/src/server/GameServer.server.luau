@@ -24,7 +24,7 @@ local function makeRemote(name: string): RemoteEvent
 end
 
 local StateEvent = makeRemote("State") -- S->C: game snapshot
-local DrawEvent = makeRemote("Draw") -- C->S: drawer's points; S->C: relayed points
+local DrawEvent = makeRemote("Draw") -- C->S: drawer's points and fills; S->C: relayed to everyone
 local CanvasEvent = makeRemote("Canvas") -- C->S: undo/clear/ready; S->C: undo/clear
 local ChatEvent = makeRemote("Chat") -- S->C: chat and system lines
 local GuessEvent = makeRemote("Guess") -- C->S: a guess or chat message
@@ -53,11 +53,14 @@ local scores: { [Player]: number } = {}
 local usedWords: { [string]: boolean } = {}
 local readyPlayers: { [Player]: boolean } = {}
 
--- Strokes of the current turn, kept so late joiners see the whole drawing.
-local strokes: { { id: number, c: number, s: number, p: { number } } } = {}
+-- Everything drawn this turn, in order, kept so late joiners see the whole drawing.
+-- A stroke has points `p`; a bucket fill has its start point `f`. Colours `c` are
+-- 0xRRGGBB numbers, so the colour wheel can pick any colour.
+local strokes: { { id: number, c: number, s: number?, p: { number }, f: { number }? } } = {}
 local strokesById: { [number]: any } = {}
 local totalNumbers = 0
 local drawRate: { [Player]: { windowStart: number, count: number } } = {}
+local lastFillAt: { [Player]: number } = {}
 local lastGuessAt: { [Player]: number } = {}
 
 local function now(): number
@@ -249,6 +252,10 @@ local function sendCanvasTo(player: Player)
 	CanvasEvent:FireClient(player, "clear")
 	local chunk = Config.MAX_NUMBERS_PER_PACKET
 	for _, stroke in strokes do
+		if stroke.f then
+			DrawEvent:FireClient(player, { id = stroke.id, c = stroke.c, f = stroke.f })
+			continue
+		end
 		for start = 1, math.max(#stroke.p, 1), chunk do
 			local points = table.move(stroke.p, start, math.min(start + chunk - 1, #stroke.p), 1, {})
 			DrawEvent:FireClient(player, { id = stroke.id, c = stroke.c, s = stroke.s, p = points })
@@ -277,7 +284,44 @@ DrawEvent.OnServerEvent:Connect(function(player, packet)
 	end
 
 	local id, c, s, p = packet.id, packet.c, packet.s, packet.p
-	if not isInteger(id, 1, 2 ^ 31) or not isInteger(c, 0, #Config.COLORS) or not isInteger(s, 1, #Config.BRUSH_SIZES) then
+	if not isInteger(id, 1, 2 ^ 31) or not isInteger(c, 0, 0xFFFFFF) then
+		return
+	end
+
+	local function relay(message)
+		for _, other in Players:GetPlayers() do
+			if other ~= player and readyPlayers[other] then
+				DrawEvent:FireClient(other, message)
+			end
+		end
+	end
+
+	-- Bucket fill: everyone floods the same spot on their own copy of the canvas.
+	local f = packet.f
+	if f ~= nil then
+		if typeof(f) ~= "table" or strokesById[id] then
+			return
+		end
+		-- Every client floods the whole grid for each fill, so keep them spaced out.
+		local tooSoon = lastFillAt[player] ~= nil and t - lastFillAt[player] < Config.MIN_FILL_INTERVAL
+		if tooSoon or #strokes >= Config.MAX_STROKES then
+			-- The drawer already filled on their own screen; take it back there.
+			CanvasEvent:FireClient(player, "undo", id)
+			return
+		end
+		lastFillAt[player] = t
+		local x, y = f[1], f[2]
+		if typeof(x) ~= "number" or typeof(y) ~= "number" or x ~= x or y ~= y then
+			return
+		end
+		local fill = { id = id, c = c, p = {}, f = { math.clamp(x, 0, 1), math.clamp(y, 0, 1) } }
+		strokesById[id] = fill
+		table.insert(strokes, fill)
+		relay({ id = id, c = c, f = fill.f })
+		return
+	end
+
+	if not isInteger(s, 1, #Config.BRUSH_SIZES) then
 		return
 	end
 	if typeof(p) ~= "table" or #p == 0 or #p % 2 ~= 0 or #p > Config.MAX_NUMBERS_PER_PACKET then
@@ -297,6 +341,9 @@ DrawEvent.OnServerEvent:Connect(function(player, packet)
 	end
 
 	local stroke = strokesById[id]
+	if stroke and stroke.f then
+		return
+	end
 	if not stroke then
 		if #strokes >= Config.MAX_STROKES then
 			return
@@ -308,12 +355,7 @@ DrawEvent.OnServerEvent:Connect(function(player, packet)
 	table.move(points, 1, #points, #stroke.p + 1, stroke.p)
 	totalNumbers += #points
 
-	local relay = { id = id, c = stroke.c, s = stroke.s, p = points }
-	for _, other in Players:GetPlayers() do
-		if other ~= player and readyPlayers[other] then
-			DrawEvent:FireClient(other, relay)
-		end
-	end
+	relay({ id = id, c = stroke.c, s = stroke.s, p = points })
 end)
 
 CanvasEvent.OnServerEvent:Connect(function(player, action)
@@ -679,6 +721,7 @@ Players.PlayerRemoving:Connect(function(player)
 	scores[player] = nil
 	readyPlayers[player] = nil
 	drawRate[player] = nil
+	lastFillAt[player] = nil
 	lastGuessAt[player] = nil
 	state.guessed[player] = nil
 	state.turnPoints[player] = nil

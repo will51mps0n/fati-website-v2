@@ -78,6 +78,11 @@ Config.COLORS = {
 	{ name = "Purple", color = Color3.fromRGB(140, 60, 200) },
 }
 
+-- The bucket fills on a grid this many cells wide (and tall to match the canvas).
+-- Finer grids hug lines more closely but make each fill slower and heavier.
+Config.FILL_GRID_WIDTH = 320
+Config.MIN_FILL_INTERVAL = 0.25 -- seconds between bucket fills
+
 -- Brush diameters as a fraction of the canvas width.
 Config.BRUSH_SIZES = { 0.006, 0.012, 0.024, 0.045 }
 Config.DEFAULT_BRUSH_SIZE = 2

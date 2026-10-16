@@ -21,8 +21,10 @@ local Theme = {
 	drawerRow = Color3.fromRGB(255, 236, 160),
 	selected = Color3.fromRGB(170, 120, 230), -- the active tool / brush size
 
-	overlay = Color3.fromRGB(3, 8, 29),
-	overlayText = Color3.fromRGB(220, 226, 240),
+	-- The screen over the canvas between turns: a deep green to match the background.
+	overlay = Color3.fromRGB(35, 82, 52),
+	overlayTransparency = 0.04,
+	overlayText = Color3.fromRGB(214, 240, 222),
 
 	-- Chat colours
 	green = Color3.fromRGB(86, 206, 39),

@@ -21,7 +21,7 @@ Players who join partway through a round can start guessing straight away and ge
 
 ## Look & feel
 
-The layout copies skribbl.io's. The logo sits above a centred game area. Below it is a flat white top bar with an alarm-clock timer, "Round X of Y" and "GUESS THIS _ _ _ _⁵". The player list shows each player's rank, name, points and avatar. Chat rows alternate in colour, with green for correct guesses and people joining, and orange for people leaving. The canvas has a dark overlay for choosing a word, the word reveal and the winners podium. Text uses Nunito (skribbl's font), and the word uses Roboto Mono.
+The layout copies skribbl.io's. The logo sits above a centred game area. Below it is a flat white top bar with an alarm-clock timer, "Round X of Y" and "GUESS THIS _ _ _ _⁵". The player list shows each player's rank, name, points and avatar. Chat rows alternate in colour, with green for correct guesses and people joining, and orange for people leaving. The canvas has a deep green overlay for choosing a word, the word reveal and the winners podium. Text uses Nunito (skribbl's font), and the word uses Roboto Mono.
 
 Animations include:
 - panels sliding in when you join
@@ -45,11 +45,19 @@ The 🔊 button in the top bar mutes them.
 ## Drawing tools
 
 - 14 basic colours, plus a large square showing the current colour
+- A colour wheel for any other colour: click the 🎨 current-colour square. Drag on the wheel to pick the colour, and use the slider below it for brightness.
 - 4 brush sizes
-- Pen, eraser, undo (removes the last stroke) and clear
+- Pen, eraser, paint bucket 🪣, undo (removes the last stroke or fill) and clear
 - Over the canvas, the mouse pointer becomes a dot the size and colour of the brush, centred exactly where the line is drawn
 
 The drawer's strokes stream to the server every 0.05s, and the server relays them to everyone else. Anyone who joins mid-turn receives the whole drawing so far.
+
+**How the bucket works:** lines are drawn as Roblox Frames, which have no pixels to fill. So each player's game also keeps a 320×240 grid (`FILL_GRID_WIDTH`) of which colour covers each spot.
+- A fill floods the matching area on that grid and draws it as rectangles.
+- The rectangles sit underneath the lines and reach slightly under them, so they meet the lines with no white gaps.
+- Every player builds the same grid from the same history, so a fill comes out the same on every screen.
+- Eraser marks inside a filled area take the fill colour.
+- Fills are limited to one every 0.25s (`MIN_FILL_INTERVAL`).
 
 ## Installing it
 
@@ -83,15 +91,17 @@ Scripts can only use images and sounds that have been uploaded to Roblox, by the
 | `src/shared/Words.luau` | ReplicatedStorage.GuessAndDraw | The word list |
 | `src/server/GameServer.server.luau` | ServerScriptService.GuessAndDraw | Game loop, scoring, guess checking, text filtering, stroke relay and validation |
 | `src/client/Main.client.luau` | StarterPlayerScripts.GuessAndDraw | Screen layout, drawing input, live canvas, chat and game-state screens |
-| `src/client/CanvasRenderer.luau` | StarterPlayerScripts.GuessAndDraw | Turns stroke points into on-screen line segments |
+| `src/client/CanvasRenderer.luau` | StarterPlayerScripts.GuessAndDraw | Draws strokes and bucket fills, and keeps the fill grid |
 | `src/client/Theme.luau` | StarterPlayerScripts.GuessAndDraw | Colours and fonts |
 | `src/client/Ui.luau` | StarterPlayerScripts.GuessAndDraw | Panels, buttons, avatars and the tween animations |
 | `src/client/Sounds.luau` | StarterPlayerScripts.GuessAndDraw | Plays the sound effects; handles mute |
 | `src/client/Effects.luau` | StarterPlayerScripts.GuessAndDraw | Confetti and floating "+points" text |
+| `src/client/ColorPicker.luau` | StarterPlayerScripts.GuessAndDraw | The colour wheel popup |
 
 ## Notes
 
 - The game is UI-only: `Config.SPAWN_CHARACTERS = false` means nobody gets an avatar. Set it to `true` if you add a lobby world.
 - Roblox's built-in chat is hidden, so guesses can't be typed where everyone would see them. All chat goes through `TextService` filtering, as Roblox requires. In Studio, filtering doesn't change the text.
 - The server only accepts drawing from the current drawer and checks every packet (colour and size ranges, point counts, rate limits, a total size cap).
-- Possible next steps: a fill bucket, saving `Wins` with DataStores, custom word packs, and a vote to skip a drawer.
+- The whole game area is designed at 1500×889 and zoomed out as one piece to fit the window below Roblox's topbar, so it keeps skribbl.io's proportions on any screen.
+- Possible next steps: saving `Wins` with DataStores, custom word packs, and a vote to skip a drawer.
