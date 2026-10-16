@@ -497,6 +497,8 @@ end)
 local snapshot: any = nil
 local wordChoices: { string }? = nil
 local chosenWord: string? = nil
+local customForm = false -- the drawer opened the password-protected custom word form
+local customError: TextLabel? = nil
 
 local selectedColor: Color3 = Config.COLORS[1].color
 local selectedSize = Config.DEFAULT_BRUSH_SIZE
@@ -1013,6 +1015,7 @@ end
 -- Overlay screens -----------------------------------------------------------------------------------
 
 local countdownLabel: TextLabel? = nil
+local render: () -> () -- defined below; the word choice screens call it
 
 local function overlayHeader(titleText: string, subtitleText: string?)
 	overlayTitle.Text = titleText
@@ -1062,7 +1065,7 @@ local function renderWordChoices()
 	for index, word in choices do
 		local choice = Ui.overlayButton({
 			Text = word,
-			Size = UDim2.fromScale(0.26, 1),
+			Size = UDim2.fromScale(0.24, 1),
 			LayoutOrder = index,
 			Parent = row,
 		})
@@ -1076,6 +1079,122 @@ local function renderWordChoices()
 			wobblingEmoji("✏️")
 		end)
 	end
+
+	-- A small lock to the side opens the password-protected custom word form.
+	local lock = make("TextButton", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.23),
+		Size = UDim2.fromScale(0.08, 0.2),
+		BackgroundColor3 = Theme.white,
+		BackgroundTransparency = 1,
+		Text = "🔒",
+		TextScaled = true,
+		AutoButtonColor = false,
+		Parent = overlayBody,
+	}, { Ui.square(), Ui.round(), Ui.border(2, Theme.white), Ui.pad(6) })
+	label({
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 1, 4),
+		Size = UDim2.fromScale(1.6, 0.4),
+		Text = "Custom",
+		TextColor3 = Theme.overlayText,
+		Parent = lock,
+	})
+	popLater(lock, #choices * 0.1)
+	Ui.hoverable(lock)
+	lock.Activated:Connect(function()
+		Sounds.play("click")
+		customForm = true
+		WordChoiceEvent:FireServer("custom") -- asks for a little extra time to type
+		render()
+	end)
+end
+
+local function textField(placeholder: string, y: number): TextBox
+	return make("TextBox", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, y),
+		Size = UDim2.fromScale(0.5, 0.17),
+		BackgroundColor3 = Theme.white,
+		TextColor3 = Theme.text,
+		PlaceholderText = placeholder,
+		PlaceholderColor3 = Theme.muted,
+		Text = "",
+		FontFace = Theme.bold,
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		Parent = overlayBody,
+	}, { Ui.corner(6), Ui.pad(10, 6), Ui.maxText(24) })
+end
+
+-- Password plus any word the drawer wants. The server checks the password.
+local function renderCustomForm()
+	local password = textField("Password", 0.02)
+	-- Text boxes can't hide what's typed, so the real text is invisible and dots
+	-- are drawn over it.
+	password.TextTransparency = 1
+	local dots = label({
+		Size = UDim2.fromScale(1, 1),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = password,
+	}, { Ui.maxText(24) })
+	password:GetPropertyChangedSignal("Text"):Connect(function()
+		dots.Text = string.rep("•", utf8.len(password.Text) or #password.Text)
+	end)
+
+	local word = textField("Word to draw", 0.23)
+
+	local errorLabel = label({
+		Position = UDim2.fromScale(0, 0.44),
+		Size = UDim2.fromScale(1, 0.12),
+		Text = "",
+		TextColor3 = Theme.yellow,
+		Parent = overlayBody,
+	}, { Ui.maxText(22) })
+	customError = errorLabel
+
+	local use = Ui.overlayButton({
+		Text = "Use word",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0.6),
+		Size = UDim2.fromScale(0.3, 0.2),
+		Parent = overlayBody,
+	})
+	local back = Ui.overlayButton({
+		Text = "Back",
+		Position = UDim2.fromScale(0, 0.64),
+		Size = UDim2.fromScale(0.16, 0.14),
+		Parent = overlayBody,
+	})
+
+	local function submit()
+		if password.Text == "" or string.match(word.Text, "%a") == nil then
+			errorLabel.Text = "Type the password and a word."
+			return
+		end
+		errorLabel.Text = "Checking..."
+		WordChoiceEvent:FireServer({ password = password.Text, word = word.Text })
+	end
+	use.Activated:Connect(submit)
+	password.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			word:CaptureFocus()
+		end
+	end)
+	word.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			submit()
+		end
+	end)
+	back.Activated:Connect(function()
+		customForm = false
+		render()
+	end)
+	task.defer(function()
+		password:CaptureFocus()
+	end)
 end
 
 local function renderTurnResults(lastTurn)
@@ -1257,7 +1376,7 @@ end
 local function buildOverlay(s)
 	local key = if s.phase == "Waiting"
 		then `Waiting{#s.players}`
-		elseif s.phase == "Choosing" then `Choosing{s.drawerUserId}{if wordChoices then "pick" else ""}{chosenWord or ""}`
+		elseif s.phase == "Choosing" then `Choosing{s.drawerUserId}{if wordChoices then "pick" else ""}{if customForm then "custom" else ""}{chosenWord or ""}`
 		else `{s.phase}{s.phaseEndsAt}`
 	if key == overlayKey then
 		return
@@ -1285,7 +1404,10 @@ local function buildOverlay(s)
 			Parent = overlayBody,
 		}, { Ui.maxText(140) })
 	elseif s.phase == "Choosing" then
-		if s.isDrawer and wordChoices then
+		if s.isDrawer and wordChoices and customForm then
+			overlayHeader("Custom word", "Enter the password, then any word you like")
+			renderCustomForm()
+		elseif s.isDrawer and wordChoices then
 			overlayHeader("Choose a word", "")
 			renderWordChoices()
 		elseif s.isDrawer then
@@ -1356,7 +1478,7 @@ end
 local TIMED_PHASES = { Starting = true, Choosing = true, Drawing = true, TurnEnd = true, MatchEnd = true }
 local toolbarShown = false
 
-local function render()
+function render()
 	local s = snapshot
 	if not s then
 		return
@@ -1466,6 +1588,7 @@ StateEvent.OnClientEvent:Connect(function(newSnapshot)
 	if newSnapshot.phase ~= "Choosing" then
 		wordChoices = nil
 		chosenWord = nil
+		customForm = false
 	end
 	render()
 	-- Wait a frame so freshly reordered rows have their final positions.
@@ -1473,6 +1596,16 @@ StateEvent.OnClientEvent:Connect(function(newSnapshot)
 end)
 
 WordChoiceEvent.OnClientEvent:Connect(function(options)
+	-- The server turned down a custom word.
+	if typeof(options) == "table" and options.error then
+		local errorLabel = customError
+		if errorLabel and errorLabel.Parent then
+			errorLabel.Text = options.error
+			Ui.shake(errorLabel, 4)
+		end
+		Sounds.play("tick")
+		return
+	end
 	wordChoices = options
 	if options then
 		Sounds.play("yourTurn")

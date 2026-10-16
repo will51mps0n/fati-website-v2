@@ -17,6 +17,10 @@ Config.MATCH_END_TIME = 12 -- winners screen
 
 Config.WORD_CHOICES = 3
 
+-- Opening the custom word form gives the drawer at least this many seconds to type
+-- (once per turn). The password itself lives in the server script, out of players' reach.
+Config.CUSTOM_WORD_TIME = 25
+
 -- A letter of the word is revealed once this fraction of the draw time has passed.
 Config.HINT_FRACTIONS = { 0.5, 0.75 }
 

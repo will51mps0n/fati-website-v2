@@ -28,7 +28,7 @@ local DrawEvent = makeRemote("Draw") -- C->S: drawer's points and fills; S->C: r
 local CanvasEvent = makeRemote("Canvas") -- C->S: undo/clear/ready; S->C: undo/clear
 local ChatEvent = makeRemote("Chat") -- S->C: chat and system lines
 local GuessEvent = makeRemote("Guess") -- C->S: a guess or chat message
-local WordChoiceEvent = makeRemote("WordChoice") -- S->C: options; C->S: chosen index
+local WordChoiceEvent = makeRemote("WordChoice") -- S->C: options or an error; C->S: index, "custom" or a custom word
 remotes.Parent = ReplicatedStorage
 
 -- State ------------------------------------------------------------------------
@@ -40,6 +40,7 @@ local state = {
 	drawer = nil :: Player?,
 	word = nil :: string?,
 	wordOptions = nil :: { string }?,
+	customTimeGiven = false, -- the drawer already got extra time for a custom word
 	revealed = {} :: { [number]: boolean },
 	turnStartedAt = 0,
 	guessed = {} :: { [Player]: boolean },
@@ -49,7 +50,13 @@ local state = {
 	winners = nil :: any,
 }
 
+-- The password for drawing a custom word. Server scripts never reach players'
+-- computers, so nobody can read it out of the game.
+local CUSTOM_WORD_PASSWORD = "poop123"
+local MAX_PASSWORD_TRIES = 5
+
 local scores: { [Player]: number } = {}
+local passwordFailures: { [Player]: number } = {}
 local usedWords: { [string]: boolean } = {}
 local readyPlayers: { [Player]: boolean } = {}
 
@@ -463,13 +470,70 @@ GuessEvent.OnServerEvent:Connect(function(player, text)
 	end
 end)
 
-WordChoiceEvent.OnServerEvent:Connect(function(player, index)
-	if player ~= state.drawer or state.phase ~= "Choosing" or state.word then
+-- Tidies a typed custom word, or returns nil if it isn't a drawable word.
+local function cleanCustomWord(text: string): string?
+	text = string.lower(text)
+	text = string.gsub(text, "%s+", " ")
+	text = string.gsub(text, "^ ", "")
+	text = string.gsub(text, " $", "")
+	if #text < 2 or #text > 30 or not string.match(text, "^%a[%a %-']*$") then
+		return nil
+	end
+	return text
+end
+
+WordChoiceEvent.OnServerEvent:Connect(function(player, choice)
+	local function stillChoosing()
+		return player == state.drawer and state.phase == "Choosing" and state.word == nil
+	end
+	if not stillChoosing() then
 		return
 	end
+
+	-- The drawer opened the custom word form: give them time to type (once per turn).
+	if choice == "custom" then
+		if not state.customTimeGiven then
+			state.customTimeGiven = true
+			state.phaseEndsAt = math.max(state.phaseEndsAt, now() + Config.CUSTOM_WORD_TIME)
+			broadcastState()
+		end
+		return
+	end
+
+	if typeof(choice) == "table" then
+		local function reject(message: string)
+			WordChoiceEvent:FireClient(player, { error = message })
+		end
+		if (passwordFailures[player] or 0) >= MAX_PASSWORD_TRIES then
+			reject("Too many wrong passwords - pick a word instead.")
+			return
+		end
+		if choice.password ~= CUSTOM_WORD_PASSWORD then
+			passwordFailures[player] = (passwordFailures[player] or 0) + 1
+			reject("Wrong password!")
+			return
+		end
+		local word = if typeof(choice.word) == "string" then cleanCustomWord(choice.word) else nil
+		if not word then
+			reject("Use 2-30 letters (spaces, - and ' are OK).")
+			return
+		end
+		-- Everyone sees the word at the end of the turn, so it must pass Roblox's filter.
+		local filtered = filterForBroadcast(word, player)
+		if not stillChoosing() then
+			return
+		end
+		if filtered ~= word then
+			reject("That word isn't allowed.")
+			return
+		end
+		state.word = word
+		return
+	end
+
 	local options = state.wordOptions
-	if options and isInteger(index, 1, #options) then
-		state.word = options[index]
+	if options and isInteger(choice, 1, #options) then
+		state.word = options[choice]
 	end
 end)
 
@@ -507,6 +571,7 @@ end
 local function runTurn(drawer: Player)
 	state.drawer = drawer
 	state.word = nil
+	state.customTimeGiven = false
 	state.revealed = {}
 	state.guessed = {}
 	state.guessCount = 0
@@ -722,6 +787,7 @@ Players.PlayerRemoving:Connect(function(player)
 	readyPlayers[player] = nil
 	drawRate[player] = nil
 	lastFillAt[player] = nil
+	passwordFailures[player] = nil
 	lastGuessAt[player] = nil
 	state.guessed[player] = nil
 	state.turnPoints[player] = nil

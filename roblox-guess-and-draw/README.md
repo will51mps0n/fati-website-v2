@@ -8,6 +8,9 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 - **Round:** every player gets one turn as the drawer.
 - **Turn:**
   1. **Choosing (15s):** the drawer picks one of 3 words. If they don't pick, one is chosen at random.
+     - The small 🔒 **Custom** button beside the choices lets the drawer type any word they like after entering a password. Opening it gives them at least 25s (`CUSTOM_WORD_TIME`).
+     - The password is `CUSTOM_WORD_PASSWORD` at the top of `src/server/GameServer.server.luau`. It stays on the server, so players can't read it, and 5 wrong tries lock that player out of the form.
+     - Custom words must be 2-30 letters (spaces, `-` and `'` allowed) and pass Roblox's text filter.
   2. **Drawing (80s):** guessers type in the chat box. The word shows as blanks (`_ _ _ _ _ (5)`), and letters are revealed as hints at 50% and 75% of the time.
      - A correct guess earns 50–300 points; the faster you guess, the more you get. The first correct guess earns a +50 bonus.
      - The drawer earns 50 points for each correct guess.
