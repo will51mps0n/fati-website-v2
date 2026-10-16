@@ -7,6 +7,7 @@ export type Theme = {
 	emoji: string,
 	background: Color3, -- the screen's colour behind everything
 	doodles: Color3, -- the colour of the doodle lines on it
+	still: boolean?, -- true keeps the background from sliding
 }
 
 local Themes = {
@@ -17,6 +18,7 @@ local Themes = {
 			emoji = "🎃",
 			background = Color3.fromRGB(255, 128, 20),
 			doodles = Color3.fromRGB(20, 12, 8),
+			still = true, -- black lines on bright orange look jerky when they slide
 		},
 		{
 			id = "general",

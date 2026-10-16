@@ -138,6 +138,10 @@ local background = make("Frame", {
 local doodles = Config.BACKGROUND_DOODLES ~= ""
 local tile = Config.BACKGROUND_TILE_SIZE
 local backgroundImage: ImageLabel? = nil
+-- Off for themes marked `still` (Halloween's bold lines on bright orange make the
+-- 1-pixel hops easy to see).
+local startingTheme = Themes.byId[Config.DEFAULT_THEME]
+local backgroundSliding = not (startingTheme and startingTheme.still)
 if doodles or Config.BACKGROUND_TILE ~= "" then
 	local image = make("ImageLabel", {
 		-- One tile larger than the screen so it can scroll seamlessly.
@@ -160,6 +164,9 @@ if doodles or Config.BACKGROUND_TILE ~= "" then
 		local offset = 0
 		RunService.RenderStepped:Connect(function(dt)
 			framesPerSecond += (1 / math.max(dt, 1 / 360) - framesPerSecond) * 0.02
+			if not backgroundSliding then
+				return
+			end
 			framesSinceHop += 1
 			if framesSinceHop >= math.max(1, math.round(framesPerSecond / Config.BACKGROUND_SCROLL_SPEED)) then
 				framesSinceHop = 0
@@ -179,6 +186,7 @@ local function applyTheme(themeId: string)
 	end
 	shownTheme = themeId
 	local theme = Themes.byId[themeId] or Themes.byId.general
+	backgroundSliding = not theme.still
 	Ui.tween(background, 0.8, { BackgroundColor3 = theme.background })
 	local image = backgroundImage
 	if image then
