@@ -65,8 +65,8 @@ After editing anything in `src/`, rebuild the command with `python3 tools/make_c
 
 Scripts can only use images and sounds that have been uploaded to Roblox, by their asset ID.
 
-- **Background:** `assets/background-tile.png` is a seamless square cut from your `background.jpeg`. Once uploaded and its ID is in `Config.BACKGROUND_TILE`, it repeats across the screen at 500 px per tile (`BACKGROUND_TILE_SIZE`) and drifts slowly, which gives small, detailed doodles like skribbl.io's.
-  - Until then, the full `background.jpeg` (`rbxassetid://107099391291442`) is stretched to cover the screen. That makes the doodles look big and a bit soft, because Roblox shrinks uploads to at most 1024 pixels wide.
+- **Background:** `assets/background-tile.png` is a seamless square cut from your `background.jpeg`. It's uploaded and set in `Config.BACKGROUND_TILE`, so it repeats across the screen at 500 px per tile (`BACKGROUND_TILE_SIZE`) and drifts slowly, which gives small, detailed doodles like skribbl.io's.
+  - If `BACKGROUND_TILE` is emptied, the full `background.jpeg` (`rbxassetid://107099391291442`) is stretched to cover the screen instead. That makes the doodles look big and a bit soft, because Roblox shrinks uploads to at most 1024 pixels wide.
 - **Sounds:** the six effects in `assets/sounds/` were made for this game (`tools/make_sounds.py`). They're uploaded and their IDs are set in `Config.SOUNDS`.
   - To swap one, upload a new file (**Window → Asset Manager → Import**), right-click it → **Copy ID**, and replace that line in `src/shared/Config.luau`, then rebuild the command.
   - You can also edit ReplicatedStorage → GuessAndDraw → Config in Studio, but re-running the command overwrites edits made there.

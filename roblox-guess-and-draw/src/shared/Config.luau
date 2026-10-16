@@ -39,7 +39,7 @@ Config.SPAWN_CHARACTERS = false
 -- The seamless square (assets/background-tile.png), repeated across the screen at
 -- BACKGROUND_TILE_SIZE so the doodles look small and detailed. When it's empty,
 -- BACKGROUND_IMAGE is shown once, stretched to cover the screen.
-Config.BACKGROUND_TILE = "" -- assets/background-tile.png
+Config.BACKGROUND_TILE = "rbxassetid://123267927775699" -- assets/background-tile.png
 Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 
 Config.SOUNDS = {
