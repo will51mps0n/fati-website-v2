@@ -90,7 +90,7 @@ Config.BACKGROUND_TILE_SIZE = 500 -- on-screen size of one tile in pixels; small
 -- How fast the background slides, in pixels per second; 0 keeps it still. It moves
 -- in 1-pixel hops on an even beat; faster speeds hop more often and look smoother
 -- (60 = one hop every frame on a 60 fps screen).
-Config.BACKGROUND_SCROLL_SPEED = 20
+Config.BACKGROUND_SCROLL_SPEED = 12
 Config.SOUND_VOLUME = 0.5
 
 -- Canvas ---------------------------------------------------------------------
