@@ -610,8 +610,8 @@ local themeButtonText = label({
 	TextTruncate = Enum.TextTruncate.AtEnd,
 	Parent = themeButton,
 })
--- The arrow, drawn from two bars because the font has no arrow glyph. The list
--- opens upwards, so it points up while closed and down (to close) while open.
+-- The arrow, drawn from two bars because the font has no arrow glyph. It points
+-- up because the list opens upwards.
 local themeArrow = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.new(1, -26, 0, 41),
@@ -706,10 +706,6 @@ for order, theme in Themes.list do
 	end)
 end
 showMyTheme()
-
-themeList:GetPropertyChangedSignal("Visible"):Connect(function()
-	Ui.tween(themeArrow, 0.15, { Rotation = if themeList.Visible then 0 else 180 })
-end)
 
 themeButton.Activated:Connect(function()
 	Sounds.play("click", 0.5)
