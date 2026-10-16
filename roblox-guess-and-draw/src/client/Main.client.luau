@@ -33,6 +33,30 @@ local ShopEvent = Remotes:WaitForChild("Shop") :: RemoteEvent
 -- The Robux symbol, which Roblox's fonts draw at this code point.
 local ROBUX = utf8.char(0xE002)
 
+-- Live prices from Roblox (they can change with Managed pricing); Config's price
+-- is shown until the real one arrives, or if it can't be looked up.
+local MarketplaceService = game:GetService("MarketplaceService")
+local livePrices: { [string]: number } = {}
+local function priceOf(item: string): number
+	return livePrices[item] or Config.PRODUCTS[item].price
+end
+local priceListeners: { () -> () } = {}
+for item, product in Config.PRODUCTS do
+	if product.id ~= 0 then
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(product.id, Enum.InfoType.Product)
+			end)
+			if ok and info and typeof(info.PriceInRobux) == "number" then
+				livePrices[item] = info.PriceInRobux
+				for _, listener in priceListeners do
+					listener()
+				end
+			end
+		end)
+	end
+end
+
 local player = Players.LocalPlayer
 
 -- Guesses go through this game's own chat box, so hide Roblox's chat to keep
@@ -1582,7 +1606,7 @@ local function renderWordChoices()
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 1, 4),
 		Size = UDim2.fromScale(1.6, 0.4),
-		Text = `{ROBUX}{Config.PRODUCTS.customWord.price} Custom`,
+		Text = `{ROBUX}{priceOf("customWord")} Custom`,
 		TextColor3 = Theme.overlayText,
 		Parent = lock,
 	})
@@ -1804,6 +1828,13 @@ local function renderPodium(winners)
 	end
 end
 
+-- Once Roblox tells us the real prices, redraw the price labels.
+table.insert(priceListeners, function()
+	if snapshot then
+		render()
+	end
+end)
+
 local overlayKey: string? = nil
 local overlayPhase: string? = nil
 local overlayShown = true
@@ -1938,7 +1969,7 @@ function render()
 	end
 	for item, priceLabel in shopPriceLabels do
 		local owned = s.credits and s.credits[item] or 0
-		priceLabel.Text = if owned > 0 then `Use ({owned})` else `{ROBUX}{Config.PRODUCTS[item].price}`
+		priceLabel.Text = if owned > 0 then `Use ({owned})` else `{ROBUX}{priceOf(item)}`
 	end
 
 	-- "Vote Kick: 1/3" votes against whoever is drawing; greyed out when it can't be used.

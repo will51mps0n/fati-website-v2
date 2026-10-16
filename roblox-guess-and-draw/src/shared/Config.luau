@@ -23,14 +23,15 @@ Config.CUSTOM_WORD_TIME = 30
 
 -- Robux shop. Each item is a Developer Product: create it on the Creator Hub (your
 -- game → Monetization → Developer Products) with this price, then paste its ID here.
--- The price shown in the game comes from here, so keep the two the same. Until an ID
+-- The game shows each product's live price from Roblox (which can change with
+-- "Managed pricing"); `price` is only shown if that can't be looked up. Until an ID
 -- is filled in, the item is free while testing in Studio and unavailable in the
 -- published game.
 Config.PRODUCTS = {
-	customWord = { id = 0, price = 10 }, -- draw any word you type
-	nuke = { id = 0, price = 99 }, -- wipe the current drawing
-	steal = { id = 0, price = 50 }, -- take over drawing for the rest of the turn
-	instaGuess = { id = 0, price = 25 }, -- guess the word instantly
+	customWord = { id = 3718880573, price = 9 }, -- draw any word you type
+	nuke = { id = 3718880654, price = 99 }, -- wipe the current drawing
+	steal = { id = 3718880703, price = 49 }, -- take over drawing for the rest of the turn
+	instaGuess = { id = 3718880747, price = 25 }, -- guess the word instantly
 }
 
 -- Vote to kick: a player is kicked once this share of the other players vote for

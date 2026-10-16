@@ -31,7 +31,16 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 - **🦹 Steal drawing (⏣50):** you become the drawer for the rest of the turn and keep the drawing so far. The old drawer now just watches, because they know the word.
 - **🏆 Insta guess (⏣25):** counts as a correct guess right away.
 
-Each item is a **Developer Product**. Create them on the Creator Hub (your game → Monetization → Developer Products) at these prices, and paste their IDs into `Config.PRODUCTS`.
+Each item is a **Developer Product**, set up on the Creator Hub (your game → Monetization → Developer Products), with its ID in `Config.PRODUCTS`:
+
+| Item | Product ID |
+| --- | --- |
+| Custom Word | 3718880573 |
+| Nuke Drawing | 3718880654 |
+| Steal Drawing | 3718880703 |
+| Insta Guess | 3718880747 |
+
+The buttons show each product's live price from Roblox. With Managed pricing on, Roblox can change prices (Steal Drawing is currently 49 and Custom Word 9), and the game always shows what players will actually pay.
 - Until an ID is set, that item is free when testing in Studio and unavailable in the published game.
 - A purchase that can't be used at that moment (for example, the turn ended while the player was paying) is saved as a credit. The button then shows "Use (1)". Credits last until the player leaves the server.
 
