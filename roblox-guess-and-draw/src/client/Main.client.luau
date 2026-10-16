@@ -138,16 +138,17 @@ local effectsLayer = make("Frame", {
 })
 Effects.init(effectsLayer)
 
--- Like skribbl.io's fixed-width page, the whole game sits in one centred box. It is
--- designed at 1500x889 pixels and zoomed out as a whole to fit smaller windows, so
--- everything keeps its proportions. `box` turns design-pixel rectangles into
--- positions and sizes inside it.
-local DESIGN = Vector2.new(1500, 889)
-local MARGIN = 12
+-- The whole game sits in one box laid out with skribbl.io's own measurements (in
+-- pixels at 1870 wide), then zoomed as a whole to fill the window's width, or its
+-- height if that runs out first, so everything keeps the same proportions and
+-- spacing on any screen. `box` turns design-pixel rectangles into positions and
+-- sizes inside it.
+local DESIGN = Vector2.new(1870, 1086)
+local MARGIN = 10
 
 local game_ = make("Frame", {
 	Name = "Game",
-	AnchorPoint = Vector2.new(0.5, 0.5),
+	AnchorPoint = Vector2.new(0.5, 0),
 	Size = UDim2.fromOffset(DESIGN.X, DESIGN.Y),
 	BackgroundTransparency = 1,
 	Parent = root,
@@ -167,9 +168,9 @@ end
 local function fitToScreen()
 	local inset = topInset()
 	local available = screen.AbsoluteSize - Vector2.new(MARGIN * 2, inset + MARGIN * 2)
-	gameScale.Scale = math.clamp(math.min(available.X / DESIGN.X, available.Y / DESIGN.Y), 0.1, 1)
-	-- Centred in the space below the topbar.
-	game_.Position = UDim2.new(0.5, 0, 0.5, inset / 2)
+	gameScale.Scale = math.clamp(math.min(available.X / DESIGN.X, available.Y / DESIGN.Y), 0.1, 2)
+	-- Centred left to right, pinned to the top just below Roblox's topbar.
+	game_.Position = UDim2.new(0.5, 0, 0, inset + MARGIN)
 end
 
 screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitToScreen)
@@ -185,7 +186,7 @@ end
 -- Logo -----------------------------------------------------------------------------------
 
 local LOGO_TEXT = "Guess & Draw"
-local logoPosition, logoSize = box(4, 0, 470, 72)
+local logoPosition, logoSize = box(0, 0, 430, 64)
 local logo = make("Frame", {
 	Position = logoPosition,
 	Size = logoSize,
@@ -193,7 +194,9 @@ local logo = make("Frame", {
 	Parent = game_,
 })
 -- A dark copy behind the letters gives the chunky drop shadow.
-label({
+local logoShadowOutline = Ui.textOutline(3, Theme.outline)
+local logoOutline = Ui.textOutline(3, Theme.outline)
+local logoShadow = label({
 	Position = UDim2.fromOffset(3, 4),
 	Size = UDim2.fromScale(0.86, 1),
 	Text = LOGO_TEXT,
@@ -202,52 +205,78 @@ label({
 	TextTransparency = 0.35,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	Parent = logo,
-}, { Ui.textOutline(3, Theme.outline) })
-label({
+}, { logoShadowOutline })
+local logoLetters = label({
 	Size = UDim2.fromScale(0.86, 1),
 	RichText = true,
 	Text = rainbowText(LOGO_TEXT),
 	FontFace = Theme.logo,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	Parent = logo,
-}, { Ui.textOutline(3, Theme.outline) })
-local logoPencil = label({
-	Position = UDim2.fromScale(0.86, 0),
-	Size = UDim2.fromScale(0.14, 1),
-	Text = "✏️",
-	Rotation = 10,
+}, { logoOutline })
+local logoPencil = Ui.pencil({
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.92, 0.5),
+	Size = UDim2.fromScale(0.12, 1.1),
+	Rotation = 23,
+	OutlineThickness = 3,
 	Parent = logo,
 })
-Ui.loop(logoPencil, 1.2, { Rotation = -10 })
+
+-- Like skribbl.io's logo, it doesn't glide: it flicks between two slightly
+-- different drawings (thicker outline, nudged a pixel) a few times a second, so it
+-- looks hand-drawn and alive.
+task.spawn(function()
+	local alternate = false
+	while true do
+		task.wait(0.32)
+		alternate = not alternate
+		logoOutline.Thickness = if alternate then 4.5 else 3
+		logoShadowOutline.Thickness = logoOutline.Thickness
+		logoLetters.Position = if alternate then UDim2.fromOffset(1, -1) else UDim2.new()
+		logoShadow.Position = if alternate then UDim2.fromOffset(4, 4) else UDim2.fromOffset(3, 4)
+		logoPencil.Rotation = if alternate then 27 else 23
+	end
+end)
 
 -- Top bar: alarm clock, round, word, sound toggle ----------------------------------------
 
-local topPosition, topSize = box(0, 80, 1500, 54)
+local topPosition, topSize = box(0, 70, 1870, 68)
 local topBar = Ui.panel({ Position = topPosition, Size = topSize, Parent = game_ })
 
--- A little alarm clock drawn from circles, bigger than the bar like skribbl.io's.
+-- skribbl.io's alarm clock: grey bells, a thick black ring and little legs, and a
+-- bit bigger than the bar so it pokes out above and below.
 local clock = make("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 4, 0.5, 0),
-	Size = UDim2.fromScale(1, 1.35),
+	Position = UDim2.new(0, -6, 0.5, 0),
+	Size = UDim2.fromScale(1, 1.3),
 	BackgroundTransparency = 1,
 	Parent = topBar,
 }, { Ui.square() })
 
+make("Frame", { -- the knob between the bells
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.09),
+	Size = UDim2.fromScale(0.08, 0.07),
+	BackgroundColor3 = Theme.outline,
+	ZIndex = 1,
+	Parent = clock,
+}, { Ui.corner(2) })
 for _, side in { -1, 1 } do
 	make("Frame", { -- bell
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5 + side * 0.32, 0.14),
-		Size = UDim2.fromScale(0.32, 0.32),
-		BackgroundColor3 = Theme.white,
+		Position = UDim2.fromScale(0.5 + side * 0.25, 0.15),
+		Size = UDim2.fromScale(0.32, 0.2),
+		Rotation = side * 35,
+		BackgroundColor3 = Color3.fromRGB(150, 150, 150),
 		ZIndex = 1,
 		Parent = clock,
 	}, { Ui.round(), Ui.border(3, Theme.outline) })
 	make("Frame", { -- leg
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5 + side * 0.26, 0.92),
-		Size = UDim2.fromScale(0.07, 0.2),
-		Rotation = side * -35,
+		Position = UDim2.fromScale(0.5 + side * 0.24, 0.92),
+		Size = UDim2.fromScale(0.06, 0.13),
+		Rotation = side * -40,
 		BackgroundColor3 = Theme.outline,
 		ZIndex = 1,
 		Parent = clock,
@@ -256,28 +285,28 @@ end
 
 local clockFace = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.54),
-	Size = UDim2.fromScale(0.84, 0.84),
+	Position = UDim2.fromScale(0.5, 0.55),
+	Size = UDim2.fromScale(0.8, 0.8),
 	BackgroundColor3 = Theme.white,
 	ZIndex = 2,
 	Parent = clock,
-}, { Ui.round(), Ui.border(3, Theme.outline) })
+}, { Ui.round(), Ui.border(4, Theme.outline) })
 
 local timerLabel = label({
 	Size = UDim2.fromScale(1, 1),
 	FontFace = Theme.heavy,
 	Text = "",
 	Parent = clockFace,
-}, { Ui.pad(7) })
+}, { Ui.pad(9) })
 
 local roundLabel = label({
-	Position = UDim2.fromScale(0.06, 0.2),
-	Size = UDim2.fromScale(0.22, 0.6),
+	Position = UDim2.fromScale(0.046, 0.15),
+	Size = UDim2.fromScale(0.25, 0.7),
 	FontFace = Theme.bold,
 	Text = "",
 	TextXAlignment = Enum.TextXAlignment.Left,
 	Parent = topBar,
-}, { Ui.maxText(24) })
+}, { Ui.maxText(32) })
 
 local wordArea = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -288,26 +317,96 @@ local wordArea = make("Frame", {
 })
 
 local wordCaption = label({
-	Position = UDim2.fromScale(0, 0.1),
+	Position = UDim2.fromScale(0, 0.08),
 	Size = UDim2.fromScale(1, 0.3),
 	FontFace = Theme.mono,
 	Text = "",
 	Parent = wordArea,
-}, { Ui.maxText(15) })
+}, { Ui.maxText(20) })
 
-local wordLabel = label({
-	Position = UDim2.fromScale(0, 0.38),
-	Size = UDim2.fromScale(1, 0.56),
-	FontFace = Theme.monoBold,
-	Text = "",
+-- The word, one letter per box like skribbl.io: hidden letters are just an
+-- underline, and each word's letter count sits raised at the end.
+local wordRow = make("Frame", {
+	Position = UDim2.fromScale(0, 0.4),
+	Size = UDim2.fromScale(1, 0.52),
+	BackgroundTransparency = 1,
 	Parent = wordArea,
-}, { Ui.maxText(28) })
+}, {
+	make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		Padding = UDim.new(0, 5),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}),
+})
+
+local shownWord: string? = nil
+local function setWord(word: string?, hidden: boolean, color: Color3)
+	local key = if word then `{word}|{hidden}|{color:ToHex()}` else nil
+	if key == shownWord then
+		return
+	end
+	shownWord = key
+	for _, child in wordRow:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	if not word then
+		return
+	end
+	local counts, current = {}, 0
+	for i = 1, #word do
+		local char = string.sub(word, i, i)
+		if char == " " then
+			make("Frame", { Size = UDim2.fromOffset(16, 1), BackgroundTransparency = 1, LayoutOrder = i, Parent = wordRow })
+			table.insert(counts, current)
+			current = 0
+		else
+			current += 1
+			local cell = label({
+				Size = UDim2.new(0, 20, 1, 0),
+				Text = if char == "_" then "" else char,
+				FontFace = Theme.monoBold,
+				TextScaled = false,
+				TextSize = 30,
+				TextColor3 = color,
+				TextYAlignment = Enum.TextYAlignment.Bottom,
+				LayoutOrder = i,
+				Parent = wordRow,
+			})
+			if hidden then
+				make("Frame", {
+					AnchorPoint = Vector2.new(0, 1),
+					Position = UDim2.new(0, 0, 1, 2),
+					Size = UDim2.new(1, 0, 0, 3),
+					BackgroundColor3 = Theme.text,
+					BorderSizePixel = 0,
+					Parent = cell,
+				})
+			end
+		end
+	end
+	table.insert(counts, current)
+	label({
+		Size = UDim2.fromScale(0, 1),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Text = table.concat(counts, " "),
+		FontFace = Theme.mono,
+		TextScaled = false,
+		TextSize = 18,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		LayoutOrder = #word + 1,
+		Parent = wordRow,
+	}, { make("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingTop = UDim.new(0, -6) }) })
+end
 
 -- Where skribbl.io has its settings gear: a sound on/off switch.
 local soundButton = make("TextButton", {
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -8, 0.5, 0),
-	Size = UDim2.fromScale(1, 0.8),
+	Position = UDim2.new(1, -6, 0.5, 0),
+	Size = UDim2.fromScale(1, 0.85),
 	BackgroundTransparency = 1,
 	Text = "🔊",
 	TextScaled = true,
@@ -322,11 +421,11 @@ end)
 
 -- Left: players ----------------------------------------------------------------------------
 
-local MAIN_TOP = 142
-local CANVAS_HEIGHT = 675
+local MAIN_TOP = 147
+local CANVAS_HEIGHT = 856 -- 4:3 of the 1141-wide canvas
 
-local playersPosition, playersSize = box(0, MAIN_TOP, 230, CANVAS_HEIGHT)
-local playersList = make("ScrollingFrame", {
+local playersPosition, playersSize = box(0, MAIN_TOP, 284, CANVAS_HEIGHT)
+local playersScroller = make("ScrollingFrame", {
 	Position = playersPosition,
 	Size = playersSize,
 	BackgroundTransparency = 1,
@@ -335,13 +434,22 @@ local playersList = make("ScrollingFrame", {
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	Parent = game_,
+})
+-- Like skribbl.io's, the list is one white card with rounded corners, only as tall
+-- as its rows (the small padding keeps the rows inside the rounded corners).
+local playersList = Ui.panel({
+	Size = UDim2.fromScale(1, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	Parent = playersScroller,
 }, {
 	make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
+	make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }),
 })
+playersList:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 7)
 
 -- Centre: canvas and toolbar ------------------------------------------------------------------
 
-local canvasPosition, canvasSize = box(238, MAIN_TOP, 900, CANVAS_HEIGHT)
+local canvasPosition, canvasSize = box(293, MAIN_TOP, 1141, CANVAS_HEIGHT)
 local canvasArea = make("Frame", {
 	Position = canvasPosition,
 	Size = canvasSize,
@@ -432,7 +540,7 @@ local overlayBody = make("Frame", {
 })
 
 -- Below the canvas: the drawing tools, shown only to the drawer.
-local toolbarPosition, toolbarSize = box(238, MAIN_TOP + CANVAS_HEIGHT + 10, 900, 56)
+local toolbarPosition, toolbarSize = box(293, MAIN_TOP + CANVAS_HEIGHT + 10, 1141, 64)
 local toolbar = make("Frame", {
 	Position = toolbarPosition,
 	Size = toolbarSize,
@@ -451,11 +559,11 @@ local toolbar = make("Frame", {
 
 -- Right: chat ----------------------------------------------------------------------------------
 
-local chatPosition, chatSize = box(1146, MAIN_TOP, 354, CANVAS_HEIGHT)
+local chatPosition, chatSize = box(1442, MAIN_TOP, 428, CANVAS_HEIGHT)
 local chatPanel = Ui.panel({ Position = chatPosition, Size = chatSize, Parent = game_ })
 
 local chatLog = make("ScrollingFrame", {
-	Size = UDim2.new(1, 0, 1, -50),
+	Size = UDim2.new(1, 0, 1, -64),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	ScrollBarThickness = 4,
@@ -474,14 +582,14 @@ local guessBorder = Ui.border(1, Theme.border)
 local guessBox = make("TextBox", {
 	AnchorPoint = Vector2.new(0, 1),
 	Position = UDim2.new(0, 6, 1, -6),
-	Size = UDim2.new(1, -12, 0, 36),
+	Size = UDim2.new(1, -12, 0, 50),
 	BackgroundColor3 = Theme.white,
 	TextColor3 = Theme.text,
 	PlaceholderText = "Type your guess here...",
 	PlaceholderColor3 = Theme.muted,
 	Text = "",
 	FontFace = Theme.regular,
-	TextSize = 17,
+	TextSize = 23,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	ClearTextOnFocus = false,
 	Parent = chatPanel,
@@ -533,7 +641,7 @@ local function addChatLine(message)
 		RichText = true,
 		Text = text,
 		TextScaled = false,
-		TextSize = 17,
+		TextSize = 24,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		FontFace = if style.bold then Theme.bold else Theme.regular,
@@ -543,7 +651,7 @@ local function addChatLine(message)
 		BackgroundTransparency = 0,
 		LayoutOrder = chatOrder,
 		Parent = chatLog,
-	}, { Ui.pad(6, 5) })
+	}, { Ui.pad(7, 9) })
 	Ui.tween(line, 0.2, { TextTransparency = 0 })
 
 	if message.kind == "close" then
@@ -598,7 +706,7 @@ end
 local refreshToolbar: () -> ()
 
 -- The colour wheel pops up just above the toolbar, from the current-colour square.
-local pickerPosition, pickerSize = box(238, MAIN_TOP + CANVAS_HEIGHT - 318, 250, 310)
+local pickerPosition, pickerSize = box(293, MAIN_TOP + CANVAS_HEIGHT - 400, 310, 390)
 local picker = ColorPicker.new({ Position = pickerPosition, Size = pickerSize, Parent = game_ }, function(color)
 	selectedColor = color
 	if tool == "eraser" then
@@ -627,7 +735,7 @@ end)
 
 -- 7 x 2 palette squares packed edge to edge.
 local palette = make("Frame", {
-	Size = UDim2.fromScale(7 * 28 / 900, 1),
+	Size = UDim2.fromScale(7 * 32 / 1141, 1),
 	BackgroundTransparency = 1,
 	LayoutOrder = 2,
 	Parent = toolbar,
@@ -924,7 +1032,7 @@ type Row = {
 	rank: TextLabel,
 	name: TextLabel,
 	score: TextLabel,
-	pencil: TextLabel,
+	pencil: Frame,
 }
 
 local rows: { [number]: Row } = {}
@@ -932,49 +1040,50 @@ local rows: { [number]: Row } = {}
 -- A skribbl.io player row: rank top-left, name and points centred, avatar on the right.
 local function createRow(entry): Row
 	local frame = make("Frame", {
-		Size = UDim2.new(1, 0, 0, 56),
+		Size = UDim2.new(1, 0, 0, 68),
 		BackgroundColor3 = Theme.white,
 		BorderSizePixel = 0,
 		Parent = playersList,
 	})
 	local rank = label({
-		Position = UDim2.fromOffset(7, 5),
-		Size = UDim2.fromOffset(40, 20),
+		Position = UDim2.fromOffset(9, 6),
+		Size = UDim2.fromOffset(44, 26),
 		TextScaled = false,
-		TextSize = 16,
+		TextSize = 23,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = "",
 		Parent = frame,
 	})
+	-- Name and points are centred in the space between the rank and the avatar.
 	local name = label({
-		Position = UDim2.new(0, 34, 0, 8),
-		Size = UDim2.new(1, -94, 0, 20),
+		Position = UDim2.new(0, 44, 0, 9),
+		Size = UDim2.new(1, -118, 0, 26),
 		TextScaled = false,
-		TextSize = 16,
+		TextSize = 23,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Text = "",
 		Parent = frame,
 	})
 	local score = label({
-		Position = UDim2.new(0, 34, 0, 28),
-		Size = UDim2.new(1, -94, 0, 18),
+		Position = UDim2.new(0, 44, 0, 35),
+		Size = UDim2.new(1, -118, 0, 22),
 		TextScaled = false,
-		TextSize = 14,
+		TextSize = 20,
 		FontFace = Theme.regular,
 		Text = "",
 		Parent = frame,
 	})
 	Ui.avatar(entry.userId, entry.name, {
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -4, 0.5, 0),
-		Size = UDim2.fromOffset(50, 50),
+		Position = UDim2.new(1, -2, 0.5, 0),
+		Size = UDim2.fromOffset(66, 66),
 		Parent = frame,
 	})
-	local pencil = label({
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -54, 0.5, 0),
-		Size = UDim2.fromOffset(22, 22),
-		Text = "✏️",
+	-- skribbl.io's pencil leans against the drawer's avatar.
+	local pencil = Ui.pencil({
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -68, 0.5, 2),
+		Size = UDim2.fromOffset(17, 58),
 		Visible = false,
 		Parent = frame,
 	})
@@ -1447,34 +1556,6 @@ end
 
 -- Rendering the game state --------------------------------------------------------------------------
 
-local SUPERSCRIPT = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" }
-
-local function superscript(n: number): string
-	return (string.gsub(tostring(n), "%d", function(digit)
-		return SUPERSCRIPT[tonumber(digit) + 1]
-	end))
-end
-
--- "_ _ p _ e" followed by the letter count of each word, like skribbl.io's "Mac³".
-local function formatWord(word: string, spaced: boolean): string
-	local chars = {}
-	local lengths = {}
-	local current = 0
-	for i = 1, #word do
-		local char = string.sub(word, i, i)
-		if char == " " then
-			table.insert(chars, if spaced then "  " else " ")
-			table.insert(lengths, superscript(current))
-			current = 0
-		else
-			table.insert(chars, char)
-			current += 1
-		end
-	end
-	table.insert(lengths, superscript(current))
-	return table.concat(chars, if spaced then " " else "") .. table.concat(lengths, " ")
-end
-
 local TIMED_PHASES = { Starting = true, Choosing = true, Drawing = true, TurnEnd = true, MatchEnd = true }
 local toolbarShown = false
 
@@ -1485,20 +1566,18 @@ function render()
 	end
 
 	roundLabel.Text = if s.round > 0 then `Round {s.round} of {s.totalRounds}` else "Waiting"
-	wordLabel.TextColor3 = Theme.text
 	if s.word and s.isDrawer then
 		wordCaption.Text = "DRAW THIS"
-		wordLabel.Text = formatWord(s.word, false)
+		setWord(s.word, false, Theme.text)
 	elseif s.word and s.wordIsFull then
 		wordCaption.Text = if s.phase == "TurnEnd" then "THE WORD WAS" else "YOU GOT IT!"
-		wordLabel.Text = formatWord(s.word, false)
-		wordLabel.TextColor3 = Theme.green
+		setWord(s.word, false, Theme.green)
 	elseif s.word then
 		wordCaption.Text = "GUESS THIS"
-		wordLabel.Text = formatWord(s.word, true)
+		setWord(s.word, true, Theme.text)
 	else
 		wordCaption.Text = "WAITING"
-		wordLabel.Text = ""
+		setWord(nil, false, Theme.text)
 	end
 
 	renderPlayers(s.players)
@@ -1552,7 +1631,7 @@ local function celebrate(old, new)
 
 	-- A hint letter appeared.
 	if sameTurn and new.phase == "Drawing" and not new.wordIsFull and countHidden(new.word) < countHidden(old.word) then
-		Ui.pulse(wordLabel, 1.3)
+		Ui.pulse(wordRow, 1.3)
 		Sounds.play("click")
 	end
 
@@ -1659,7 +1738,7 @@ end
 
 slideIn(logo, UDim2.fromScale(0, -0.15), 0)
 slideIn(topBar, UDim2.fromScale(0, -0.25), 0.05)
-slideIn(playersList, UDim2.fromScale(-0.25, 0), 0.12)
+slideIn(playersScroller, UDim2.fromScale(-0.25, 0), 0.12)
 slideIn(chatPanel, UDim2.fromScale(0.3, 0), 0.18)
 popLater(canvasArea, 0.25, 0.6)
 

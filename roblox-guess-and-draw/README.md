@@ -24,7 +24,7 @@ Players who join partway through a round can start guessing straight away and ge
 
 ## Look & feel
 
-The layout copies skribbl.io's. The logo sits above a centred game area. Below it is a flat white top bar with an alarm-clock timer, "Round X of Y" and "GUESS THIS _ _ _ _⁵". The player list shows each player's rank, name, points and avatar. Chat rows alternate in colour, with green for correct guesses and people joining, and orange for people leaving. The canvas has a deep green overlay for choosing a word, the word reveal and the winners podium. Text uses Nunito (skribbl's font), and the word uses Roboto Mono.
+The layout copies skribbl.io's, using the pixel measurements from a skribbl.io screenshot (1870 px wide: a 284 px player list, a 1141 px canvas and a 428 px chat, with 68 px player rows). The game is pinned to the top and zoomed to fill the window. The clock (grey bells, thick ring, little legs) and the pencils are drawn from shapes, and the logo flickers between two drawings like skribbl's. The logo sits above a centred game area. Below it is a flat white top bar with an alarm-clock timer, "Round X of Y" and "GUESS THIS _ _ _ _⁵". The player list shows each player's rank, name, points and avatar. Chat rows alternate in colour, with green for correct guesses and people joining, and orange for people leaving. The canvas has a deep green overlay for choosing a word, the word reveal and the winners podium. Text uses Nunito (skribbl's font), and the word uses Roboto Mono.
 
 Animations include:
 - panels sliding in when you join
@@ -106,5 +106,5 @@ Scripts can only use images and sounds that have been uploaded to Roblox, by the
 - The game is UI-only: `Config.SPAWN_CHARACTERS = false` means nobody gets an avatar. Set it to `true` if you add a lobby world.
 - Roblox's built-in chat is hidden, so guesses can't be typed where everyone would see them. All chat goes through `TextService` filtering, as Roblox requires. In Studio, filtering doesn't change the text.
 - The server only accepts drawing from the current drawer and checks every packet (colour and size ranges, point counts, rate limits, a total size cap).
-- The whole game area is designed at 1500×889 and zoomed out as one piece to fit the window below Roblox's topbar, so it keeps skribbl.io's proportions on any screen.
+- The whole game area is designed at 1870×1086 and zoomed as one piece to fit the window below Roblox's topbar, so it keeps skribbl.io's proportions and spacing on any screen.
 - Possible next steps: saving `Wins` with DataStores, custom word packs, and a vote to skip a drawer.

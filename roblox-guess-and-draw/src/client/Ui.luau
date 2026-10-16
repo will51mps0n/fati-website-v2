@@ -236,6 +236,68 @@ function Ui.toolButton(props: { [string]: any }): TextButton
 	return button
 end
 
+-- Pencil -------------------------------------------------------------------------------
+
+-- skribbl.io's chunky pencil: pink eraser, striped orange body and a sharpened tip,
+-- leaning to the right. `props` places and sizes it (it keeps a 1:3.4 shape);
+-- OutlineThickness sets the black outline.
+function Ui.pencil(props: { [string]: any }): Frame
+	local outline = props.OutlineThickness or 2
+	props.OutlineThickness = nil
+	local ink = Color3.fromRGB(10, 10, 10)
+	local pencil = make("Frame", merge({ BackgroundTransparency = 1, Rotation = 25 }, props), {
+		make("UIAspectRatioConstraint", { AspectRatio = 1 / 3.4 }),
+	})
+	-- The tip is a diamond centred on the bottom of the body; the body hides its top
+	-- half, leaving a point. A smaller dark diamond makes the lead.
+	make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.794),
+		Size = UDim2.fromScale(0.72, 1),
+		Rotation = 45,
+		BackgroundColor3 = Color3.fromRGB(245, 205, 155),
+		ZIndex = 1,
+		Parent = pencil,
+	}, { Ui.square(), Ui.border(outline, ink) })
+	make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.898),
+		Size = UDim2.fromScale(0.22, 1),
+		Rotation = 45,
+		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+		ZIndex = 2,
+		Parent = pencil,
+	}, { Ui.square() })
+	make("Frame", {
+		Position = UDim2.fromScale(0, 0.147),
+		Size = UDim2.fromScale(1, 0.647),
+		BackgroundColor3 = Color3.fromRGB(245, 140, 40),
+		ZIndex = 3,
+		Parent = pencil,
+	}, {
+		Ui.border(outline, ink),
+		make("Frame", {
+			Position = UDim2.fromScale(0.26, 0.04),
+			Size = UDim2.fromScale(0.13, 0.92),
+			BackgroundColor3 = Color3.fromRGB(255, 192, 110),
+			BorderSizePixel = 0,
+		}),
+		make("Frame", {
+			Position = UDim2.fromScale(0.6, 0.04),
+			Size = UDim2.fromScale(0.13, 0.92),
+			BackgroundColor3 = Color3.fromRGB(255, 192, 110),
+			BorderSizePixel = 0,
+		}),
+	})
+	make("Frame", { -- eraser
+		Size = UDim2.fromScale(1, 0.17),
+		BackgroundColor3 = Color3.fromRGB(250, 150, 205),
+		ZIndex = 4,
+		Parent = pencil,
+	}, { Ui.corner(5), Ui.border(outline, ink) })
+	return pencil
+end
+
 -- Avatars ------------------------------------------------------------------------------
 
 -- The player's avatar headshot. Shows their initial in a circle when there is no
