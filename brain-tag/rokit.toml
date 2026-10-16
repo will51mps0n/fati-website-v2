@@ -1,0 +1,5 @@
+# Tool versions for this project. Run `rokit install` to get them.
+[tools]
+rojo = "rojo-rbx/rojo@7.6.1"
+stylua = "JohnnyMorganz/StyLua@2.6.0"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"

@@ -1,0 +1,8 @@
+# Built place files (regenerate with `rojo build -o BrainTag.rbxlx`)
+*.rbxlx
+*.rbxl
+*.rbxlx.lock
+*.rbxl.lock
+sourcemap.json
+tools/out/
+__pycache__/

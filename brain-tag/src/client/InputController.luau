@@ -1,0 +1,92 @@
+-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
+--   Left click / R2: use item (hold for the swordfish drag)
+--   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local MovementController = require(script.Parent.MovementController)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+local InputController = {}
+
+local useRemote = Remotes.event("UseItem")
+local pickRemote = Remotes.event("PickUp")
+local dropRemote = Remotes.event("DropItem")
+local returnRemote = Remotes.event("ZombieReturn")
+
+-- Set by the HUD.
+InputController.onShop = function() end
+InputController.isMenuOpen = function(): boolean
+	return false
+end
+
+local using = false
+
+function InputController.useStart()
+	using = true
+	useRemote:FireServer("start", MovementController.aim())
+end
+
+function InputController.useStop()
+	if using then
+		using = false
+		useRemote:FireServer("stop", MovementController.aim())
+	end
+end
+
+function InputController.pickUp()
+	pickRemote:FireServer()
+end
+
+function InputController.drop()
+	dropRemote:FireServer()
+end
+
+function InputController.zombieReturn()
+	returnRemote:FireServer()
+end
+
+function InputController.shop()
+	InputController.onShop()
+end
+
+local BEGIN: { [Enum.KeyCode]: () -> () } = {
+	[Enum.KeyCode.E] = InputController.pickUp,
+	[Enum.KeyCode.G] = InputController.drop,
+	[Enum.KeyCode.B] = InputController.shop,
+	[Enum.KeyCode.Z] = InputController.zombieReturn,
+	[Enum.KeyCode.ButtonX] = InputController.pickUp,
+	[Enum.KeyCode.ButtonB] = InputController.drop,
+	[Enum.KeyCode.ButtonY] = InputController.shop,
+	[Enum.KeyCode.ButtonL1] = InputController.zombieReturn,
+	[Enum.KeyCode.ButtonR2] = InputController.useStart,
+}
+
+function InputController.start()
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if not InputController.isMenuOpen() then
+				InputController.useStart()
+			end
+			return
+		end
+		local action = BEGIN[input.KeyCode]
+		if action then
+			action()
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.KeyCode == Enum.KeyCode.ButtonR2
+		then
+			InputController.useStop()
+		end
+	end)
+end
+
+return InputController

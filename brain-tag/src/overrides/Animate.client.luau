@@ -1,0 +1,2 @@
+-- Intentionally empty. Brain Tag characters are flat top-down blobs with no
+-- limbs, so Roblox's default walk/idle animation script is replaced by this one.

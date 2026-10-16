@@ -1,0 +1,2 @@
+-- Intentionally empty. A LocalScript with this name replaces Roblox's default
+-- character sounds (footsteps, jump, landing), so Brain Tag stays footstep-free.
