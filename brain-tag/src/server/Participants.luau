@@ -41,10 +41,21 @@ local Participants = {}
 
 local byId: { [string]: Participant } = {}
 local order: { Participant } = {}
-local added = Instance.new("BindableEvent")
-local removing = Instance.new("BindableEvent")
-Participants.Added = added.Event
-Participants.Removing = removing.Event
+-- Plain callback lists, not BindableEvents: a BindableEvent hands listeners a
+-- COPY of any table it carries, and every service must share the same
+-- participant table.
+local addedCallbacks: { (Participant) -> () } = {}
+local removingCallbacks: { (Participant) -> () } = {}
+
+-- Runs `callback(p)` in its own thread for every participant added from now on.
+function Participants.onAdded(callback: (Participant) -> ())
+	table.insert(addedCallbacks, callback)
+end
+
+-- Runs `callback(p)` just before a participant is removed.
+function Participants.onRemoving(callback: (Participant) -> ())
+	table.insert(removingCallbacks, callback)
+end
 
 local function stateFolder(): Folder
 	return ReplicatedStorage:WaitForChild("BrainTagState"):WaitForChild("Participants") :: Folder
@@ -138,7 +149,9 @@ function Participants.add(info: NewParticipant): Participant
 	table.insert(order, p)
 	Participants.publish(p)
 	state.Parent = stateFolder()
-	added:Fire(p)
+	for _, callback in addedCallbacks do
+		task.spawn(callback, p)
+	end
 	return p
 end
 
@@ -146,7 +159,9 @@ function Participants.remove(p: Participant)
 	if byId[p.id] ~= p then
 		return
 	end
-	removing:Fire(p)
+	for _, callback in removingCallbacks do
+		task.spawn(callback, p)
+	end
 	byId[p.id] = nil
 	local index = table.find(order, p)
 	if index then

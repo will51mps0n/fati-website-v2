@@ -47,8 +47,14 @@ local function step(dt: number)
 		local distance = (item.projectileSpeed or 90) * dt
 		local radius = item.projectileRadius or 0.6
 		local done = false
+		-- A Spherecast ignores parts already overlapping its starting sphere,
+		-- so each cast starts a little behind the potato. Otherwise a zombie
+		-- walking into it between frames would be missed.
+		local back = radius + 1
+		local origin = shot.position - shot.direction * back
 		for _ = 1, 4 do
-			local result = workspace:Spherecast(shot.position, radius, shot.direction * distance, shot.params)
+			local result =
+				workspace:Spherecast(origin, radius, shot.direction * (distance + back), shot.params)
 			if not result then
 				break
 			end

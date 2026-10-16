@@ -186,6 +186,11 @@ function DataService.load(player: Player): Profile
 			session.loaded = true
 		end
 	end
+	if player.Parent ~= Players then
+		-- They left while we were loading: never register (or autosave) this
+		-- stale copy, or it could overwrite progress made in another server.
+		return session.data
+	end
 	sessions[player] = session
 	return session.data
 end

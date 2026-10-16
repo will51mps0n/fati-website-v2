@@ -150,7 +150,7 @@ local function step(dt: number)
 			if target.Magnitude > maxSpeed then
 				target = target.Unit * maxSpeed
 			end
-			horizontal = horizontal:Lerp(target, math.min(1, dt * 20))
+			horizontal = horizontal:Lerp(target, math.min(1, dt * 30))
 			local factor = Config.FURNITURE_PUSH_FACTOR[piece.weight]
 			local wantSpin = math.clamp(
 				piece.spin * Config.FURNITURE_SPIN * factor / math.max(1, body.Size.Magnitude / 4),

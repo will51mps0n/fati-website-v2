@@ -325,23 +325,35 @@ local function runInfection(): Winner?
 	end
 end
 
+local function runRound()
+	waitForPlayers()
+
+	resetWorld()
+	local round = state:GetAttribute("Round")
+	state:SetAttribute("Round", (if typeof(round) == "number" then round else 0) + 1)
+	ItemService.scatter()
+	setPhase("Prep", Config.PREP_SECONDS)
+	Wizard.schedule()
+	Announcer.chat("Outbreak in " .. Config.PREP_SECONDS .. " seconds. Barricade a room and grab items!")
+	if waitPhase() then
+		outbreak()
+		local winner = runInfection()
+		if winner then
+			finishRound(winner :: Winner)
+		end
+	end
+end
+
 local function loop()
 	while true do
-		waitForPlayers()
-
-		resetWorld()
-		local round = state:GetAttribute("Round")
-		state:SetAttribute("Round", (if typeof(round) == "number" then round else 0) + 1)
-		ItemService.scatter()
-		setPhase("Prep", Config.PREP_SECONDS)
-		Wizard.schedule()
-		Announcer.chat("Outbreak in " .. Config.PREP_SECONDS .. " seconds. Barricade a room and grab items!")
-		if waitPhase() then
-			outbreak()
-			local winner = runInfection()
-			if winner then
-				finishRound(winner :: Winner)
-			end
+		local ok, err = pcall(function()
+			runRound()
+			return true
+		end)
+		if not ok then
+			warn("[Rounds] round failed, starting a new one: " .. tostring(err))
+			state:SetAttribute("Winner", "")
+			task.wait(2)
 		end
 	end
 end
@@ -355,7 +367,9 @@ local function spawnNew(p: Participant)
 		p.state:SetAttribute("Team", "Zombie")
 	end
 	CharacterService.spawn(p, spawnFrame(p.team, p.scale))
-	grantRoundStartItems(p)
+	if p.team == "Human" then
+		grantRoundStartItems(p)
+	end
 	ItemService.refreshHand(p)
 	recount()
 end
@@ -389,10 +403,8 @@ function RoundManager.start()
 		ItemService.refreshHand(p)
 	end
 
-	Participants.Added:Connect(function(p)
-		task.spawn(spawnNew, p)
-	end)
-	Participants.Removing:Connect(function(p)
+	Participants.onAdded(spawnNew)
+	Participants.onRemoving(function(p)
 		if p.isBot and p.character then
 			p.character:Destroy()
 		end

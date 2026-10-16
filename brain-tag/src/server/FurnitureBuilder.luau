@@ -302,8 +302,11 @@ function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance)
 
 	body.Anchored = false
 	body.CollisionGroup = "Furniture"
+	-- Low friction with weight 1: floors (friction 0, weight 100) let pieces
+	-- glide at exactly the speed FurnitureService sets, while walls (friction
+	-- 1, weight 100) grip them, so a barricade pressed into a doorway holds.
 	body.CustomPhysicalProperties =
-		PhysicalProperties.new(Config.FURNITURE_DENSITY[spec.weight], 1, 0, 100, 1)
+		PhysicalProperties.new(Config.FURNITURE_DENSITY[spec.weight], 0.3, 0, 1, 1)
 
 	-- Stay upright but spin freely around the vertical axis.
 	local attachment = Instance.new("Attachment")

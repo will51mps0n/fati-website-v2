@@ -348,16 +348,38 @@ end
 
 -- Public ----------------------------------------------------------------------------
 
+-- Surface physics for furniture (see FurnitureBuilder): the weight-100 side
+-- of a contact decides its friction.
+local SLIPPERY = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+local GRIPPY = PhysicalProperties.new(0.7, 1, 0, 100, 1)
+
+local function setPhysics(folder: Instance, properties: PhysicalProperties)
+	for _, part in folder:GetDescendants() do
+		if part:IsA("BasePart") and part.CanCollide then
+			part.CustomPhysicalProperties = properties
+		end
+	end
+end
+
 function MapBuilder.build()
 	mapFolder = workspace:WaitForChild("Map") :: Folder
 	mapFolder:ClearAllChildren()
-	buildGround(sub("Ground", mapFolder))
-	buildRoad(sub("Road", mapFolder))
-	buildFloors(sub("Floors", mapFolder))
+	local ground = sub("Ground", mapFolder)
+	buildGround(ground)
+	local road = sub("Road", mapFolder)
+	buildRoad(road)
+	local floors = sub("Floors", mapFolder)
+	buildFloors(floors)
 	wallsFolder = sub("Walls", mapFolder)
 	buildWalls(wallsFolder)
-	buildBushes(sub("Bushes", mapFolder))
+	local bushes = sub("Bushes", mapFolder)
+	buildBushes(bushes)
 	buildBoundary(sub("Boundary", mapFolder))
+	for _, folder in { ground, road, floors } do
+		setPhysics(folder, SLIPPERY)
+	end
+	setPhysics(wallsFolder, GRIPPY)
+	setPhysics(bushes, GRIPPY)
 end
 
 function MapBuilder.wallsFolder(): Folder

@@ -9,7 +9,9 @@ end
 -- Unit vector on the ground plane, or nil when there is no horizontal part.
 function Util.flatUnit(v: Vector3): Vector3?
 	local f = Vector3.new(v.X, 0, v.Z)
-	if f.Magnitude < 1e-4 then
+	local m = f.Magnitude
+	-- `m ~= m` catches NaN; huge catches infinity (both can come from exploiters).
+	if m ~= m or m == math.huge or m < 1e-4 then
 		return nil
 	end
 	return f.Unit
