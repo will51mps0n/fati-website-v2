@@ -70,10 +70,10 @@ Names can be a username or display name, or just the start of one. Commands also
 | Theme | Colours | Words |
 | --- | --- | --- |
 | 🎃 Halloween (default) | orange, darker orange doodles | 273 |
-| 🌍 General | your original green background, unchanged | 554 |
+| 🌍 General | your original green background, unchanged | 887 |
 | 🐉 Fantasy | purple | 267 |
-| 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 371 |
-| 🏙️ People, Places & Things | blue | 216 |
+| 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 372 |
+| 🏙️ People, Places & Things | blue | 570 |
 | 🍔 Food (fast food places, candy, drinks, dishes from around the world…) | red | 308 |
 
 - Themes and their colours are in `src/shared/Themes.luau`. The words are in `src/shared/Words.luau`, by theme and then easy / medium / hard. The default theme is `Config.DEFAULT_THEME`. Easy is one simple thing a kid could draw (pumpkin, bat, cherry); medium takes more drawing (werewolf, haunted mansion, swordfish); hard is a well-known character, scene or harder-to-draw thing (Jack Skellington, platypus), never an obscure word.
