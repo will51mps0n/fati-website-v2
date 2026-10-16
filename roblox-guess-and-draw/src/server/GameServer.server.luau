@@ -117,20 +117,30 @@ local function revealRandomLetter()
 	end
 end
 
+-- One word from each list in turn, so the choices run easy, medium, hard. Words
+-- aren't repeated within a match until a list runs out.
+local TIERS = { "easy", "medium", "hard" }
+
 local function pickWords(count: number): { string }
-	local pool = {}
-	for _, word in Words do
-		if not usedWords[word] then
-			table.insert(pool, word)
-		end
-	end
-	if #pool < count then
-		table.clear(usedWords)
-		pool = table.clone(Words)
-	end
 	local picks = {}
-	for _ = 1, count do
-		local word = table.remove(pool, math.random(#pool))
+	for i = 1, count do
+		local list = Words[TIERS[(i - 1) % #TIERS + 1]]
+		local pool = {}
+		for _, word in list do
+			if not usedWords[word] and not table.find(picks, word) then
+				table.insert(pool, word)
+			end
+		end
+		if #pool == 0 then
+			-- This list is used up: allow its words again.
+			for _, word in list do
+				usedWords[word] = nil
+				if not table.find(picks, word) then
+					table.insert(pool, word)
+				end
+			end
+		end
+		local word = pool[math.random(#pool)]
 		usedWords[word] = true
 		table.insert(picks, word)
 	end

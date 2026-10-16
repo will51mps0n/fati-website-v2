@@ -7,7 +7,8 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 - **Match:** a batch of `ROUNDS_PER_MATCH` rounds (6 by default). It starts once `MIN_PLAYERS` (2) are in the server.
 - **Round:** every player gets one turn as the drawer.
 - **Turn:**
-  1. **Choosing (15s):** the drawer picks one of 3 words. If they don't pick, one is chosen at random.
+  1. **Choosing (15s):** the drawer picks one of 3 words: one easy, one medium and one hard, in that order. If they don't pick, one is chosen at random.
+     - `src/shared/Words.luau` has the three lists: 200 easy words, 160 medium (including characters like Mario, SpongeBob and Pikachu) and 150 hard (Harry Potter, Darth Vader, landmarks, ideas and sayings). Words don't repeat within a match until a list runs out.
      - The small 🔒 **Custom** button beside the choices lets the drawer type any word they like after entering a password. Opening it gives them at least 25s (`CUSTOM_WORD_TIME`).
      - The password is `CUSTOM_WORD_PASSWORD` at the top of `src/server/GameServer.server.luau`. It stays on the server, so players can't read it, and 5 wrong tries lock that player out of the form.
      - Custom words must be 2-30 letters (spaces, `-` and `'` allowed) and pass Roblox's text filter.
