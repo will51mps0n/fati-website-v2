@@ -35,12 +35,12 @@ Config.SPAWN_CHARACTERS = false
 -- Upload the files in the assets folder (see the README), then paste each asset ID
 -- between the quotes, like "rbxassetid://1234567890". Empty ones are skipped: no
 -- background picture (just the green), or no sound.
-Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 
--- "Fill" shows the picture once, covering the whole screen.
--- "Tile" repeats it and slowly scrolls it. Only use "Tile" with an image that
--- repeats seamlessly, like assets/background-tile.png.
-Config.BACKGROUND_STYLE = "Fill"
+-- The seamless square (assets/background-tile.png), repeated across the screen at
+-- BACKGROUND_TILE_SIZE so the doodles look small and detailed. When it's empty,
+-- BACKGROUND_IMAGE is shown once, stretched to cover the screen.
+Config.BACKGROUND_TILE = "" -- assets/background-tile.png
+Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 
 Config.SOUNDS = {
 	click = "", -- assets/sounds/click.ogg
@@ -51,8 +51,8 @@ Config.SOUNDS = {
 	victory = "", -- assets/sounds/victory.ogg
 }
 
-Config.BACKGROUND_TILE_SIZE = 420 -- "Tile" only: on-screen size of one tile, in pixels
-Config.BACKGROUND_SCROLL_SPEED = 12 -- "Tile" only: pixels per second; 0 keeps it still
+Config.BACKGROUND_TILE_SIZE = 500 -- on-screen size of one tile in pixels; smaller = tinier doodles
+Config.BACKGROUND_SCROLL_SPEED = 12 -- how fast the tiles drift, in pixels per second; 0 keeps them still
 Config.SOUND_VOLUME = 0.5
 
 -- Canvas ---------------------------------------------------------------------

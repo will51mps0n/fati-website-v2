@@ -101,14 +101,14 @@ local background = make("Frame", {
 	Parent = screen,
 })
 
-if Config.BACKGROUND_IMAGE ~= "" then
-	local tiled = Config.BACKGROUND_STYLE == "Tile"
+local tiled = Config.BACKGROUND_TILE ~= ""
+if tiled or Config.BACKGROUND_IMAGE ~= "" then
 	local tile = Config.BACKGROUND_TILE_SIZE
 	local image = make("ImageLabel", {
 		-- A tiled image is one tile larger than the screen so it can scroll seamlessly.
 		Size = if tiled then UDim2.new(1, tile, 1, tile) else UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		Image = Config.BACKGROUND_IMAGE,
+		Image = if tiled then Config.BACKGROUND_TILE else Config.BACKGROUND_IMAGE,
 		ScaleType = if tiled then Enum.ScaleType.Tile else Enum.ScaleType.Crop,
 		TileSize = UDim2.fromOffset(tile, tile),
 		Parent = background,
