@@ -48,7 +48,21 @@ The buttons show each product's live price from Roblox. With Managed pricing on,
 
 **Vote to kick:** the orange **Vote Kick: x/n** button in the top bar votes to kick whoever is drawing. You can also click any other player in the list and choose **👢 Vote to kick**. Chat shows "X is voting to kick Y (1/2)".
 - The kick happens once 60% of the other players have voted (`VOTE_KICK_SHARE`), with at least 2 votes (`VOTE_KICK_MIN`), so 2 players can't kick each other.
-- A kicked player can't rejoin that server.
+- A kicked player can't rejoin that server for 10 minutes (`VOTE_KICK_BAN_MINUTES`); they can join a different server straight away. Admins can't be vote-kicked.
+
+**Admins:** the game's owner (for a group game, the group's owner) and anyone in `Config.ADMINS` (usernames or user IDs). Admins type these in the game's chat box; nobody else sees them:
+
+| Command | What it does |
+| --- | --- |
+| `/help` | Lists the commands |
+| `/kick name [minutes]` | Kicks someone; they can't rejoin this server for 10 minutes, or the minutes given (0 lets them straight back) |
+| `/ban name` | Kicks someone until this server closes |
+| `/unban name` / `/unban all` | Lets kicked players back in |
+| `/skip` | Ends the current turn (or hurries a countdown) |
+| `/clear` | Wipes the drawing |
+| `/announce message` | Posts a message to everyone |
+
+Names can be a username or display name, or just the start of one. Commands also work with `:` instead of `/`.
 - Votes from or against someone who leaves stop counting.
 
 **Word themes:** the **YOUR THEME ▾** menu under the player list sets which words you get when it's your turn to draw. When you draw, everyone's background changes to your theme's colours. The top bar shows the theme under the round, and chat says "X is drawing now! (🎃 Halloween)".

@@ -55,6 +55,7 @@ local state = {
 	guessed = {} :: { [Player]: boolean },
 	guessCount = 0,
 	turnPoints = {} :: { [Player]: number },
+	skipped = false, -- an admin skipped this turn
 	lastTurn = nil :: any,
 	winners = nil :: any,
 }
@@ -67,9 +68,12 @@ local CUSTOM_WORD_PASSWORD = "poop123"
 local scores: { [Player]: number } = {}
 -- Robux items bought but not used yet, per player: credits[player][item] = count.
 local credits: { [Player]: { [string]: number } } = {}
--- kickVotes[target][voter] = true. Kicked players can't come back to this server.
+-- kickVotes[target][voter] = true.
 local kickVotes: { [Player]: { [Player]: boolean } } = {}
-local kickedUserIds: { [number]: boolean } = {}
+-- Players kicked from this server, by user ID, and when (os.time) they may come
+-- back; math.huge for a ban that lasts as long as the server.
+local bans: { [number]: { untilTime: number, name: string } } = {}
+local admins: { [Player]: boolean } = {}
 local allTimeWins: { [Player]: number } = {} -- matches won, ever, saved in a DataStore
 
 local usedWords: { [string]: boolean } = {}
@@ -519,6 +523,153 @@ local function awardGuess(player: Player)
 	broadcastState()
 end
 
+-- Admins and kicks ------------------------------------------------------------------------
+
+local function checkAdmin(player: Player): boolean
+	if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
+		return true
+	end
+	for _, admin in Config.ADMINS do
+		if admin == player.UserId or (typeof(admin) == "string" and string.lower(admin) == string.lower(player.Name)) then
+			return true
+		end
+	end
+	if game.CreatorType == Enum.CreatorType.Group then
+		local ok, rank = pcall(player.GetRankInGroup, player, game.CreatorId)
+		return ok and rank == 255 -- the group's owner
+	end
+	return false
+end
+
+-- When a kicked user may come back, as a sentence, or nil once they may.
+local function rejoinNote(userId: number): string?
+	local ban = bans[userId]
+	if not ban then
+		return nil
+	end
+	if ban.untilTime == math.huge then
+		return "You can't rejoin this server - try another one!"
+	end
+	local secondsLeft = ban.untilTime - os.time()
+	if secondsLeft <= 0 then
+		bans[userId] = nil
+		return nil
+	end
+	local minutes = math.ceil(secondsLeft / 60)
+	return `You can rejoin this server in {minutes} minute{if minutes == 1 then "" else "s"}, or try another server now.`
+end
+
+-- Kicks a player and keeps them out of this server for `minutes` (math.huge: for
+-- good; 0: they can come straight back).
+local function banFromServer(player: Player, minutes: number, reason: string)
+	if minutes > 0 then
+		bans[player.UserId] = {
+			untilTime = if minutes == math.huge then math.huge else os.time() + minutes * 60,
+			name = player.Name,
+		}
+	end
+	local note = rejoinNote(player.UserId)
+	player:Kick(if note then `{reason} {note}` else reason)
+end
+
+-- A player by (the start of) their username or display name.
+local function findPlayer(query: string): (Player?, string?)
+	query = string.lower(query)
+	local matches = {}
+	for _, player in Players:GetPlayers() do
+		local name, display = string.lower(player.Name), string.lower(player.DisplayName)
+		if name == query or display == query then
+			return player
+		end
+		if string.sub(name, 1, #query) == query or string.sub(display, 1, #query) == query then
+			table.insert(matches, player)
+		end
+	end
+	if #matches == 1 then
+		return matches[1]
+	end
+	return nil, if #matches == 0 then `Nobody here is called "{query}".` else `"{query}" matches more than one player - type more of the name.`
+end
+
+local ADMIN_HELP = {
+	"Admin commands:",
+	"/kick name [minutes] - kick someone (default " .. Config.VOTE_KICK_BAN_MINUTES .. " min before they can rejoin; 0 lets them straight back)",
+	"/ban name - kick someone until this server closes",
+	"/unban name - let a kicked player back in (/unban all for everyone)",
+	"/skip - end this turn and move on",
+	"/clear - wipe the drawing",
+	"/announce message - post a message to everyone",
+}
+
+local function runAdminCommand(admin: Player, text: string)
+	local command, rest = string.match(text, "^[/:](%a+)%s*(.*)$")
+	command = string.lower(command or "")
+	local function reply(message: string)
+		systemMessage(message, "system", { admin })
+	end
+
+	if command == "kick" or command == "ban" then
+		local query, minutesText = string.match(rest, "^(%S+)%s*(%S*)")
+		if not query then
+			reply(`Usage: /{command} name`)
+			return
+		end
+		local target, problem = findPlayer(query)
+		if not target then
+			reply(problem :: string)
+			return
+		end
+		if admins[target] then
+			reply(`{target.DisplayName} is an admin.`)
+			return
+		end
+		local minutes = if command == "ban" then math.huge else tonumber(minutesText) or Config.VOTE_KICK_BAN_MINUTES
+		minutes = math.max(0, minutes)
+		banFromServer(target, minutes, "You were kicked by an admin.")
+		systemMessage(`{target.DisplayName} was kicked by an admin.`, "kick")
+	elseif command == "unban" then
+		if string.lower(rest) == "all" then
+			table.clear(bans)
+			reply("Everyone kicked from this server can rejoin now.")
+			return
+		end
+		local query = string.lower(rest)
+		for userId, ban in bans do
+			if string.lower(ban.name) == query or tostring(userId) == query then
+				bans[userId] = nil
+				reply(`{ban.name} can rejoin now.`)
+				return
+			end
+		end
+		reply(if query == "" then "Usage: /unban name" else `Nobody called "{rest}" is kicked from this server.`)
+	elseif command == "skip" then
+		if state.phase == "Choosing" or state.phase == "Drawing" then
+			state.skipped = true
+			systemMessage("An admin skipped this turn.", "system")
+		else
+			state.phaseEndsAt = now() -- hurry along the countdown or the results screen
+		end
+	elseif command == "clear" then
+		if state.phase == "Drawing" then
+			clearCanvas()
+			systemMessage("An admin cleared the drawing.", "system")
+		else
+			reply("There's no drawing to clear right now.")
+		end
+	elseif command == "announce" then
+		local message = if rest ~= "" then filterForBroadcast(rest, admin) else nil
+		if message then
+			systemMessage(`📢 {message}`, "reveal")
+		else
+			reply("Usage: /announce message")
+		end
+	else
+		for _, line in ADMIN_HELP do
+			reply(line)
+		end
+	end
+end
+
 GuessEvent.OnServerEvent:Connect(function(player, text)
 	if typeof(text) ~= "string" then
 		return
@@ -533,6 +684,12 @@ GuessEvent.OnServerEvent:Connect(function(player, text)
 		return
 	end
 	lastGuessAt[player] = t
+
+	-- Admin commands, like /kick or /skip. Never shown in chat.
+	if admins[player] and string.match(text, "^[/:]%a") then
+		runAdminCommand(player, text)
+		return
+	end
 
 	-- The secret password, typed by the drawer while picking a word: a free custom
 	-- word. Swallowed here, so nobody else ever sees it.
@@ -718,13 +875,14 @@ local function runTurn(drawer: Player)
 	state.guessed = {}
 	state.guessCount = 0
 	state.turnPoints = {}
+	state.skipped = false
 	state.lastTurn = nil
 	clearCanvas()
 
 	-- Choosing
 	-- state.drawer, not `drawer`: someone may steal the drawing mid-turn.
 	local drawerGone = function()
-		return not isPresent(state.drawer) or not enoughPlayers()
+		return not isPresent(state.drawer) or not enoughPlayers() or state.skipped
 	end
 	state.phase = "Choosing"
 	-- The drawer's theme picks the words and colours everyone's background.
@@ -736,6 +894,9 @@ local function runTurn(drawer: Player)
 	end)
 	if drawerGone() then
 		state.wordOptions = nil
+		if isPresent(drawer) then
+			WordChoiceEvent:FireClient(drawer, nil) -- skipped: close their word choices
+		end
 		return
 	end
 	if not state.word then
@@ -782,8 +943,9 @@ local function runTurn(drawer: Player)
 		word = state.word,
 		drawerName = drawer.DisplayName,
 		everyoneGuessed = allGuessed,
-		reason = if not isPresent(drawer)
-			then "The drawer left."
+		reason = if state.skipped
+			then "An admin skipped the turn."
+			elseif not isPresent(drawer) then "The drawer left."
 			elseif allGuessed then "Everyone guessed it!"
 			else "Time's up!",
 		results = results,
@@ -969,6 +1131,10 @@ VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId, reason)
 		if not target or target == player then
 			return
 		end
+		if admins[target] then
+			systemMessage(`{target.DisplayName} is an admin and can't be vote-kicked.`, "system", { player })
+			return
+		end
 		local votes = kickVotes[target] or {}
 		kickVotes[target] = votes
 		if votes[player] then
@@ -984,9 +1150,8 @@ VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId, reason)
 		local needed = kickVotesNeeded()
 		systemMessage(`{player.DisplayName} is voting to kick {target.DisplayName} ({count}/{needed})`, "kick")
 		if count >= needed then
-			kickedUserIds[target.UserId] = true
+			banFromServer(target, Config.VOTE_KICK_BAN_MINUTES, "You were vote-kicked from this server.")
 			systemMessage(`{target.DisplayName} was kicked!`, "kick")
-			target:Kick("You were vote-kicked from this server.")
 		end
 	end
 end)
@@ -1156,8 +1321,10 @@ end
 -- Players ----------------------------------------------------------------------------
 
 local function onPlayerAdded(player: Player)
-	if kickedUserIds[player.UserId] then
-		player:Kick("You were vote-kicked from this server.")
+	admins[player] = checkAdmin(player)
+	local note = if admins[player] then nil else rejoinNote(player.UserId)
+	if note then
+		player:Kick(`You were kicked from this server. {note}`)
 		return
 	end
 	local stats = Instance.new("Folder")
@@ -1184,8 +1351,10 @@ end
 
 Players.PlayerRemoving:Connect(function(player)
 	if scores[player] == nil then
-		return -- turned away on joining (vote-kicked earlier), so never really joined
+		admins[player] = nil
+		return -- turned away on joining (kicked earlier), so never really joined
 	end
+	admins[player] = nil
 	systemMessage(`{player.DisplayName} left the room!`, "leave")
 	scores[player] = nil
 	allTimeWins[player] = nil

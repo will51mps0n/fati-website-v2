@@ -42,6 +42,13 @@ Config.PRODUCTS = {
 -- it (and never with fewer than VOTE_KICK_MIN votes, so 2 players can't kick each other).
 Config.VOTE_KICK_SHARE = 0.6
 Config.VOTE_KICK_MIN = 2
+-- A vote-kicked player can't rejoin that server for this many minutes.
+Config.VOTE_KICK_BAN_MINUTES = 10
+
+-- Admins: they can't be vote-kicked or locked out, and can type commands in the
+-- chat (/help lists them). The game's owner is always an admin (for a group game,
+-- the group's owner). Add more by username or user ID, e.g. { "Poopguy7249", 12345 }.
+Config.ADMINS = { "Poopguy7249" }
 
 -- A letter of the word is revealed once this fraction of the draw time has passed.
 Config.HINT_FRACTIONS = { 0.5, 0.75 }
