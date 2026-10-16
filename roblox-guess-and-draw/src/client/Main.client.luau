@@ -150,9 +150,22 @@ if doodles or Config.BACKGROUND_TILE ~= "" then
 	})
 	backgroundImage = image
 	if Config.BACKGROUND_SCROLL_SPEED > 0 then
-		RunService.RenderStepped:Connect(function()
-			local offset = (os.clock() * Config.BACKGROUND_SCROLL_SPEED) % tile
-			image.Position = UDim2.fromOffset(-offset, -offset)
+		-- Roblox draws GUI at whole pixels, so the drift is a series of 1-pixel hops.
+		-- Timing each hop by the clock lets frame-time wobble space them unevenly
+		-- (4 frames, then 6, then 5...), which reads as a judder on bold lines. So hop
+		-- every N frames instead, with N worked out from the smoothed frame rate: the
+		-- hops come at an even beat and the speed still matches the setting.
+		local framesPerSecond = 60
+		local framesSinceHop = 0
+		local offset = 0
+		RunService.RenderStepped:Connect(function(dt)
+			framesPerSecond += (1 / math.max(dt, 1 / 360) - framesPerSecond) * 0.02
+			framesSinceHop += 1
+			if framesSinceHop >= math.max(1, math.round(framesPerSecond / Config.BACKGROUND_SCROLL_SPEED)) then
+				framesSinceHop = 0
+				offset = (offset + 1) % tile
+				image.Position = UDim2.fromOffset(-offset, -offset)
+			end
 		end)
 	end
 end
@@ -589,7 +602,7 @@ label({
 })
 local themeButtonText = label({
 	Position = UDim2.fromOffset(12, 26),
-	Size = UDim2.new(1, -24, 0, 30),
+	Size = UDim2.new(1, -52, 0, 30),
 	Text = "",
 	TextScaled = false,
 	TextSize = 22,
@@ -597,6 +610,25 @@ local themeButtonText = label({
 	TextTruncate = Enum.TextTruncate.AtEnd,
 	Parent = themeButton,
 })
+-- The ▾ arrow, drawn from two bars because the font has no arrow glyph. It
+-- flips to point up while the list is open.
+local themeArrow = make("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(1, -26, 0, 41),
+	Size = UDim2.fromOffset(18, 18),
+	BackgroundTransparency = 1,
+	Parent = themeButton,
+})
+for _, side in { -1, 1 } do
+	make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, side * 4, 0.5, 0),
+		Size = UDim2.fromOffset(12, 4),
+		Rotation = side * -45,
+		BackgroundColor3 = Theme.text,
+		Parent = themeArrow,
+	}, { Ui.corner(2) })
+end
 Ui.hoverable(themeButton)
 
 local themeList = Ui.panel({
@@ -617,7 +649,7 @@ local themeOptions: { [string]: TextLabel } = {}
 
 local function showMyTheme()
 	local theme = Themes.byId[myTheme] or Themes.byId.general
-	themeButtonText.Text = `{theme.emoji} {theme.name} ▾`
+	themeButtonText.Text = `{theme.emoji} {theme.name}`
 	for id, tick in themeOptions do
 		tick.Text = if id == myTheme then "✓" else ""
 	end
@@ -673,6 +705,10 @@ for order, theme in Themes.list do
 	end)
 end
 showMyTheme()
+
+themeList:GetPropertyChangedSignal("Visible"):Connect(function()
+	Ui.tween(themeArrow, 0.15, { Rotation = if themeList.Visible then 180 else 0 })
+end)
 
 themeButton.Activated:Connect(function()
 	Sounds.play("click", 0.5)
