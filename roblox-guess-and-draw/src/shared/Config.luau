@@ -52,8 +52,8 @@ Config.BACKGROUND_TILE = "rbxassetid://123267927775699" -- assets/background-til
 Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 
 -- The thumbs in the canvas's top-right corner. Until these are set, emoji stand in.
-Config.THUMBS_UP_IMAGE = "" -- assets/thumbs-up.png
-Config.THUMBS_DOWN_IMAGE = "" -- assets/thumbs-down.png
+Config.THUMBS_UP_IMAGE = "rbxassetid://132536788217807" -- assets/thumbs-up.png
+Config.THUMBS_DOWN_IMAGE = "rbxassetid://108441151233215" -- assets/thumbs-down.png
 
 Config.SOUNDS = {
 	click = "rbxassetid://117439492244306", -- assets/sounds/click.ogg
