@@ -19,9 +19,32 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 
 Players who join partway through a round can start guessing straight away and get their first turn to draw in the next round. If the server drops below 2 players, the match is cancelled and the game goes back to waiting.
 
+## Look & feel
+
+The layout copies skribbl.io's. The logo sits above a centred game area. Below it is a flat white top bar with an alarm-clock timer, "Round X of Y" and "GUESS THIS _ _ _ _⁵". The player list shows each player's rank, name, points and avatar. Chat rows alternate in colour, with green for correct guesses and people joining, and orange for people leaving. The canvas has a dark overlay for choosing a word, the word reveal and the winners podium. Text uses Nunito (skribbl's font), and the word uses Roboto Mono.
+
+Animations include:
+- panels sliding in when you join
+- the overlay sliding down
+- word choices popping in
+- the timer shaking during the last 10 seconds
+- "+points" floating up from players who score
+- a "Guess!" / "Draw!" pop when a turn starts
+- a podium that rises up
+- confetti for the winners
+
+Sounds play for:
+- your turn to draw
+- correct guesses
+- each second of the countdown and the last 10 seconds of a turn
+- the time running out
+- the winner fanfare
+
+The 🔊 button in the top bar mutes them.
+
 ## Drawing tools
 
-- 14 basic colours
+- 14 basic colours, plus a large square showing the current colour
 - 4 brush sizes
 - Pen, eraser, undo (removes the last stroke) and clear
 - Over the canvas, the mouse pointer becomes a dot the size and colour of the brush, centred exactly where the line is drawn
@@ -38,17 +61,37 @@ The command creates three folders, all named `GuessAndDraw`: one in ReplicatedSt
 
 After editing anything in `src/`, rebuild the command with `python3 tools/make_command_bar.py`.
 
+### Background and sounds
+
+Scripts can only use images and sounds that have been uploaded to Roblox, by their asset ID.
+
+- **Background:** set to your uploaded `background.jpeg` (`rbxassetid://107099391291442`) and shown filling the screen.
+  - Roblox shrinks uploads to at most 1024 pixels wide, so the full image can look soft on big screens.
+  - For a sharper background that slowly scrolls, upload `assets/background-tile.png` (a seamless square cut from the same image), put its ID in `BACKGROUND_IMAGE` and set `BACKGROUND_STYLE = "Tile"`.
+- **Sounds:** the six effects in `assets/sounds/` were made for this game (`tools/make_sounds.py`). Until their IDs are filled in, the game runs silently.
+  1. In Studio, open **Window → Asset Manager → Bulk Import** and select all six `.ogg` files.
+  2. Once they're approved, right-click each one → **Copy ID**.
+  3. Paste each ID into `Config.SOUNDS`, either in `src/shared/Config.luau` (then rebuild the command) or straight into ReplicatedStorage → GuessAndDraw → Config in Studio.
+
+  Re-running the command overwrites edits made in Studio, so keep `src/shared/Config.luau` up to date too.
+
 ## Files
 
 | Path | Ends up in | What it does |
 | --- | --- | --- |
 | `CommandBar.lua` | — | The generated install command (don't edit by hand) |
 | `tools/make_command_bar.py` | — | Rebuilds `CommandBar.lua` from `src/` |
+| `tools/make_sounds.py` | — | Synthesises the sound effects into `assets/sounds/` |
+| `assets/` | Upload to Roblox | The seamless background tile and the sound effects |
 | `src/shared/Config.luau` | ReplicatedStorage.GuessAndDraw | All tunable settings: timings, rounds, scoring, colours, brush sizes, limits |
 | `src/shared/Words.luau` | ReplicatedStorage.GuessAndDraw | The word list |
 | `src/server/GameServer.server.luau` | ServerScriptService.GuessAndDraw | Game loop, scoring, guess checking, text filtering, stroke relay and validation |
-| `src/client/Main.client.luau` | StarterPlayerScripts.GuessAndDraw | The whole UI, drawing input and live canvas updates |
+| `src/client/Main.client.luau` | StarterPlayerScripts.GuessAndDraw | Screen layout, drawing input, live canvas, chat and game-state screens |
 | `src/client/CanvasRenderer.luau` | StarterPlayerScripts.GuessAndDraw | Turns stroke points into on-screen line segments |
+| `src/client/Theme.luau` | StarterPlayerScripts.GuessAndDraw | Colours and fonts |
+| `src/client/Ui.luau` | StarterPlayerScripts.GuessAndDraw | Panels, buttons, avatars and the tween animations |
+| `src/client/Sounds.luau` | StarterPlayerScripts.GuessAndDraw | Plays the sound effects; handles mute |
+| `src/client/Effects.luau` | StarterPlayerScripts.GuessAndDraw | Confetti and floating "+points" text |
 
 ## Notes
 

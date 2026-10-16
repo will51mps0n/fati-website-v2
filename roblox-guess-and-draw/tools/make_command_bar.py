@@ -16,6 +16,10 @@ SCRIPTS = [
     ("server", "GameServer", "Script", "src/server/GameServer.server.luau"),
     ("client", "Main", "LocalScript", "src/client/Main.client.luau"),
     ("client", "CanvasRenderer", "ModuleScript", "src/client/CanvasRenderer.luau"),
+    ("client", "Theme", "ModuleScript", "src/client/Theme.luau"),
+    ("client", "Sounds", "ModuleScript", "src/client/Sounds.luau"),
+    ("client", "Ui", "ModuleScript", "src/client/Ui.luau"),
+    ("client", "Effects", "ModuleScript", "src/client/Effects.luau"),
 ]
 
 

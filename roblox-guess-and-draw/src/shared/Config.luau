@@ -30,6 +30,31 @@ Config.DRAWER_POINTS_PER_GUESS = 50
 -- When false the game is UI-only: nobody gets an avatar in the 3D world.
 Config.SPAWN_CHARACTERS = false
 
+-- Look & sound -------------------------------------------------------------------
+
+-- Upload the files in the assets folder (see the README), then paste each asset ID
+-- between the quotes, like "rbxassetid://1234567890". Empty ones are skipped: no
+-- background picture (just the green), or no sound.
+Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
+
+-- "Fill" shows the picture once, covering the whole screen.
+-- "Tile" repeats it and slowly scrolls it. Only use "Tile" with an image that
+-- repeats seamlessly, like assets/background-tile.png.
+Config.BACKGROUND_STYLE = "Fill"
+
+Config.SOUNDS = {
+	click = "", -- assets/sounds/click.ogg
+	tick = "", -- assets/sounds/tick.ogg
+	correct = "", -- assets/sounds/correct.ogg
+	yourTurn = "", -- assets/sounds/your-turn.ogg
+	timeUp = "", -- assets/sounds/time-up.ogg
+	victory = "", -- assets/sounds/victory.ogg
+}
+
+Config.BACKGROUND_TILE_SIZE = 420 -- "Tile" only: on-screen size of one tile, in pixels
+Config.BACKGROUND_SCROLL_SPEED = 12 -- "Tile" only: pixels per second; 0 keeps it still
+Config.SOUND_VOLUME = 0.5
+
 -- Canvas ---------------------------------------------------------------------
 
 Config.CANVAS_ASPECT = 4 / 3 -- width / height

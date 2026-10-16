@@ -513,23 +513,30 @@ local function runTurn(drawer: Player)
 	local results = {}
 	for player, points in state.turnPoints do
 		if isPresent(player) then
-			table.insert(results, { name = player.DisplayName, points = points, isDrawer = player == drawer })
+			table.insert(results, {
+				userId = player.UserId,
+				name = player.DisplayName,
+				points = points,
+				isDrawer = player == drawer,
+			})
 		end
 	end
 	table.sort(results, function(a, b)
 		return a.points > b.points
 	end)
+	local allGuessed = isPresent(drawer) and everyoneGuessed()
 	state.lastTurn = {
 		word = state.word,
 		drawerName = drawer.DisplayName,
+		everyoneGuessed = allGuessed,
 		reason = if not isPresent(drawer)
 			then "The drawer left."
-			elseif everyoneGuessed() then "Everyone guessed it!"
+			elseif allGuessed then "Everyone guessed it!"
 			else "Time's up!",
 		results = results,
 	}
 	state.phase = "TurnEnd"
-	systemMessage(`The word was: {state.word}`, "reveal")
+	systemMessage(`The word was '{state.word}'`, "reveal")
 	waitPhase(Config.TURN_END_TIME)
 	state.drawer = nil
 	state.word = nil
@@ -556,7 +563,12 @@ local function finishMatch()
 		if place > 3 then
 			break
 		end
-		table.insert(winners, { place = place, name = entry.player.DisplayName, score = entry.score })
+		table.insert(winners, {
+			place = place,
+			userId = entry.player.UserId,
+			name = entry.player.DisplayName,
+			score = entry.score,
+		})
 		if place == 1 then
 			local stats = entry.player:FindFirstChild("leaderstats")
 			local wins = stats and stats:FindFirstChild("Wins") :: IntValue?
@@ -653,6 +665,7 @@ local function onPlayerAdded(player: Player)
 	stats.Parent = player
 
 	scores[player] = 0
+	systemMessage(`{player.DisplayName} joined the room!`, "join")
 	broadcastState()
 end
 
@@ -662,6 +675,7 @@ for _, player in Players:GetPlayers() do
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	systemMessage(`{player.DisplayName} left the room!`, "leave")
 	scores[player] = nil
 	readyPlayers[player] = nil
 	drawRate[player] = nil
