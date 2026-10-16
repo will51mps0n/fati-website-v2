@@ -8,6 +8,7 @@ export type Theme = {
 	background: Color3, -- the screen's colour behind everything
 	doodles: Color3, -- the colour of the doodle lines on it
 	still: boolean?, -- true keeps the background from sliding
+	overlay: Color3?, -- the screen over the canvas between turns (default: a darker background)
 }
 
 local Themes = {
@@ -24,8 +25,10 @@ local Themes = {
 			id = "general",
 			name = "General",
 			emoji = "🌍",
+			-- Shows the original green tile (Config.BACKGROUND_TILE) as it always was.
 			background = Color3.fromRGB(59, 106, 72),
 			doodles = Color3.fromRGB(22, 61, 37),
+			overlay = Color3.fromRGB(35, 82, 52),
 		},
 		{
 			id = "fantasy",

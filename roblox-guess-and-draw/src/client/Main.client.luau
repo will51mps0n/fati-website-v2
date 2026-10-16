@@ -132,49 +132,72 @@ local background = make("Frame", {
 	Parent = screen,
 })
 
--- The background takes the colours of the current word theme. With the doodle
--- lines uploaded (white on see-through), they're tinted per theme over a plain
--- colour; without them, the green tile shows for the General theme only.
-local doodles = Config.BACKGROUND_DOODLES ~= ""
+-- The background takes the colours of the current word theme. The General theme
+-- shows your original green tile untouched; the others show the doodle lines
+-- (white on see-through) tinted over a plain colour. Both images slide together
+-- and fade into each other when the theme changes.
 local tile = Config.BACKGROUND_TILE_SIZE
-local backgroundImage: ImageLabel? = nil
+local startingTheme = Themes.byId[Config.DEFAULT_THEME] or Themes.byId.general
 -- Off for themes marked `still` (Halloween's bold lines on bright orange make the
 -- 1-pixel hops easy to see).
-local startingTheme = Themes.byId[Config.DEFAULT_THEME]
-local backgroundSliding = not (startingTheme and startingTheme.still)
-if doodles or Config.BACKGROUND_TILE ~= "" then
-	local image = make("ImageLabel", {
+local backgroundSliding = not startingTheme.still
+
+local function backgroundLayer(image: string): ImageLabel?
+	if image == "" then
+		return nil
+	end
+	return make("ImageLabel", {
 		-- One tile larger than the screen so it can scroll seamlessly.
 		Size = UDim2.new(1, tile, 1, tile),
 		BackgroundTransparency = 1,
-		Image = if doodles then Config.BACKGROUND_DOODLES else Config.BACKGROUND_TILE,
+		Image = image,
+		ImageTransparency = 1,
 		ScaleType = Enum.ScaleType.Tile,
 		TileSize = UDim2.fromOffset(tile, tile),
 		Parent = background,
 	})
-	backgroundImage = image
-	if Config.BACKGROUND_SCROLL_SPEED > 0 then
-		-- Roblox draws GUI at whole pixels, so the drift is a series of 1-pixel hops.
-		-- Timing each hop by the clock lets frame-time wobble space them unevenly
-		-- (4 frames, then 6, then 5...), which reads as a judder on bold lines. So hop
-		-- every N frames instead, with N worked out from the smoothed frame rate: the
-		-- hops come at an even beat and the speed still matches the setting.
-		local framesPerSecond = 60
-		local framesSinceHop = 0
-		local offset = 0
-		RunService.RenderStepped:Connect(function(dt)
-			framesPerSecond += (1 / math.max(dt, 1 / 360) - framesPerSecond) * 0.02
-			if not backgroundSliding then
-				return
-			end
-			framesSinceHop += 1
-			if framesSinceHop >= math.max(1, math.round(framesPerSecond / Config.BACKGROUND_SCROLL_SPEED)) then
-				framesSinceHop = 0
-				offset = (offset + 1) % tile
+end
+local tileImage = backgroundLayer(Config.BACKGROUND_TILE)
+local doodleImage = backgroundLayer(Config.BACKGROUND_DOODLES)
+
+-- The green tile for General (if it's set), else the tinted doodles.
+local function showsTile(theme: Themes.Theme): boolean
+	return theme.id == "general" and tileImage ~= nil
+end
+
+-- Start out showing the default theme, until the server says whose turn it is.
+background.BackgroundColor3 = startingTheme.background
+if tileImage then
+	tileImage.ImageTransparency = if showsTile(startingTheme) then 0 else 1
+end
+if doodleImage then
+	doodleImage.ImageColor3 = startingTheme.doodles
+	doodleImage.ImageTransparency = if showsTile(startingTheme) then 1 else 0
+end
+
+if (tileImage or doodleImage) and Config.BACKGROUND_SCROLL_SPEED > 0 then
+	-- Roblox draws GUI at whole pixels, so the drift is a series of 1-pixel hops.
+	-- Timing each hop by the clock lets frame-time wobble space them unevenly
+	-- (4 frames, then 6, then 5...), which reads as a judder on bold lines. So hop
+	-- every N frames instead, with N worked out from the smoothed frame rate: the
+	-- hops come at an even beat and the speed still matches the setting.
+	local framesPerSecond = 60
+	local framesSinceHop = 0
+	local offset = 0
+	RunService.RenderStepped:Connect(function(dt)
+		framesPerSecond += (1 / math.max(dt, 1 / 360) - framesPerSecond) * 0.02
+		if not backgroundSliding then
+			return
+		end
+		framesSinceHop += 1
+		if framesSinceHop >= math.max(1, math.round(framesPerSecond / Config.BACKGROUND_SCROLL_SPEED)) then
+			framesSinceHop = 0
+			offset = (offset + 1) % tile
+			for _, image in { tileImage, doodleImage } do
 				image.Position = UDim2.fromOffset(-offset, -offset)
 			end
-		end)
-	end
+		end
+	end)
 end
 
 local shownTheme: string? = nil
@@ -188,14 +211,12 @@ local function applyTheme(themeId: string)
 	local theme = Themes.byId[themeId] or Themes.byId.general
 	backgroundSliding = not theme.still
 	Ui.tween(background, 0.8, { BackgroundColor3 = theme.background })
-	local image = backgroundImage
-	if image then
-		if doodles then
-			Ui.tween(image, 0.8, { ImageColor3 = theme.doodles, ImageTransparency = 0 })
-		else
-			-- Only the green tile is available: show it for General, plain colour otherwise.
-			Ui.tween(image, 0.8, { ImageTransparency = if theme.id == "general" then 0 else 1 })
-		end
+	local showTile = showsTile(theme)
+	if tileImage then
+		Ui.tween(tileImage, 0.8, { ImageTransparency = if showTile then 0 else 1 })
+	end
+	if doodleImage then
+		Ui.tween(doodleImage, 0.8, { ImageColor3 = theme.doodles, ImageTransparency = if showTile then 1 else 0 })
 	end
 	applyThemeToOverlay(theme)
 end
@@ -792,7 +813,7 @@ local overlay = canvasLayer("Frame", {
 }, { Ui.corner(4) })
 
 applyThemeToOverlay = function(theme)
-	Ui.tween(overlay, 0.8, { BackgroundColor3 = theme.background:Lerp(Color3.new(0, 0, 0), 0.45) })
+	Ui.tween(overlay, 0.8, { BackgroundColor3 = theme.overlay or theme.background:Lerp(Color3.new(0, 0, 0), 0.45) })
 end
 
 local overlayContent = make("Frame", {
