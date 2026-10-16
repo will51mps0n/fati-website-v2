@@ -28,6 +28,10 @@ local ChatEvent = Remotes:WaitForChild("Chat") :: RemoteEvent
 local GuessEvent = Remotes:WaitForChild("Guess") :: RemoteEvent
 local WordChoiceEvent = Remotes:WaitForChild("WordChoice") :: RemoteEvent
 local VoteEvent = Remotes:WaitForChild("Vote") :: RemoteEvent
+local ShopEvent = Remotes:WaitForChild("Shop") :: RemoteEvent
+
+-- The Robux symbol, which Roblox's fonts draw at this code point.
+local ROBUX = utf8.char(0xE002)
 
 local player = Players.LocalPlayer
 
@@ -443,6 +447,28 @@ soundButton.Activated:Connect(function()
 	Sounds.play("click")
 end)
 
+-- Orange pill buttons in the top bar.
+local function pill(text: string, width: number, rightOffset: number): TextButton
+	local button = make("TextButton", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -rightOffset, 0.5, 0),
+		Size = UDim2.fromOffset(width, 48),
+		BackgroundColor3 = Color3.fromRGB(255, 150, 30),
+		AutoButtonColor = false,
+		Text = text,
+		TextScaled = true,
+		FontFace = Theme.heavy,
+		TextColor3 = Theme.white,
+		Parent = topBar,
+	}, { Ui.corner(10), Ui.pad(14, 9) })
+	Ui.hoverable(button)
+	return button
+end
+
+-- Votes to kick whoever is drawing right now (e.g. for drawing something rude).
+local voteKickButton = pill("Vote Kick: 0/2", 230, 230)
+local reportButton = pill("Report", 140, 78)
+
 -- Left: players ----------------------------------------------------------------------------
 
 local MAIN_TOP = 147
@@ -636,6 +662,76 @@ for order, vote in RATINGS do
 	end)
 end
 
+-- The Robux shop under the canvas, for everyone but the drawer.
+local shopBar = make("Frame", {
+	Position = toolbarPosition,
+	Size = toolbarSize,
+	BackgroundTransparency = 1,
+	Visible = false,
+	Parent = game_,
+}, {
+	make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 22),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}),
+})
+
+local SHOP_ITEMS = {
+	{ item = "nuke", title = "NUKE DRAWING!", icon = "💣", color = Color3.fromRGB(235, 85, 85) },
+	{ item = "steal", title = "STEAL DRAWING!", icon = "🦹", color = Color3.fromRGB(80, 140, 235) },
+	{ item = "instaGuess", title = "INSTA GUESS!", icon = "🏆", color = Color3.fromRGB(245, 160, 40) },
+}
+local shopPriceLabels: { [string]: TextLabel } = {}
+
+for order, entry in SHOP_ITEMS do
+	local button = make("TextButton", {
+		Size = UDim2.new(0, 330, 1, 0),
+		BackgroundColor3 = Theme.white,
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = order,
+		Parent = shopBar,
+	}, {
+		Ui.corner(16),
+		Ui.border(3, entry.color:Lerp(Theme.outline, 0.4)),
+		make("UIGradient", { Color = ColorSequence.new(Theme.white:Lerp(entry.color, 0.25), entry.color), Rotation = 90 }),
+	})
+	label({ -- big icon poking out on the left
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, -14, 0.5, 0),
+		Size = UDim2.fromOffset(84, 84),
+		Text = entry.icon,
+		Rotation = -10,
+		Parent = button,
+	})
+	shopPriceLabels[entry.item] = label({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -14, 0, 2),
+		Size = UDim2.new(0.5, 0, 0.36, 0),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Right,
+		FontFace = Theme.heavy,
+		TextColor3 = Theme.white,
+		Parent = button,
+	}, { Ui.textOutline(2) })
+	label({
+		Position = UDim2.new(0, 70, 0.34, 0),
+		Size = UDim2.new(1, -82, 0.62, 0),
+		Text = entry.title,
+		FontFace = Theme.heavy,
+		TextColor3 = Theme.white,
+		Parent = button,
+	}, { Ui.textOutline(2.5) })
+	Ui.hoverable(button)
+	button.Activated:Connect(function()
+		Sounds.play("click")
+		ShopEvent:FireServer(entry.item)
+	end)
+end
+
 -- Right: chat ----------------------------------------------------------------------------------
 
 local chatPosition, chatSize = box(1442, MAIN_TOP, 428, CANVAS_HEIGHT)
@@ -712,6 +808,7 @@ local CHAT_STYLES = {
 	like = { text = Theme.green, bold = true },
 	dislike = { text = Theme.orange, bold = true },
 	kick = { text = Theme.orange, bold = true },
+	power = { text = Theme.selected, bold = true },
 }
 
 local function addChatLine(message)
@@ -933,7 +1030,9 @@ refreshToolbar()
 
 -- Drawing input -----------------------------------------------------------------------------------
 
-local strokeCounter = 0
+-- Starts at a random point so that after someone steals the drawing, their stroke
+-- IDs don't clash with the previous drawer's.
+local strokeCounter = math.random(1, 2 ^ 20) * 1024
 local activeStroke: { id: number, c: number, s: number, lastX: number, lastY: number }? = nil
 local activeInput: InputObject? = nil
 local pending: { number } = {}
@@ -1177,6 +1276,104 @@ local function openKickMenu(userId: number, name: string, row: GuiObject)
 end
 
 kickMenuClose.Activated:Connect(closeKickMenu)
+-- The Report button: pick a player, then a reason. Reports are saved for the
+-- game's owner; for anything serious, Roblox's own menu (☰ → Report) is the way.
+local REPORT_REASONS = { "Inappropriate drawing", "Bad language", "Cheating or spamming", "Being mean" }
+local reportMenu = Ui.panel({
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.fromOffset(DESIGN.X - 70, 146),
+	Size = UDim2.fromOffset(380, 100),
+	Visible = false,
+	ZIndex = 20,
+	Parent = game_,
+}, { Ui.border(2, Theme.border), Ui.pad(12) })
+make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = reportMenu })
+
+local function closeReportMenu()
+	reportMenu.Visible = false
+end
+
+local function reportOption(text: string, order: number, color: Color3?): TextButton
+	local option = make("TextButton", {
+		Size = UDim2.new(1, 0, 0, 44),
+		BackgroundColor3 = color or Theme.rowAlt,
+		AutoButtonColor = false,
+		Text = text,
+		TextScaled = true,
+		FontFace = Theme.bold,
+		TextColor3 = if color then Theme.white else Theme.text,
+		LayoutOrder = order,
+		Parent = reportMenu,
+	}, { Ui.corner(8), Ui.pad(10, 9) })
+	option.MouseEnter:Connect(function()
+		option.BackgroundTransparency = 0.25
+	end)
+	option.MouseLeave:Connect(function()
+		option.BackgroundTransparency = 0
+	end)
+	return option
+end
+
+local function fillReportMenu(title: string, options: { { text: string, color: Color3?, pick: () -> () } })
+	clearChildren(reportMenu)
+	label({ Size = UDim2.new(1, 0, 0, 30), Text = title, TextScaled = false, TextSize = 22, LayoutOrder = 0, Parent = reportMenu })
+	for i, option in options do
+		reportOption(option.text, i, option.color).Activated:Connect(option.pick)
+	end
+	reportMenu.Size = UDim2.fromOffset(380, 24 + 30 + #options * 52)
+end
+
+local function openReportMenu()
+	local s = snapshot
+	if reportMenu.Visible or not s then
+		closeReportMenu()
+		return
+	end
+	local options = {}
+	for _, entry in s.players do
+		if entry.userId ~= player.UserId then
+			table.insert(options, {
+				text = entry.name,
+				pick = function()
+					local reasons = {}
+					for _, reason in REPORT_REASONS do
+						table.insert(reasons, {
+							text = reason,
+							pick = function()
+								VoteEvent:FireServer("report", entry.userId, reason)
+								Sounds.play("click")
+								closeReportMenu()
+							end,
+						})
+					end
+					table.insert(reasons, { text = "Cancel", color = Theme.muted, pick = closeReportMenu })
+					fillReportMenu(`Why report {entry.name}?`, reasons)
+				end,
+			})
+		end
+	end
+	if #options == 0 then
+		table.insert(options, { text = "Nobody else is here yet", pick = closeReportMenu })
+	end
+	table.insert(options, { text = "Cancel", color = Theme.muted, pick = closeReportMenu })
+	fillReportMenu("Report a player", options)
+	reportMenu.Visible = true
+	Ui.pop(reportMenu, 0.7, 0.25)
+end
+
+reportButton.Activated:Connect(function()
+	Sounds.play("click")
+	openReportMenu()
+end)
+
+voteKickButton.Activated:Connect(function()
+	local s = snapshot
+	if s and s.drawerUserId and not s.isDrawer and not s.votedOnDrawer then
+		Sounds.play("click")
+		VoteEvent:FireServer("kick", s.drawerUserId)
+	end
+end)
+
 kickButton.Activated:Connect(function()
 	if kickTarget then
 		VoteEvent:FireServer("kick", kickTarget)
@@ -1369,7 +1566,7 @@ local function renderWordChoices()
 		end)
 	end
 
-	-- A small lock to the side opens the password-protected custom word form.
+	-- A small lock to the side: pay to draw any word you type.
 	local lock = make("TextButton", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.fromScale(1, 0.23),
@@ -1385,7 +1582,7 @@ local function renderWordChoices()
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 1, 4),
 		Size = UDim2.fromScale(1.6, 0.4),
-		Text = "Custom",
+		Text = `{ROBUX}{Config.PRODUCTS.customWord.price} Custom`,
 		TextColor3 = Theme.overlayText,
 		Parent = lock,
 	})
@@ -1393,9 +1590,8 @@ local function renderWordChoices()
 	Ui.hoverable(lock)
 	lock.Activated:Connect(function()
 		Sounds.play("click")
-		customForm = true
-		WordChoiceEvent:FireServer("custom") -- asks for a little extra time to type
-		render()
+		-- The server asks for the Robux; the form opens once it's paid.
+		ShopEvent:FireServer("customWord")
 	end)
 end
 
@@ -1417,26 +1613,12 @@ local function textField(placeholder: string, y: number): TextBox
 	}, { Ui.corner(6), Ui.pad(10, 6), Ui.maxText(24) })
 end
 
--- Password plus any word the drawer wants. The server checks the password.
+-- Once paid for, the drawer can type any word. The server checks it's allowed.
 local function renderCustomForm()
-	local password = textField("Password", 0.02)
-	-- Text boxes can't hide what's typed, so the real text is invisible and dots
-	-- are drawn over it.
-	password.TextTransparency = 1
-	local dots = label({
-		Size = UDim2.fromScale(1, 1),
-		Text = "",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = password,
-	}, { Ui.maxText(24) })
-	password:GetPropertyChangedSignal("Text"):Connect(function()
-		dots.Text = string.rep("•", utf8.len(password.Text) or #password.Text)
-	end)
-
-	local word = textField("Word to draw", 0.23)
+	local word = textField("Type any word to draw", 0.06)
 
 	local errorLabel = label({
-		Position = UDim2.fromScale(0, 0.44),
+		Position = UDim2.fromScale(0, 0.3),
 		Size = UDim2.fromScale(1, 0.12),
 		Text = "",
 		TextColor3 = Theme.yellow,
@@ -1447,31 +1629,26 @@ local function renderCustomForm()
 	local use = Ui.overlayButton({
 		Text = "Use word",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.fromScale(0.5, 0.6),
+		Position = UDim2.fromScale(0.5, 0.48),
 		Size = UDim2.fromScale(0.3, 0.2),
 		Parent = overlayBody,
 	})
 	local back = Ui.overlayButton({
 		Text = "Back",
-		Position = UDim2.fromScale(0, 0.64),
+		Position = UDim2.fromScale(0, 0.52),
 		Size = UDim2.fromScale(0.16, 0.14),
 		Parent = overlayBody,
 	})
 
 	local function submit()
-		if password.Text == "" or string.match(word.Text, "%a") == nil then
-			errorLabel.Text = "Type the password and a word."
+		if string.match(word.Text, "%a") == nil then
+			errorLabel.Text = "Type a word first."
 			return
 		end
 		errorLabel.Text = "Checking..."
-		WordChoiceEvent:FireServer({ password = password.Text, word = word.Text })
+		WordChoiceEvent:FireServer({ word = word.Text })
 	end
 	use.Activated:Connect(submit)
-	password.FocusLost:Connect(function(enterPressed)
-		if enterPressed then
-			word:CaptureFocus()
-		end
-	end)
 	word.FocusLost:Connect(function(enterPressed)
 		if enterPressed then
 			submit()
@@ -1482,7 +1659,7 @@ local function renderCustomForm()
 		render()
 	end)
 	task.defer(function()
-		password:CaptureFocus()
+		word:CaptureFocus()
 	end)
 end
 
@@ -1684,7 +1861,7 @@ local function buildOverlay(s)
 		}, { Ui.maxText(140) })
 	elseif s.phase == "Choosing" then
 		if s.isDrawer and wordChoices and customForm then
-			overlayHeader("Custom word", "Enter the password, then any word you like")
+			overlayHeader("Custom word", "Draw anything you like - keep it family friendly!")
 			renderCustomForm()
 		elseif s.isDrawer and wordChoices then
 			overlayHeader("Choose a word", "")
@@ -1751,6 +1928,23 @@ function render()
 	end
 
 	renderPlayers(s.players)
+
+	local canShop = s.phase == "Drawing" and not s.isDrawer
+	if canShop ~= shopBar.Visible then
+		shopBar.Visible = canShop
+		if canShop then
+			Ui.pop(shopBar, 0.8, 0.3)
+		end
+	end
+	for item, priceLabel in shopPriceLabels do
+		local owned = s.credits and s.credits[item] or 0
+		priceLabel.Text = if owned > 0 then `Use ({owned})` else `{ROBUX}{Config.PRODUCTS[item].price}`
+	end
+
+	-- "Vote Kick: 1/3" votes against whoever is drawing; greyed out when it can't be used.
+	local canVoteKick = s.drawerUserId ~= nil and not s.isDrawer and not s.votedOnDrawer
+	voteKickButton.Text = `Vote Kick: {s.drawerKickVotes or 0}/{s.kickVotesNeeded or 2}`
+	voteKickButton.BackgroundColor3 = if canVoteKick then Color3.fromRGB(255, 150, 30) else Color3.fromRGB(200, 190, 175)
 
 	local canRate = s.phase == "Drawing" and not s.isDrawer and not ratedThisTurn
 	if canRate ~= rateBar.Visible then
@@ -1859,6 +2053,13 @@ StateEvent.OnClientEvent:Connect(function(newSnapshot)
 end)
 
 WordChoiceEvent.OnClientEvent:Connect(function(options)
+	-- A custom word was paid for (or unlocked): show the form.
+	if typeof(options) == "table" and options.custom then
+		customForm = true
+		Sounds.play("yourTurn", 0.6)
+		render()
+		return
+	end
 	-- The server turned down a custom word.
 	if typeof(options) == "table" and options.error then
 		local errorLabel = customError
@@ -1874,6 +2075,25 @@ WordChoiceEvent.OnClientEvent:Connect(function(options)
 		Sounds.play("yourTurn")
 	end
 	render()
+end)
+
+-- Someone bought a nuke: a flash, a shake and a big boom over the canvas.
+ShopEvent.OnClientEvent:Connect(function(effect)
+	if effect ~= "nuke" then
+		return
+	end
+	local flash = canvasLayer("Frame", {
+		BackgroundColor3 = Color3.fromRGB(255, 230, 150),
+		BackgroundTransparency = 0,
+		ZIndex = 6,
+	}, { Ui.corner(4) })
+	Ui.tween(flash, 0.8, { BackgroundTransparency = 1 })
+	task.delay(0.9, function()
+		flash:Destroy()
+	end)
+	Ui.shake(canvasArea, 4)
+	Effects.floatText("💥", Theme.white, Effects.centreOf(canvas), 140)
+	Sounds.play("timeUp", 0.7)
 end)
 
 -- Timer ------------------------------------------------------------------------------------------------

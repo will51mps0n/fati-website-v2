@@ -4,6 +4,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataStoreService = game:GetService("DataStoreService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 
 local Shared = ReplicatedStorage:WaitForChild("GuessAndDraw")
@@ -30,7 +32,8 @@ local CanvasEvent = makeRemote("Canvas") -- C->S: undo/clear/ready; S->C: undo/c
 local ChatEvent = makeRemote("Chat") -- S->C: chat and system lines
 local GuessEvent = makeRemote("Guess") -- C->S: a guess or chat message
 local WordChoiceEvent = makeRemote("WordChoice") -- S->C: options or an error; C->S: index, "custom" or a custom word
-local VoteEvent = makeRemote("Vote") -- C->S: "like", "dislike", or "kick" plus a user ID
+local VoteEvent = makeRemote("Vote") -- C->S: "like", "dislike", "kick" + user ID, or "report" + user ID + reason
+local ShopEvent = makeRemote("Shop") -- C->S: buy or use an item; S->C: "nuke" effect
 remotes.Parent = ReplicatedStorage
 
 -- State ------------------------------------------------------------------------
@@ -44,6 +47,7 @@ local state = {
 	wordOptions = nil :: { string }?,
 	customTimeGiven = false, -- the drawer already got extra time for a custom word
 	rated = {} :: { [Player]: boolean }, -- who already gave this drawing a thumbs up or down
+	customUnlocked = nil :: string?, -- "credit" or "free" once the drawer has paid for a custom word
 	revealed = {} :: { [number]: boolean },
 	turnStartedAt = 0,
 	guessed = {} :: { [Player]: boolean },
@@ -53,14 +57,19 @@ local state = {
 	winners = nil :: any,
 }
 
--- The password for drawing a custom word. Server scripts never reach players'
+-- The secret: typed into the chat on your turn to pick a word, it unlocks a free
+-- custom word. It's never shown in chat, and server scripts never reach players'
 -- computers, so nobody can read it out of the game.
 local CUSTOM_WORD_PASSWORD = "poop123"
-local MAX_PASSWORD_TRIES = 5
 
 local scores: { [Player]: number } = {}
+-- Robux items bought but not used yet, per player: credits[player][item] = count.
+local credits: { [Player]: { [string]: number } } = {}
+-- kickVotes[target][voter] = true. Kicked players can't come back to this server.
+local kickVotes: { [Player]: { [Player]: boolean } } = {}
+local kickedUserIds: { [number]: boolean } = {}
 local allTimeWins: { [Player]: number } = {} -- matches won, ever, saved in a DataStore
-local passwordFailures: { [Player]: number } = {}
+
 local usedWords: { [string]: boolean } = {}
 local readyPlayers: { [Player]: boolean } = {}
 
@@ -212,9 +221,24 @@ local function buildSnapshot(forPlayer: Player)
 		wordDisplay = if seesWord then state.word else maskedWord()
 	end
 
+	local drawerVotes = 0
+	local votedOnDrawer = false
+	if state.drawer and kickVotes[state.drawer] then
+		for voter in kickVotes[state.drawer] do
+			if voter.Parent == Players then
+				drawerVotes += 1
+			end
+		end
+		votedOnDrawer = kickVotes[state.drawer][forPlayer] == true
+	end
+
 	return {
 		phase = state.phase,
 		round = state.round,
+		credits = credits[forPlayer] or {},
+		drawerKickVotes = drawerVotes,
+		votedOnDrawer = votedOnDrawer,
+		kickVotesNeeded = math.max(Config.VOTE_KICK_MIN, math.ceil((#Players:GetPlayers() - 1) * Config.VOTE_KICK_SHARE)),
 		totalRounds = Config.ROUNDS_PER_MATCH,
 		phaseEndsAt = state.phaseEndsAt,
 		drawerUserId = state.drawer and state.drawer.UserId,
@@ -469,6 +493,24 @@ local function insiders(): { Player }
 	return list
 end
 
+-- Scores a correct guess (typed, or bought with Insta Guess).
+local function awardGuess(player: Player)
+	state.guessed[player] = true
+	state.guessCount += 1
+	local timeLeft = math.clamp((state.phaseEndsAt - now()) / Config.DRAW_TIME, 0, 1)
+	local points = math.floor(Config.MIN_GUESS_POINTS + (Config.MAX_GUESS_POINTS - Config.MIN_GUESS_POINTS) * timeLeft)
+	if state.guessCount == 1 then
+		points += Config.FIRST_GUESS_BONUS
+	end
+	addScore(player, points)
+	if isPresent(state.drawer) then
+		addScore(state.drawer :: Player, Config.DRAWER_POINTS_PER_GUESS)
+	end
+	systemMessage(player.DisplayName .. " guessed the word!", "correct")
+	systemMessage(`You guessed it! +{points} points`, "correct", { player })
+	broadcastState()
+end
+
 GuessEvent.OnServerEvent:Connect(function(player, text)
 	if typeof(text) ~= "string" then
 		return
@@ -483,6 +525,19 @@ GuessEvent.OnServerEvent:Connect(function(player, text)
 		return
 	end
 	lastGuessAt[player] = t
+
+	-- The secret password, typed by the drawer while picking a word: a free custom
+	-- word. Swallowed here, so nobody else ever sees it.
+	if text == CUSTOM_WORD_PASSWORD and player == state.drawer and state.phase == "Choosing" and not state.word then
+		state.customUnlocked = "free"
+		if not state.customTimeGiven then
+			state.customTimeGiven = true
+			state.phaseEndsAt = math.max(state.phaseEndsAt, now() + Config.CUSTOM_WORD_TIME)
+			broadcastState()
+		end
+		WordChoiceEvent:FireClient(player, { custom = true })
+		return
+	end
 
 	local word = state.word
 	if state.phase == "Drawing" and word then
@@ -501,22 +556,7 @@ GuessEvent.OnServerEvent:Connect(function(player, text)
 
 		local guess, answer = normalize(text), normalize(word)
 		if guess == answer then
-			state.guessed[player] = true
-			state.guessCount += 1
-			local timeLeft = math.clamp((state.phaseEndsAt - now()) / Config.DRAW_TIME, 0, 1)
-			local points = math.floor(
-				Config.MIN_GUESS_POINTS + (Config.MAX_GUESS_POINTS - Config.MIN_GUESS_POINTS) * timeLeft
-			)
-			if state.guessCount == 1 then
-				points += Config.FIRST_GUESS_BONUS
-			end
-			addScore(player, points)
-			if isPresent(state.drawer) then
-				addScore(state.drawer :: Player, Config.DRAWER_POINTS_PER_GUESS)
-			end
-			systemMessage(player.DisplayName .. " guessed the word!", "correct")
-			systemMessage(`You guessed it! +{points} points`, "correct", { player })
-			broadcastState()
+			awardGuess(player)
 			return
 		end
 
@@ -535,6 +575,35 @@ GuessEvent.OnServerEvent:Connect(function(player, text)
 		ChatEvent:FireAllClients({ kind = "chat", name = player.DisplayName, text = filtered })
 	end
 end)
+
+-- Words never allowed as custom words, on top of Roblox's own filter (which lets
+-- everything through while testing in Studio). Short ones only match whole words,
+-- so "class" or "grass" are fine; longer ones match anywhere in the word.
+local BLOCKED_WORDS = {
+	"anal", "anus", "arse", "ass", "butt", "cock", "crap", "cum", "damn", "dick", "fag", "hoe", "kkk", "kms",
+	"kys", "nig", "rape", "sex", "tit", "wtf",
+}
+local BLOCKED_ANYWHERE = {
+	"bastard", "bitch", "boner", "boob", "clit", "cunt", "dildo", "dyke", "fuck", "fuk", "hentai", "hitler",
+	"horny", "jizz", "killyourself", "molest", "naked", "nazi", "nigg", "nipple", "nude", "orgasm", "penis",
+	"piss", "porn", "pussy", "retard", "semen", "sexy", "shit", "slut", "sperm", "suicide", "testicle", "twat",
+	"vagina", "wank", "whore", "xxx",
+}
+
+local function isBlockedWord(word: string): boolean
+	local squashed = string.gsub(word, "[^%a]", "")
+	for _, bad in BLOCKED_ANYWHERE do
+		if string.find(squashed, bad, 1, true) then
+			return true
+		end
+	end
+	for piece in string.gmatch(word, "%a+") do
+		if table.find(BLOCKED_WORDS, piece) then
+			return true
+		end
+	end
+	return false
+end
 
 -- Tidies a typed custom word, or returns nil if it isn't a drawable word.
 local function cleanCustomWord(text: string): string?
@@ -556,32 +625,21 @@ WordChoiceEvent.OnServerEvent:Connect(function(player, choice)
 		return
 	end
 
-	-- The drawer opened the custom word form: give them time to type (once per turn).
-	if choice == "custom" then
-		if not state.customTimeGiven then
-			state.customTimeGiven = true
-			state.phaseEndsAt = math.max(state.phaseEndsAt, now() + Config.CUSTOM_WORD_TIME)
-			broadcastState()
-		end
-		return
-	end
-
+	-- A custom word, once the drawer has paid for it (see the shop below).
 	if typeof(choice) == "table" then
 		local function reject(message: string)
 			WordChoiceEvent:FireClient(player, { error = message })
 		end
-		if (passwordFailures[player] or 0) >= MAX_PASSWORD_TRIES then
-			reject("Too many wrong passwords - pick a word instead.")
-			return
-		end
-		if choice.password ~= CUSTOM_WORD_PASSWORD then
-			passwordFailures[player] = (passwordFailures[player] or 0) + 1
-			reject("Wrong password!")
+		if not state.customUnlocked then
 			return
 		end
 		local word = if typeof(choice.word) == "string" then cleanCustomWord(choice.word) else nil
 		if not word then
 			reject("Use 2-30 letters (spaces, - and ' are OK).")
+			return
+		end
+		if isBlockedWord(word) then
+			reject("That word isn't allowed - keep it family friendly!")
 			return
 		end
 		-- Everyone sees the word at the end of the turn, so it must pass Roblox's filter.
@@ -590,8 +648,16 @@ WordChoiceEvent.OnServerEvent:Connect(function(player, choice)
 			return
 		end
 		if filtered ~= word then
-			reject("That word isn't allowed.")
+			reject("That word isn't allowed - keep it family friendly!")
 			return
+		end
+		-- The paid credit is only used up once a word is accepted.
+		if state.customUnlocked == "credit" then
+			local mine = credits[player]
+			if not mine or (mine.customWord or 0) < 1 then
+				return
+			end
+			mine.customWord -= 1
 		end
 		state.word = word
 		return
@@ -638,6 +704,7 @@ local function runTurn(drawer: Player)
 	state.drawer = drawer
 	state.word = nil
 	state.customTimeGiven = false
+	state.customUnlocked = nil
 	state.rated = {}
 	state.revealed = {}
 	state.guessed = {}
@@ -647,8 +714,9 @@ local function runTurn(drawer: Player)
 	clearCanvas()
 
 	-- Choosing
+	-- state.drawer, not `drawer`: someone may steal the drawing mid-turn.
 	local drawerGone = function()
-		return not isPresent(drawer) or not enoughPlayers()
+		return not isPresent(state.drawer) or not enoughPlayers()
 	end
 	state.phase = "Choosing"
 	state.wordOptions = pickWords(Config.WORD_CHOICES)
@@ -823,16 +891,55 @@ end)
 
 -- Thumbs up / down and vote kick ------------------------------------------------------
 
--- kickVotes[target][voter] = true. Kicked players can't come back to this server.
-local kickVotes: { [Player]: { [Player]: boolean } } = {}
-local kickedUserIds: { [number]: boolean } = {}
-
 local function kickVotesNeeded(): number
 	local others = #Players:GetPlayers() - 1
 	return math.max(Config.VOTE_KICK_MIN, math.ceil(others * Config.VOTE_KICK_SHARE))
 end
 
-VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId)
+local REPORT_REASONS = { "Inappropriate drawing", "Bad language", "Cheating or spamming", "Being mean" }
+local lastReportAt: { [Player]: number } = {}
+local reportStore: DataStore? = nil
+pcall(function()
+	reportStore = DataStoreService:GetDataStore("GuessAndDrawReports")
+end)
+
+VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId, reason)
+	-- Reports are saved so the game's owner can review them (Creator Hub → your game →
+	-- Data Stores → GuessAndDrawReports) and printed in the server's output.
+	if kind == "report" then
+		local target = if typeof(targetUserId) == "number" then Players:GetPlayerByUserId(targetUserId) else nil
+		if not target or target == player or not table.find(REPORT_REASONS, reason) then
+			return
+		end
+		local t = os.clock()
+		if lastReportAt[player] and t - lastReportAt[player] < 20 then
+			systemMessage("Please wait a moment before sending another report.", "system", { player })
+			return
+		end
+		lastReportAt[player] = t
+		local report = {
+			reporter = player.UserId,
+			reporterName = player.Name,
+			reported = target.UserId,
+			reportedName = target.Name,
+			reason = reason,
+			time = os.time(),
+		}
+		warn(`[Report] {player.Name} reported {target.Name}: {reason}`)
+		local store = reportStore
+		if store then
+			task.spawn(pcall, function()
+				store:SetAsync(`{os.time()}_{player.UserId}`, report)
+			end)
+		end
+		systemMessage(
+			"Thanks - your report was sent. For anything serious, also report them in Roblox's menu (☰ → Report).",
+			"system",
+			{ player }
+		)
+		return
+	end
+
 	if kind == "like" or kind == "dislike" then
 		-- Everyone but the drawer can rate each drawing once.
 		if state.phase ~= "Drawing" or player == state.drawer or state.rated[player] then
@@ -873,6 +980,158 @@ VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId)
 	end
 end)
 
+-- Robux shop --------------------------------------------------------------------------
+
+-- Buying an item gives the player a credit, which is used straight away if it can
+-- be. If not (say the turn ended while they were paying), it's kept for later in
+-- this server, so nobody pays for nothing.
+
+local PRODUCT_ITEMS: { [number]: string } = {}
+for item, product in Config.PRODUCTS do
+	if product.id ~= 0 then
+		PRODUCT_ITEMS[product.id] = item
+	end
+end
+
+local function notify(player: Player, text: string)
+	systemMessage(text, "system", { player })
+end
+
+local function addCredit(player: Player, item: string)
+	local mine = credits[player] or {}
+	credits[player] = mine
+	mine[item] = (mine[item] or 0) + 1
+end
+
+-- Can `item` be used by `player` right now? If not, says why.
+local function canUse(player: Player, item: string): (boolean, string?)
+	if item == "customWord" then
+		if player ~= state.drawer or state.phase ~= "Choosing" or state.word then
+			return false, "Custom words can be bought when it's your turn to pick a word."
+		end
+		return true
+	end
+	if state.phase ~= "Drawing" or not isPresent(state.drawer) then
+		return false, "Use that while someone is drawing."
+	end
+	if player == state.drawer then
+		return false, "You can't use that on your own drawing."
+	end
+	if item == "instaGuess" and state.guessed[player] then
+		return false, "You already guessed this one."
+	end
+	return true
+end
+
+-- Gives the drawer extra time to buy and type a custom word (once per turn).
+local function giveCustomWordTime()
+	if not state.customTimeGiven then
+		state.customTimeGiven = true
+		state.phaseEndsAt = math.max(state.phaseEndsAt, now() + Config.CUSTOM_WORD_TIME)
+		broadcastState()
+	end
+end
+
+-- Uses one of the player's credits for `item`. Returns whether it was used and,
+-- if not, why.
+local function useItem(player: Player, item: string): (boolean, string?)
+	local mine = credits[player]
+	if not mine or (mine[item] or 0) < 1 then
+		return false
+	end
+	local usable, why = canUse(player, item)
+	if not usable then
+		return false, `{why} It's saved for later.`
+	end
+
+	if item == "customWord" then
+		-- The credit is spent once a word is accepted; for now, open the form.
+		state.customUnlocked = "credit"
+		giveCustomWordTime()
+		WordChoiceEvent:FireClient(player, { custom = true })
+		return true
+	end
+
+	mine[item] -= 1
+	if item == "instaGuess" then
+		systemMessage(`⚡ {player.DisplayName} used Insta Guess!`, "power")
+		awardGuess(player)
+	elseif item == "nuke" then
+		clearCanvas()
+		ShopEvent:FireAllClients("nuke")
+		systemMessage(`💥 {player.DisplayName} nuked the drawing!`, "power")
+	elseif item == "steal" then
+		local victim = state.drawer :: Player
+		state.drawer = player
+		state.guessed[player] = nil
+		state.guessed[victim] = true -- they know the word, so now they just watch and chat
+		systemMessage(`🦹 {player.DisplayName} stole the drawing from {victim.DisplayName}!`, "power")
+	end
+	broadcastState()
+	return true
+end
+
+ShopEvent.OnServerEvent:Connect(function(player, item)
+	local product = if typeof(item) == "string" then Config.PRODUCTS[item] else nil
+	if not product then
+		return
+	end
+	-- Already paid for a custom word this turn: just reopen the form.
+	if item == "customWord" and state.customUnlocked and player == state.drawer and state.phase == "Choosing" then
+		WordChoiceEvent:FireClient(player, { custom = true })
+		return
+	end
+	-- Has one saved? Use it instead of buying another.
+	if credits[player] and (credits[player][item] or 0) > 0 then
+		local used, why = useItem(player, item)
+		if not used and why then
+			notify(player, why)
+		end
+		return
+	end
+	-- Don't charge for something that can't be used right now.
+	local usable, why = canUse(player, item)
+	if not usable then
+		notify(player, why :: string)
+		return
+	end
+	if item == "customWord" then
+		giveCustomWordTime() -- the purchase window takes a few seconds
+	end
+	if product.id == 0 then
+		if RunService:IsStudio() then
+			-- Not set up yet: free while testing in Studio.
+			addCredit(player, item)
+			useItem(player, item)
+		else
+			notify(player, "That isn't for sale yet.")
+		end
+		return
+	end
+	MarketplaceService:PromptProductPurchase(player, product.id)
+end)
+
+-- Roblox calls this once a purchase is paid for (again, if the server didn't confirm).
+local processedPurchases: { [string]: boolean } = {}
+MarketplaceService.ProcessReceipt = function(receipt)
+	if processedPurchases[receipt.PurchaseId] then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	local item = PRODUCT_ITEMS[receipt.ProductId]
+	local player = Players:GetPlayerByUserId(receipt.PlayerId)
+	if not item or not player then
+		return Enum.ProductPurchaseDecision.NotProcessedYet -- try again when they're back
+	end
+	processedPurchases[receipt.PurchaseId] = true
+	addCredit(player, item)
+	local used, why = useItem(player, item)
+	if not used then
+		notify(player, why or "Saved for later!")
+	end
+	broadcastState()
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
 -- Players ----------------------------------------------------------------------------
 
 local function onPlayerAdded(player: Player)
@@ -912,7 +1171,8 @@ Players.PlayerRemoving:Connect(function(player)
 	readyPlayers[player] = nil
 	drawRate[player] = nil
 	lastFillAt[player] = nil
-	passwordFailures[player] = nil
+	credits[player] = nil
+	lastReportAt[player] = nil
 	state.rated[player] = nil
 	-- Votes against or by a player who leaves no longer count.
 	kickVotes[player] = nil

@@ -17,9 +17,21 @@ Config.MATCH_END_TIME = 12 -- winners screen
 
 Config.WORD_CHOICES = 3
 
--- Opening the custom word form gives the drawer at least this many seconds to type
--- (once per turn). The password itself lives in the server script, out of players' reach.
-Config.CUSTOM_WORD_TIME = 25
+-- Opening the custom word form gives the drawer at least this many seconds to buy
+-- and type (once per turn).
+Config.CUSTOM_WORD_TIME = 30
+
+-- Robux shop. Each item is a Developer Product: create it on the Creator Hub (your
+-- game → Monetization → Developer Products) with this price, then paste its ID here.
+-- The price shown in the game comes from here, so keep the two the same. Until an ID
+-- is filled in, the item is free while testing in Studio and unavailable in the
+-- published game.
+Config.PRODUCTS = {
+	customWord = { id = 0, price = 10 }, -- draw any word you type
+	nuke = { id = 0, price = 99 }, -- wipe the current drawing
+	steal = { id = 0, price = 50 }, -- take over drawing for the rest of the turn
+	instaGuess = { id = 0, price = 25 }, -- guess the word instantly
+}
 
 -- Vote to kick: a player is kicked once this share of the other players vote for
 -- it (and never with fewer than VOTE_KICK_MIN votes, so 2 players can't kick each other).

@@ -9,9 +9,9 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 - **Turn:**
   1. **Choosing (15s):** the drawer picks one of 3 words: one easy, one medium and one hard, in that order. If they don't pick, one is chosen at random.
      - `src/shared/Words.luau` has the three lists: 200 easy words, 170 medium (including characters like Mario, SpongeBob, Pikachu and Bluey) and 180 hard (Harry Potter, Darth Vader, the Bob's Burgers family, other cartoon characters, landmarks, ideas and sayings). Words don't repeat within a match until a list runs out.
-     - The small 🔒 **Custom** button beside the choices lets the drawer type any word they like after entering a password. Opening it gives them at least 25s (`CUSTOM_WORD_TIME`).
-     - The password is `CUSTOM_WORD_PASSWORD` at the top of `src/server/GameServer.server.luau`. It stays on the server, so players can't read it, and 5 wrong tries lock that player out of the form.
-     - Custom words must be 2-30 letters (spaces, `-` and `'` allowed) and pass Roblox's text filter.
+     - The small 🔒 **⏣10 Custom** button beside the choices lets the drawer buy a custom word and type any word they like. Clicking it gives them at least 30s (`CUSTOM_WORD_TIME`).
+     - **Secret free custom word:** on your turn to pick, type the password (`CUSTOM_WORD_PASSWORD` at the top of `src/server/GameServer.server.luau`) into the chat. It's never shown to anyone and opens the custom word box for free. It lives only on the server, so players can't dig it out of the game.
+     - Custom words must be 2-30 letters (spaces, `-` and `'` allowed). They're checked against a blocklist of rude words (whole words for short ones, so "class" or "grapes" are fine) and must pass Roblox's text filter.
   2. **Drawing (80s):** guessers type in the chat box. The word shows as blanks (`_ _ _ _ _ (5)`), and letters are revealed as hints at 50% and 75% of the time.
      - A correct guess earns 50–300 points; the faster you guess, the more you get. The first correct guess earns a +50 bonus.
      - The drawer earns 50 points for each correct guess.
@@ -26,7 +26,18 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 
 **Thumbs up / down:** while someone draws, everyone else gets a thumbs up and a thumbs down in the canvas's top-right corner, like skribbl.io, one vote per drawing. The pixel-art thumbs are `assets/thumbs-up.png` and `assets/thumbs-down.png` (set in `Config.THUMBS_UP_IMAGE` / `THUMBS_DOWN_IMAGE`); until they're uploaded, emoji stand in. Chat shows "X liked the drawing!" or "X disliked the drawing!", and a thumb floats up over the canvas.
 
-**Vote to kick:** click another player in the list and choose **👢 Vote to kick**. Chat shows "X is voting to kick Y (1/2)".
+**Robux shop:** while someone draws, everyone else sees three buttons under the canvas:
+- **💣 Nuke drawing (⏣99):** wipes the drawing for everyone, with a flash and a boom.
+- **🦹 Steal drawing (⏣50):** you become the drawer for the rest of the turn and keep the drawing so far. The old drawer now just watches, because they know the word.
+- **🏆 Insta guess (⏣25):** counts as a correct guess right away.
+
+Each item is a **Developer Product**. Create them on the Creator Hub (your game → Monetization → Developer Products) at these prices, and paste their IDs into `Config.PRODUCTS`.
+- Until an ID is set, that item is free when testing in Studio and unavailable in the published game.
+- A purchase that can't be used at that moment (for example, the turn ended while the player was paying) is saved as a credit. The button then shows "Use (1)". Credits last until the player leaves the server.
+
+**Report:** the orange Report button in the top bar lets you pick a player and a reason. Reports are printed in the server output and saved in the `GuessAndDrawReports` DataStore. Roblox doesn't let games open its own report form, so the game also points players to Roblox's menu (☰ → Report) for anything serious.
+
+**Vote to kick:** the orange **Vote Kick: x/n** button in the top bar votes to kick whoever is drawing. You can also click any other player in the list and choose **👢 Vote to kick**. Chat shows "X is voting to kick Y (1/2)".
 - The kick happens once 60% of the other players have voted (`VOTE_KICK_SHARE`), with at least 2 votes (`VOTE_KICK_MIN`), so 2 players can't kick each other.
 - A kicked player can't rejoin that server.
 - Votes from or against someone who leaves stop counting.
