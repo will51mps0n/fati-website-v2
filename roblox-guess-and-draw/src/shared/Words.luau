@@ -44,6 +44,7 @@ return {
 		"mario", "luigi", "pikachu", "spongebob", "patrick star", "minion", "pac-man", "sonic", "kirby", "shrek",
 		"olaf", "elsa", "nemo", "mickey mouse", "batman", "spiderman", "superman", "hulk", "iron man", "santa claus",
 		"easter bunny", "tooth fairy", "peppa pig", "garfield", "among us", "noob", "creeper", "steve", "yoshi", "dory",
+		"bluey", "bingo", "dora", "boots the monkey", "paw patrol", "hello kitty", "snoopy", "charlie brown", "tigger", "eeyore",
 		"crown jewels", "magic wand", "crystal ball", "treasure chest", "message in a bottle", "paper airplane", "sticky note", "piggy bank", "hourglass", "compass",
 	},
 
@@ -64,5 +65,8 @@ return {
 		"traffic jam", "rush hour", "airport security", "lost luggage", "elevator music", "dentist", "barber", "lifeguard", "zookeeper", "magician",
 		"selfie", "photobomb", "influencer", "livestream", "podcast", "emoji", "meme", "screenshot", "voice chat", "loading screen",
 		"brain freeze", "sugar rush", "food coma", "bad hair day", "cold feet", "butterflies in stomach", "piece of cake", "raining cats and dogs", "couch potato", "night owl",
+		"bob belcher", "linda belcher", "tina belcher", "gene belcher", "louise belcher", "louise's bunny ears", "burger of the day", "teddy", "jimmy pesto", "mr fischoeder",
+		"phineas and ferb", "perry the platypus", "finn the human", "jake the dog", "gumball", "ben ten", "tom and jerry", "bugs bunny", "daffy duck", "tweety bird",
+		"popeye", "fred flintstone", "jimmy neutron", "timmy turner", "danny phantom", "the grinch", "rick sanchez", "courage the cowardly dog", "johnny bravo", "dexter's laboratory",
 	},
 }

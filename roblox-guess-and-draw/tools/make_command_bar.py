@@ -1,5 +1,6 @@
 """Builds CommandBar.lua: one line of Luau that installs the game when pasted
-into Roblox Studio's command bar. Run after editing anything in src/:
+into Roblox Studio's command bar. Also builds WordsCommand.lua, which only
+updates the word list of a game that is already installed. Run after editing anything in src/:
 
     python3 tools/make_command_bar.py
 """
@@ -67,6 +68,17 @@ def main() -> None:
     command = "; ".join(parts) + "\n"
     (ROOT / "CommandBar.lua").write_text(command, encoding="ascii")
     print(f"Wrote CommandBar.lua ({len(command):,} characters)")
+
+    # A short command that only updates the word list of an installed game.
+    words = (ROOT / "src/shared/Words.luau").read_text(encoding="utf-8")
+    words_command = "; ".join([
+        'local folder = game:GetService("ReplicatedStorage"):FindFirstChild("GuessAndDraw")',
+        'local words = folder and folder:FindFirstChild("Words")',
+        f'if words then words.Source = {luau_string(words)} print("Guess & Draw words updated!") '
+        'else warn("Guess & Draw is not installed yet - run CommandBar.lua first.") end',
+    ]) + "\n"
+    (ROOT / "WordsCommand.lua").write_text(words_command, encoding="ascii")
+    print(f"Wrote WordsCommand.lua ({len(words_command):,} characters)")
 
 
 if __name__ == "__main__":

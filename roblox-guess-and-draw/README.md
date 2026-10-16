@@ -8,7 +8,7 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 - **Round:** every player gets one turn as the drawer.
 - **Turn:**
   1. **Choosing (15s):** the drawer picks one of 3 words: one easy, one medium and one hard, in that order. If they don't pick, one is chosen at random.
-     - `src/shared/Words.luau` has the three lists: 200 easy words, 160 medium (including characters like Mario, SpongeBob and Pikachu) and 150 hard (Harry Potter, Darth Vader, landmarks, ideas and sayings). Words don't repeat within a match until a list runs out.
+     - `src/shared/Words.luau` has the three lists: 200 easy words, 170 medium (including characters like Mario, SpongeBob, Pikachu and Bluey) and 180 hard (Harry Potter, Darth Vader, the Bob's Burgers family, other cartoon characters, landmarks, ideas and sayings). Words don't repeat within a match until a list runs out.
      - The small 🔒 **Custom** button beside the choices lets the drawer type any word they like after entering a password. Opening it gives them at least 25s (`CUSTOM_WORD_TIME`).
      - The password is `CUSTOM_WORD_PASSWORD` at the top of `src/server/GameServer.server.luau`. It stays on the server, so players can't read it, and 5 wrong tries lock that player out of the form.
      - Custom words must be 2-30 letters (spaces, `-` and `'` allowed) and pass Roblox's text filter.
@@ -76,6 +76,8 @@ The command creates three folders, all named `GuessAndDraw`: one in ReplicatedSt
 
 After editing anything in `src/`, rebuild the command with `python3 tools/make_command_bar.py`.
 
+To change only the words, paste the much shorter `WordsCommand.lua` instead. It replaces the word list in a game that's already installed and leaves everything else alone.
+
 ### Background and sounds
 
 Scripts can only use images and sounds that have been uploaded to Roblox, by their asset ID.
@@ -91,6 +93,7 @@ Scripts can only use images and sounds that have been uploaded to Roblox, by the
 | Path | Ends up in | What it does |
 | --- | --- | --- |
 | `CommandBar.lua` | — | The generated install command (don't edit by hand) |
+| `WordsCommand.lua` | — | The generated words-only update command |
 | `tools/make_command_bar.py` | — | Rebuilds `CommandBar.lua` from `src/` |
 | `tools/make_sounds.py` | — | Synthesises the sound effects into `assets/sounds/` |
 | `assets/` | Upload to Roblox | The seamless background tile and the sound effects |
