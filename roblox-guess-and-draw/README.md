@@ -55,7 +55,7 @@ The buttons show each product's live price from Roblox. With Managed pricing on,
 
 | Theme | Colours | Words |
 | --- | --- | --- |
-| 🎃 Halloween (default) | orange, black doodles | 315 |
+| 🎃 Halloween (default) | orange, darker orange doodles | 315 |
 | 🌍 General | your original green background, unchanged | 550 |
 | 🐉 Fantasy | purple | 339 |
 | 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 601 |
@@ -124,7 +124,7 @@ To change only the words, paste the much shorter `WordsCommand.lua` instead. It 
 
 Scripts can only use images and sounds that have been uploaded to Roblox, by their asset ID.
 
-- **Background:** `assets/background-tile.png` is a seamless square cut from your `background.jpeg`. It's uploaded and set in `Config.BACKGROUND_TILE`, so it repeats across the screen at 500 px per tile (`BACKGROUND_TILE_SIZE`), which gives small, detailed doodles like skribbl.io's. It slides slowly (`BACKGROUND_SCROLL_SPEED`, 0 to keep it still), except for themes marked `still` in `Themes.luau`: Halloween stays put, because its bold black lines on orange look jerky when they move.
+- **Background:** `assets/background-tile.png` is a seamless square cut from your `background.jpeg`. It's uploaded and set in `Config.BACKGROUND_TILE`, so it repeats across the screen at 500 px per tile (`BACKGROUND_TILE_SIZE`), which gives small, detailed doodles like skribbl.io's. It slides slowly (`BACKGROUND_SCROLL_SPEED`, 0 to keep it still; a theme can opt out with `still = true` in `Themes.luau`). Each theme's doodles are a darker shade of its own colour: high contrast, like black on orange, looks jerky when it slides.
   - If `BACKGROUND_TILE` is emptied, the full `background.jpeg` (`rbxassetid://107099391291442`) is stretched to cover the screen instead. That makes the doodles look big and a bit soft, because Roblox shrinks uploads to at most 1024 pixels wide.
 - **Sounds:** the six effects in `assets/sounds/` were made for this game (`tools/make_sounds.py`). They're uploaded and their IDs are set in `Config.SOUNDS`.
   - To swap one, upload a new file (**Window → Asset Manager → Import**), right-click it → **Copy ID**, and replace that line in `src/shared/Config.luau`, then rebuild the command.

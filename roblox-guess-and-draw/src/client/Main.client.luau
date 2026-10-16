@@ -138,8 +138,7 @@ local background = make("Frame", {
 -- and fade into each other when the theme changes.
 local tile = Config.BACKGROUND_TILE_SIZE
 local startingTheme = Themes.byId[Config.DEFAULT_THEME] or Themes.byId.general
--- Off for themes marked `still` (Halloween's bold lines on bright orange make the
--- 1-pixel hops easy to see).
+-- Off for themes marked `still` in Themes.luau.
 local backgroundSliding = not startingTheme.still
 
 local function backgroundLayer(image: string): ImageLabel?
