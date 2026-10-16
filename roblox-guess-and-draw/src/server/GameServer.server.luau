@@ -11,6 +11,7 @@ local TextService = game:GetService("TextService")
 local Shared = ReplicatedStorage:WaitForChild("GuessAndDraw")
 local Config = require(Shared:WaitForChild("Config"))
 local Words = require(Shared:WaitForChild("Words"))
+local Themes = require(Shared:WaitForChild("Themes"))
 
 Players.CharacterAutoLoads = Config.SPAWN_CHARACTERS
 
@@ -33,6 +34,7 @@ local ChatEvent = makeRemote("Chat") -- S->C: chat and system lines
 local GuessEvent = makeRemote("Guess") -- C->S: a guess or chat message
 local WordChoiceEvent = makeRemote("WordChoice") -- S->C: options or an error; C->S: index, "custom" or a custom word
 local VoteEvent = makeRemote("Vote") -- C->S: "like", "dislike", "kick" + user ID, or "report" + user ID + reason
+local ThemeEvent = makeRemote("Theme") -- C->S: the player picked a word theme
 local ShopEvent = makeRemote("Shop") -- C->S: buy or use an item; S->C: "nuke" effect
 remotes.Parent = ReplicatedStorage
 
@@ -71,6 +73,9 @@ local kickedUserIds: { [number]: boolean } = {}
 local allTimeWins: { [Player]: number } = {} -- matches won, ever, saved in a DataStore
 
 local usedWords: { [string]: boolean } = {}
+-- Each player's chosen word theme; the drawer's sets the words and the background.
+local playerThemes: { [Player]: string } = {}
+local currentTheme = Config.DEFAULT_THEME
 local readyPlayers: { [Player]: boolean } = {}
 
 -- Everything drawn this turn, in order, kept so late joiners see the whole drawing.
@@ -132,10 +137,11 @@ end
 -- aren't repeated within a match until a list runs out.
 local TIERS = { "easy", "medium", "hard" }
 
-local function pickWords(count: number): { string }
+local function pickWords(count: number, theme: string): { string }
+	local lists = Words[theme] or Words.general
 	local picks = {}
 	for i = 1, count do
-		local list = Words[TIERS[(i - 1) % #TIERS + 1]]
+		local list = lists[TIERS[(i - 1) % #TIERS + 1]]
 		local pool = {}
 		for _, word in list do
 			if not usedWords[word] and not table.find(picks, word) then
@@ -235,6 +241,8 @@ local function buildSnapshot(forPlayer: Player)
 	return {
 		phase = state.phase,
 		round = state.round,
+		theme = currentTheme,
+		myTheme = playerThemes[forPlayer] or Config.DEFAULT_THEME,
 		credits = credits[forPlayer] or {},
 		drawerKickVotes = drawerVotes,
 		votedOnDrawer = votedOnDrawer,
@@ -719,7 +727,9 @@ local function runTurn(drawer: Player)
 		return not isPresent(state.drawer) or not enoughPlayers()
 	end
 	state.phase = "Choosing"
-	state.wordOptions = pickWords(Config.WORD_CHOICES)
+	-- The drawer's theme picks the words and colours everyone's background.
+	currentTheme = playerThemes[drawer] or Config.DEFAULT_THEME
+	state.wordOptions = pickWords(Config.WORD_CHOICES, currentTheme)
 	WordChoiceEvent:FireClient(drawer, state.wordOptions)
 	waitPhase(Config.CHOOSE_TIME, function()
 		return state.word ~= nil or drawerGone()
@@ -738,7 +748,8 @@ local function runTurn(drawer: Player)
 	-- Drawing
 	state.phase = "Drawing"
 	state.turnStartedAt = now()
-	systemMessage(drawer.DisplayName .. " is drawing now!")
+	local theme = Themes.byId[currentTheme]
+	systemMessage(`{drawer.DisplayName} is drawing now! ({theme.emoji} {theme.name})`)
 	local hintsGiven = 0
 	waitPhase(Config.DRAW_TIME, function()
 		local elapsed = (now() - state.turnStartedAt) / Config.DRAW_TIME
@@ -980,6 +991,16 @@ VoteEvent.OnServerEvent:Connect(function(player, kind, targetUserId, reason)
 	end
 end)
 
+-- Word themes --------------------------------------------------------------------------
+
+ThemeEvent.OnServerEvent:Connect(function(player, themeId)
+	if typeof(themeId) ~= "string" or not Themes.byId[themeId] then
+		return
+	end
+	playerThemes[player] = themeId
+	StateEvent:FireClient(player, buildSnapshot(player))
+end)
+
 -- Robux shop --------------------------------------------------------------------------
 
 -- Buying an item gives the player a credit, which is used straight away if it can
@@ -1172,6 +1193,7 @@ Players.PlayerRemoving:Connect(function(player)
 	drawRate[player] = nil
 	lastFillAt[player] = nil
 	credits[player] = nil
+	playerThemes[player] = nil
 	lastReportAt[player] = nil
 	state.rated[player] = nil
 	-- Votes against or by a player who leaves no longer count.

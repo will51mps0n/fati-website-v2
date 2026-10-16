@@ -17,6 +17,10 @@ Config.MATCH_END_TIME = 12 -- winners screen
 
 Config.WORD_CHOICES = 3
 
+-- The theme everyone starts with (an id from Themes.luau). Players can switch theirs
+-- with the "Your theme" menu.
+Config.DEFAULT_THEME = "halloween"
+
 -- Opening the custom word form gives the drawer at least this many seconds to buy
 -- and type (once per turn).
 Config.CUSTOM_WORD_TIME = 30
@@ -63,6 +67,11 @@ Config.SPAWN_CHARACTERS = false
 -- BACKGROUND_IMAGE is shown once, stretched to cover the screen.
 Config.BACKGROUND_TILE = "rbxassetid://123267927775699" -- assets/background-tile.png
 Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
+
+-- Just the doodle lines, white on see-through (assets/background-doodles.png). Each
+-- theme tints them and colours the screen behind them. Until this is set, the green
+-- tile above is used for the General theme and the others show plain colour.
+Config.BACKGROUND_DOODLES = "" -- assets/background-doodles.png
 
 -- The thumbs in the canvas's top-right corner. Until these are set, emoji stand in.
 Config.THUMBS_UP_IMAGE = "rbxassetid://132536788217807" -- assets/thumbs-up.png

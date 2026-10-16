@@ -51,6 +51,20 @@ The buttons show each product's live price from Roblox. With Managed pricing on,
 - A kicked player can't rejoin that server.
 - Votes from or against someone who leaves stop counting.
 
+**Word themes:** the **YOUR THEME ▾** menu under the player list sets which words you get when it's your turn to draw. When you draw, everyone's background changes to your theme's colours. The top bar shows the theme under the round, and chat says "X is drawing now! (🎃 Halloween)".
+
+| Theme | Colours | Words |
+| --- | --- | --- |
+| 🎃 Halloween (default) | orange, black doodles | 200 |
+| 🌍 General | green | 550 |
+| 🐉 Fantasy | purple | 200 |
+| 🌿 Plants & Animals (fish, microbes, germs…) | teal | 222 |
+| 🏙️ People, Places & Things | blue | 213 |
+
+- Themes and their colours are in `src/shared/Themes.luau`. The words are in `src/shared/Words.luau`, by theme and then easy / medium / hard. The default theme is `Config.DEFAULT_THEME`.
+- The background doodles are one image, `assets/background-doodles.png` (white lines on see-through, made by `tools/make_doodle_mask.py`). Each theme tints the lines and colours the screen behind them.
+- Until that image's ID is in `Config.BACKGROUND_DOODLES`, the General theme shows the green tile and the other themes show plain colour.
+
 Players who join partway through a round can start guessing straight away and get their first turn to draw in the next round. If the server drops below 2 players, the match is cancelled and the game goes back to waiting.
 
 ## Look & feel

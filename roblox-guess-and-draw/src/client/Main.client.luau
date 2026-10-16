@@ -11,6 +11,7 @@ local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage:WaitForChild("GuessAndDraw"):WaitForChild("Config"))
+local Themes = require(ReplicatedStorage:WaitForChild("GuessAndDraw"):WaitForChild("Themes"))
 local CanvasRenderer = require(script.Parent:WaitForChild("CanvasRenderer"))
 local ColorPicker = require(script.Parent:WaitForChild("ColorPicker"))
 local Effects = require(script.Parent:WaitForChild("Effects"))
@@ -29,6 +30,7 @@ local GuessEvent = Remotes:WaitForChild("Guess") :: RemoteEvent
 local WordChoiceEvent = Remotes:WaitForChild("WordChoice") :: RemoteEvent
 local VoteEvent = Remotes:WaitForChild("Vote") :: RemoteEvent
 local ShopEvent = Remotes:WaitForChild("Shop") :: RemoteEvent
+local ThemeEvent = Remotes:WaitForChild("Theme") :: RemoteEvent
 
 -- The Robux symbol, which Roblox's fonts draw at this code point.
 local ROBUX = utf8.char(0xE002)
@@ -130,24 +132,51 @@ local background = make("Frame", {
 	Parent = screen,
 })
 
-local tiled = Config.BACKGROUND_TILE ~= ""
-if tiled or Config.BACKGROUND_IMAGE ~= "" then
-	local tile = Config.BACKGROUND_TILE_SIZE
+-- The background takes the colours of the current word theme. With the doodle
+-- lines uploaded (white on see-through), they're tinted per theme over a plain
+-- colour; without them, the green tile shows for the General theme only.
+local doodles = Config.BACKGROUND_DOODLES ~= ""
+local tile = Config.BACKGROUND_TILE_SIZE
+local backgroundImage: ImageLabel? = nil
+if doodles or Config.BACKGROUND_TILE ~= "" then
 	local image = make("ImageLabel", {
-		-- A tiled image is one tile larger than the screen so it can scroll seamlessly.
-		Size = if tiled then UDim2.new(1, tile, 1, tile) else UDim2.fromScale(1, 1),
+		-- One tile larger than the screen so it can scroll seamlessly.
+		Size = UDim2.new(1, tile, 1, tile),
 		BackgroundTransparency = 1,
-		Image = if tiled then Config.BACKGROUND_TILE else Config.BACKGROUND_IMAGE,
-		ScaleType = if tiled then Enum.ScaleType.Tile else Enum.ScaleType.Crop,
+		Image = if doodles then Config.BACKGROUND_DOODLES else Config.BACKGROUND_TILE,
+		ScaleType = Enum.ScaleType.Tile,
 		TileSize = UDim2.fromOffset(tile, tile),
 		Parent = background,
 	})
-	if tiled and Config.BACKGROUND_SCROLL_SPEED > 0 then
+	backgroundImage = image
+	if Config.BACKGROUND_SCROLL_SPEED > 0 then
 		RunService.RenderStepped:Connect(function()
 			local offset = (os.clock() * Config.BACKGROUND_SCROLL_SPEED) % tile
 			image.Position = UDim2.fromOffset(-offset, -offset)
 		end)
 	end
+end
+
+local shownTheme: string? = nil
+local applyThemeToOverlay: (Themes.Theme) -> () = function() end
+
+local function applyTheme(themeId: string)
+	if themeId == shownTheme then
+		return
+	end
+	shownTheme = themeId
+	local theme = Themes.byId[themeId] or Themes.byId.general
+	Ui.tween(background, 0.8, { BackgroundColor3 = theme.background })
+	local image = backgroundImage
+	if image then
+		if doodles then
+			Ui.tween(image, 0.8, { ImageColor3 = theme.doodles, ImageTransparency = 0 })
+		else
+			-- Only the green tile is available: show it for General, plain colour otherwise.
+			Ui.tween(image, 0.8, { ImageTransparency = if theme.id == "general" then 0 else 1 })
+		end
+	end
+	applyThemeToOverlay(theme)
 end
 
 local root = make("Frame", {
@@ -352,13 +381,24 @@ local timerLabel = label({
 }, { Ui.pad(8) })
 
 local roundLabel = label({
-	Position = UDim2.fromScale(0.045, 0.15),
-	Size = UDim2.fromScale(0.25, 0.7),
+	Position = UDim2.fromScale(0.045, 0.06),
+	Size = UDim2.fromScale(0.25, 0.54),
 	FontFace = Theme.bold,
 	Text = "",
 	TextXAlignment = Enum.TextXAlignment.Left,
 	Parent = topBar,
-}, { Ui.maxText(32) })
+}, { Ui.maxText(30) })
+
+-- Which word theme this turn uses, under the round.
+local themeLabel = label({
+	Position = UDim2.fromScale(0.045, 0.58),
+	Size = UDim2.fromScale(0.25, 0.36),
+	FontFace = Theme.bold,
+	Text = "",
+	TextColor3 = Theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = topBar,
+}, { Ui.maxText(20) })
 
 local wordArea = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -498,7 +538,8 @@ local reportButton = pill("Report", 140, 78)
 local MAIN_TOP = 147
 local CANVAS_HEIGHT = 856 -- 4:3 of the 1141-wide canvas
 
-local playersPosition, playersSize = box(0, MAIN_TOP, 284, CANVAS_HEIGHT)
+local THEME_MENU_HEIGHT = 64
+local playersPosition, playersSize = box(0, MAIN_TOP, 284, CANVAS_HEIGHT - THEME_MENU_HEIGHT - 10)
 local playersScroller = make("ScrollingFrame", {
 	Position = playersPosition,
 	Size = playersSize,
@@ -523,6 +564,123 @@ sizeToContent(playersLayout, playersList, 10, function(height)
 	playersScroller.CanvasSize = UDim2.fromOffset(0, height)
 end)
 playersList:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 7)
+
+-- "Your theme" menu under the player list: the words you get, and everyone's
+-- background colour, when it's your turn to draw.
+local themeMenuPosition, themeMenuSize = box(0, MAIN_TOP + CANVAS_HEIGHT - THEME_MENU_HEIGHT, 284, THEME_MENU_HEIGHT)
+local themeButton = make("TextButton", {
+	Position = themeMenuPosition,
+	Size = themeMenuSize,
+	BackgroundColor3 = Theme.white,
+	AutoButtonColor = false,
+	Text = "",
+	Parent = game_,
+}, { Ui.corner(7) })
+label({
+	Position = UDim2.fromOffset(12, 5),
+	Size = UDim2.new(1, -24, 0, 20),
+	Text = "YOUR THEME",
+	TextScaled = false,
+	TextSize = 15,
+	FontFace = Theme.mono,
+	TextColor3 = Theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = themeButton,
+})
+local themeButtonText = label({
+	Position = UDim2.fromOffset(12, 26),
+	Size = UDim2.new(1, -24, 0, 30),
+	Text = "",
+	TextScaled = false,
+	TextSize = 22,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	Parent = themeButton,
+})
+Ui.hoverable(themeButton)
+
+local themeList = Ui.panel({
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromOffset(0, MAIN_TOP + CANVAS_HEIGHT - THEME_MENU_HEIGHT - 8),
+	Size = UDim2.fromOffset(330, 16 + #Themes.list * 58),
+	Visible = false,
+	ZIndex = 20,
+	Parent = game_,
+}, {
+	Ui.border(2, Theme.border),
+	Ui.pad(8),
+	make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+
+local myTheme = Config.DEFAULT_THEME
+local themeOptions: { [string]: TextLabel } = {}
+
+local function showMyTheme()
+	local theme = Themes.byId[myTheme] or Themes.byId.general
+	themeButtonText.Text = `{theme.emoji} {theme.name} ▾`
+	for id, tick in themeOptions do
+		tick.Text = if id == myTheme then "✓" else ""
+	end
+end
+
+for order, theme in Themes.list do
+	local option = make("TextButton", {
+		Size = UDim2.new(1, 0, 0, 52),
+		BackgroundColor3 = Theme.rowAlt,
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = order,
+		Parent = themeList,
+	}, { Ui.corner(8) })
+	make("Frame", { -- a swatch of the theme's background colour
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 8, 0.5, 0),
+		Size = UDim2.fromOffset(36, 36),
+		BackgroundColor3 = theme.background,
+		Parent = option,
+	}, { Ui.corner(8), Ui.border(2, theme.doodles) })
+	label({
+		Position = UDim2.fromOffset(54, 0),
+		Size = UDim2.new(1, -94, 1, 0),
+		Text = `{theme.emoji} {theme.name}`,
+		TextScaled = false,
+		TextSize = 21,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = option,
+	})
+	themeOptions[theme.id] = label({
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Size = UDim2.fromOffset(28, 28),
+		Text = "",
+		TextColor3 = Theme.green,
+		FontFace = Theme.heavy,
+		Parent = option,
+	})
+	option.MouseEnter:Connect(function()
+		option.BackgroundColor3 = Theme.border
+	end)
+	option.MouseLeave:Connect(function()
+		option.BackgroundColor3 = Theme.rowAlt
+	end)
+	option.Activated:Connect(function()
+		myTheme = theme.id
+		showMyTheme()
+		ThemeEvent:FireServer(theme.id)
+		Sounds.play("click")
+		themeList.Visible = false
+	end)
+end
+showMyTheme()
+
+themeButton.Activated:Connect(function()
+	Sounds.play("click", 0.5)
+	themeList.Visible = not themeList.Visible
+	if themeList.Visible then
+		Ui.pop(themeList, 0.7, 0.25)
+	end
+end)
 
 -- Centre: canvas and toolbar ------------------------------------------------------------------
 
@@ -582,11 +740,15 @@ local renderer = CanvasRenderer.new(canvas)
 -- content slides down from the top, as on skribbl.io.
 local overlay = canvasLayer("Frame", {
 	Name = "Overlay",
-	BackgroundColor3 = Theme.overlay,
+	BackgroundColor3 = Theme.overlay, -- replaced by a darker shade of the theme colour
 	BackgroundTransparency = Theme.overlayTransparency,
 	ClipsDescendants = true,
 	ZIndex = 3,
 }, { Ui.corner(4) })
+
+applyThemeToOverlay = function(theme)
+	Ui.tween(overlay, 0.8, { BackgroundColor3 = theme.background:Lerp(Color3.new(0, 0, 0), 0.45) })
+end
 
 local overlayContent = make("Frame", {
 	Size = UDim2.fromScale(1, 1),
@@ -1944,6 +2106,14 @@ function render()
 	end
 
 	roundLabel.Text = if s.round > 0 then `Round {s.round} of {s.totalRounds}` else "Waiting"
+	-- This turn's word theme: shown in the top bar and on everyone's background.
+	local theme = Themes.byId[s.theme] or Themes.byId.general
+	themeLabel.Text = `{theme.emoji} {theme.name} words`
+	applyTheme(theme.id)
+	if s.myTheme and s.myTheme ~= myTheme then
+		myTheme = s.myTheme
+		showMyTheme()
+	end
 	if s.word and s.isDrawer then
 		wordCaption.Text = "DRAW THIS"
 		setWord(s.word, false, Theme.text)

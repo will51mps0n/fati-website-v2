@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = [
     ("shared", "Config", "ModuleScript", "src/shared/Config.luau"),
     ("shared", "Words", "ModuleScript", "src/shared/Words.luau"),
+    ("shared", "Themes", "ModuleScript", "src/shared/Themes.luau"),
     ("server", "GameServer", "Script", "src/server/GameServer.server.luau"),
     ("client", "Main", "LocalScript", "src/client/Main.client.luau"),
     ("client", "CanvasRenderer", "ModuleScript", "src/client/CanvasRenderer.luau"),
