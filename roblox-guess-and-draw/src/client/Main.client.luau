@@ -144,6 +144,8 @@ Effects.init(effectsLayer)
 -- sizes inside it.
 local DESIGN = Vector2.new(1870, 1086)
 local MARGIN = 10
+-- At most this share of the window's width, so background shows at the sides.
+local MAX_WIDTH_SHARE = 0.82
 
 local game_ = make("Frame", {
 	Name = "Game",
@@ -167,7 +169,8 @@ end
 local function fitToScreen()
 	local inset = topInset()
 	local available = screen.AbsoluteSize - Vector2.new(MARGIN * 2, inset + MARGIN * 2)
-	gameScale.Scale = math.clamp(math.min(available.X / DESIGN.X, available.Y / DESIGN.Y), 0.1, 2)
+	local width = math.min(available.X, screen.AbsoluteSize.X * MAX_WIDTH_SHARE)
+	gameScale.Scale = math.clamp(math.min(width / DESIGN.X, available.Y / DESIGN.Y), 0.1, 2)
 	-- Centred left to right, pinned to the top just below Roblox's topbar.
 	game_.Position = UDim2.new(0.5, 0, 0, inset + MARGIN)
 end
@@ -247,8 +250,8 @@ local topBar = Ui.panel({ Position = topPosition, Size = topSize, Parent = game_
 -- bit bigger than the bar so it pokes out above and below.
 local clock = make("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, -6, 0.5, 0),
-	Size = UDim2.fromScale(1, 1.3),
+	Position = UDim2.new(0, 2, 0.5, 0),
+	Size = UDim2.fromScale(1, 1.12),
 	BackgroundTransparency = 1,
 	Parent = topBar,
 }, { Ui.square() })
@@ -285,7 +288,7 @@ end
 local clockFace = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.55),
-	Size = UDim2.fromScale(0.8, 0.8),
+	Size = UDim2.fromScale(0.76, 0.76),
 	BackgroundColor3 = Theme.white,
 	ZIndex = 2,
 	Parent = clock,
@@ -296,10 +299,10 @@ local timerLabel = label({
 	FontFace = Theme.heavy,
 	Text = "",
 	Parent = clockFace,
-}, { Ui.pad(9) })
+}, { Ui.pad(8) })
 
 local roundLabel = label({
-	Position = UDim2.fromScale(0.046, 0.15),
+	Position = UDim2.fromScale(0.045, 0.15),
 	Size = UDim2.fromScale(0.25, 0.7),
 	FontFace = Theme.bold,
 	Text = "",

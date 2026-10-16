@@ -20,6 +20,10 @@ function Ui.make(className: string, props: { [string]: any }, children: { Instan
 	for _, child in children or {} do
 		child.Parent = instance
 	end
+	-- Roblox gives new GUI objects a 1px dark border; this look never wants it.
+	if props.BorderSizePixel == nil and instance:IsA("GuiObject") then
+		(instance :: GuiObject).BorderSizePixel = 0
+	end
 	if props.Parent then
 		instance.Parent = props.Parent
 	end
