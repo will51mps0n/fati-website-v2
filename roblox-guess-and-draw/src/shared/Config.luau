@@ -87,7 +87,10 @@ Config.SOUNDS = {
 }
 
 Config.BACKGROUND_TILE_SIZE = 500 -- on-screen size of one tile in pixels; smaller = tinier doodles
-Config.BACKGROUND_SCROLL_SPEED = 12 -- how fast the tiles drift, in pixels per second; 0 keeps them still
+-- How fast the background drifts, in pixels per second; 0 keeps it still. Roblox
+-- draws GUI at whole pixels, so a slow drift moves in little hops that can look
+-- jerky (and make some people feel sick); it's off by default.
+Config.BACKGROUND_SCROLL_SPEED = 0
 Config.SOUND_VOLUME = 0.5
 
 -- Canvas ---------------------------------------------------------------------
