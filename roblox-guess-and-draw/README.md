@@ -55,15 +55,16 @@ The buttons show each product's live price from Roblox. With Managed pricing on,
 
 | Theme | Colours | Words |
 | --- | --- | --- |
-| 🎃 Halloween (default) | orange, black doodles | 200 |
+| 🎃 Halloween (default) | orange, black doodles | 315 |
 | 🌍 General | green | 550 |
-| 🐉 Fantasy | purple | 200 |
-| 🌿 Plants & Animals (fish, microbes, germs…) | teal | 222 |
+| 🐉 Fantasy | purple | 339 |
+| 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 601 |
 | 🏙️ People, Places & Things | blue | 213 |
+| 🍔 Food (fast food places, candy, drinks, dishes from around the world…) | red | 355 |
 
 - Themes and their colours are in `src/shared/Themes.luau`. The words are in `src/shared/Words.luau`, by theme and then easy / medium / hard. The default theme is `Config.DEFAULT_THEME`.
 - The background doodles are one image, `assets/background-doodles.png` (white lines on see-through, made by `tools/make_doodle_mask.py`). Each theme tints the lines and colours the screen behind them.
-- Until that image's ID is in `Config.BACKGROUND_DOODLES`, the General theme shows the green tile and the other themes show plain colour.
+- `Config.BACKGROUND_DOODLES` holds that image's ID. If it's emptied, the General theme shows the green tile and the other themes show plain colour.
 
 Players who join partway through a round can start guessing straight away and get their first turn to draw in the next round. If the server drops below 2 players, the match is cancelled and the game goes back to waiting.
 

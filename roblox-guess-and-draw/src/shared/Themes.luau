@@ -46,6 +46,13 @@ local Themes = {
 			background = Color3.fromRGB(50, 100, 210),
 			doodles = Color3.fromRGB(20, 48, 128),
 		},
+		{
+			id = "food",
+			name = "Food",
+			emoji = "🍔",
+			background = Color3.fromRGB(236, 70, 86),
+			doodles = Color3.fromRGB(120, 18, 36),
+		},
 	} :: { Theme },
 	byId = {} :: { [string]: Theme },
 }

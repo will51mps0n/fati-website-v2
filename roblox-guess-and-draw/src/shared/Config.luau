@@ -71,7 +71,7 @@ Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 -- Just the doodle lines, white on see-through (assets/background-doodles.png). Each
 -- theme tints them and colours the screen behind them. Until this is set, the green
 -- tile above is used for the General theme and the others show plain colour.
-Config.BACKGROUND_DOODLES = "" -- assets/background-doodles.png
+Config.BACKGROUND_DOODLES = "rbxassetid://110219448107097" -- assets/background-doodles.png
 
 -- The thumbs in the canvas's top-right corner. Until these are set, emoji stand in.
 Config.THUMBS_UP_IMAGE = "rbxassetid://132536788217807" -- assets/thumbs-up.png
