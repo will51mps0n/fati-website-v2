@@ -55,14 +55,14 @@ The buttons show each product's live price from Roblox. With Managed pricing on,
 
 | Theme | Colours | Words |
 | --- | --- | --- |
-| 🎃 Halloween (default) | orange, darker orange doodles | 315 |
+| 🎃 Halloween (default) | orange, darker orange doodles | 273 |
 | 🌍 General | your original green background, unchanged | 550 |
-| 🐉 Fantasy | purple | 339 |
-| 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 601 |
+| 🐉 Fantasy | purple | 267 |
+| 🌿 Plants & Animals (pets, wild animals, fish, birds, bugs, plants, microbes, germs…) | teal | 371 |
 | 🏙️ People, Places & Things | blue | 213 |
-| 🍔 Food (fast food places, candy, drinks, dishes from around the world…) | red | 355 |
+| 🍔 Food (fast food places, candy, drinks, dishes from around the world…) | red | 308 |
 
-- Themes and their colours are in `src/shared/Themes.luau`. The words are in `src/shared/Words.luau`, by theme and then easy / medium / hard. The default theme is `Config.DEFAULT_THEME`.
+- Themes and their colours are in `src/shared/Themes.luau`. The words are in `src/shared/Words.luau`, by theme and then easy / medium / hard. The default theme is `Config.DEFAULT_THEME`. Easy is one simple thing a kid could draw (pumpkin, bat, cherry); medium takes more drawing (werewolf, haunted mansion, swordfish); hard is a well-known character, scene or harder-to-draw thing (Jack Skellington, platypus), never an obscure word.
 - The background doodles are one image, `assets/background-doodles.png` (white lines on see-through, made by `tools/make_doodle_mask.py`). Each theme except General tints the lines and colours the screen behind them; General shows the original green tile (`Config.BACKGROUND_TILE`) exactly as before.
 - `Config.BACKGROUND_DOODLES` holds that image's ID. If it's emptied, the other themes show plain colour.
 
