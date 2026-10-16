@@ -85,8 +85,7 @@ end
 local screen = make("ScreenGui", {
 	Name = "GuessAndDraw",
 	ResetOnSpawn = false,
-	-- Lay out in full-window pixels, the same space as GetMouseLocation(), so the
-	-- pointer maps onto the canvas with no topbar offset.
+	-- Cover the whole window, behind Roblox's topbar too, so the background fills it.
 	IgnoreGuiInset = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	Parent = player:WaitForChild("PlayerGui"),
@@ -976,7 +975,7 @@ local BUCKET_DOT = 0.008 -- canvas widths
 local mouseHidden = false
 
 RunService.RenderStepped:Connect(function()
-	local point = UserInputService:GetMouseLocation()
+	local point = Ui.pointerPosition()
 	local x, y, inside = toCanvas(point)
 	local overCanvas = canDraw()
 		and UserInputService.MouseEnabled

@@ -39,11 +39,15 @@ function Effects.confetti(count: number?)
 	end
 end
 
--- Pops up text at a screen position, then drifts it upward and fades it out.
+-- Pops up text at a screen position (in AbsolutePosition terms), then drifts it
+-- upward and fades it out.
 function Effects.floatText(text: string, color: Color3, position: Vector2, textSize: number?)
 	if not layer then
 		return
 	end
+	-- The layer's own corner isn't at 0, 0 (it starts above the topbar), so place
+	-- the text relative to it.
+	position -= layer.AbsolutePosition
 	local outline = Ui.textOutline(3)
 	local label = Ui.label({
 		AnchorPoint = Vector2.new(0.5, 0.5),

@@ -97,14 +97,15 @@ function Ui.panel(props: { [string]: any }, children: { Instance }?): Frame
 	return make("Frame", merge({ BackgroundColor3 = Theme.panel, BorderSizePixel = 0 }, props), list)
 end
 
--- Pointer position in full-window pixels, the space our ScreenGui is laid out in
--- (it ignores the topbar inset), so it compares directly with AbsolutePosition.
+-- Pointer position in the same space as AbsolutePosition. Roblox measures GUI
+-- positions and InputObject.Position from just below the topbar (even in a ScreenGui
+-- that ignores the inset), while GetMouseLocation() counts from the very top of the
+-- window, so the topbar height has to come off that one.
 function Ui.pointerPosition(input: InputObject?): Vector2
-	if input and input.UserInputType == Enum.UserInputType.Touch then
-		-- Touch positions are measured from below the topbar; shift them into window space.
-		return Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
+	if input then
+		return Vector2.new(input.Position.X, input.Position.Y)
 	end
-	return UserInputService:GetMouseLocation()
+	return UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
 end
 
 function Ui.isPress(input: InputObject): boolean
