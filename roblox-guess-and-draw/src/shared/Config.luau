@@ -43,12 +43,12 @@ Config.BACKGROUND_TILE = "" -- assets/background-tile.png
 Config.BACKGROUND_IMAGE = "rbxassetid://107099391291442" -- your background.jpeg
 
 Config.SOUNDS = {
-	click = "", -- assets/sounds/click.ogg
-	tick = "", -- assets/sounds/tick.ogg
-	correct = "", -- assets/sounds/correct.ogg
-	yourTurn = "", -- assets/sounds/your-turn.ogg
-	timeUp = "", -- assets/sounds/time-up.ogg
-	victory = "", -- assets/sounds/victory.ogg
+	click = "rbxassetid://117439492244306", -- assets/sounds/click.ogg
+	tick = "rbxassetid://130785928873648", -- assets/sounds/tick.ogg
+	correct = "rbxassetid://76162664841053", -- assets/sounds/correct.ogg
+	yourTurn = "rbxassetid://84068102723904", -- assets/sounds/your-turn.ogg
+	timeUp = "rbxassetid://105977925187605", -- assets/sounds/time-up.ogg
+	victory = "rbxassetid://119138221086024", -- assets/sounds/victory.ogg
 }
 
 Config.BACKGROUND_TILE_SIZE = 500 -- on-screen size of one tile in pixels; smaller = tinier doodles
