@@ -4,7 +4,7 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
 
 ## How a match plays
 
-- **Match:** a batch of `ROUNDS_PER_MATCH` rounds (3 by default). It starts once `MIN_PLAYERS` (2) are in the server.
+- **Match:** a batch of `ROUNDS_PER_MATCH` rounds (6 by default). It starts once `MIN_PLAYERS` (2) are in the server.
 - **Round:** every player gets one turn as the drawer.
 - **Turn:**
   1. **Choosing (15s):** the drawer picks one of 3 words. If they don't pick, one is chosen at random.
@@ -18,7 +18,10 @@ A multiplayer drawing and guessing game. One player draws a secret word and ever
      - Correct guesses are never shown to other players. Once you've guessed, you can only chat with the drawer and the other players who guessed, so nobody can leak the answer.
      - The turn ends early when everyone has guessed or the drawer leaves.
   3. **Reveal (6s):** shows the word and the points everyone earned that turn.
-- **Match end:** a podium shows 1st, 2nd and 3rd place (tied players share a place). Each 1st-place winner gets +1 `Wins` on the leaderboard. A new match then starts automatically.
+- **Match end:** a podium shows 1st, 2nd and 3rd place (tied players share a place). Each 1st-place winner gets +1 win. A new match then starts automatically.
+- **All-time wins:** wins are saved in a DataStore (`GuessAndDrawWins`), so they carry over between servers and visits. Each player's total shows as a small 👑 and number after their name in the player list, and as `Wins` on the Roblox leaderboard.
+  - DataStores only work in a published game. To test them in Studio, switch on **Game Settings → Security → Enable Studio Access to API Services**.
+  - Without a DataStore, wins only count for the current server.
 
 Players who join partway through a round can start guessing straight away and get their first turn to draw in the next round. If the server drops below 2 players, the match is cancelled and the game goes back to waiting.
 

@@ -1063,6 +1063,7 @@ local function createRow(entry): Row
 		TextScaled = false,
 		TextSize = 23,
 		TextTruncate = Enum.TextTruncate.AtEnd,
+		RichText = true,
 		Text = "",
 		Parent = frame,
 	})
@@ -1102,7 +1103,11 @@ local function renderPlayers(list)
 		local isMe = entry.userId == player.UserId
 		row.frame.LayoutOrder = position
 		row.rank.Text = `#{position}`
-		row.name.Text = entry.name .. (if isMe then " (You)" else "")
+		-- A small crown and the player's all-time match wins sit right after the name.
+		local crowns = if (entry.wins or 0) > 0
+			then ` <font size="17" color="#{Theme.crownText:ToHex()}">👑{entry.wins}</font>`
+			else ""
+		row.name.Text = escapeRichText(entry.name) .. (if isMe then " (You)" else "") .. crowns
 		row.name.TextColor3 = if isMe then Theme.you else Theme.text
 		row.score.Text = `{entry.score} points`
 		row.pencil.Visible = entry.isDrawer
@@ -1429,20 +1434,10 @@ local function renderPodium(winners)
 				Parent = plate,
 			})
 			Ui.square().Parent = avatar
-			if slot.place == 1 then
-				label({
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.08),
-					Size = UDim2.fromScale(0.4, 0.25),
-					Text = "👑",
-					Rotation = -10,
-					Parent = plate,
-				})
-			end
 			title({
 				Position = UDim2.fromScale(0, 0.72),
 				Size = UDim2.fromScale(1, 0.26),
-				Text = table.concat(names, " & "),
+				Text = (if slot.place == 1 then "👑 " else "") .. table.concat(names, " & "),
 				Parent = plate,
 			}, { Ui.maxText(22) })
 

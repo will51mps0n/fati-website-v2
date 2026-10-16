@@ -3,6 +3,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
 local TextService = game:GetService("TextService")
 
 local Shared = ReplicatedStorage:WaitForChild("GuessAndDraw")
@@ -56,6 +57,7 @@ local CUSTOM_WORD_PASSWORD = "poop123"
 local MAX_PASSWORD_TRIES = 5
 
 local scores: { [Player]: number } = {}
+local allTimeWins: { [Player]: number } = {} -- matches won, ever, saved in a DataStore
 local passwordFailures: { [Player]: number } = {}
 local usedWords: { [string]: boolean } = {}
 local readyPlayers: { [Player]: boolean } = {}
@@ -180,6 +182,7 @@ local function buildSnapshot(forPlayer: Player)
 			userId = player.UserId,
 			name = player.DisplayName,
 			score = scores[player] or 0,
+			wins = allTimeWins[player] or 0,
 			guessed = state.guessed[player] == true,
 			isDrawer = player == state.drawer,
 		})
@@ -244,6 +247,57 @@ local function filterForBroadcast(text: string, from: Player): string?
 	end
 	warn("Text filtering failed:", result)
 	return nil
+end
+
+-- All-time wins -----------------------------------------------------------------------
+
+-- Saved between servers and sessions. A DataStore only works in a published game
+-- (and in Studio only with "Enable Studio Access to API Services" switched on);
+-- without one, wins simply count for this server.
+local winsStore: DataStore? = nil
+pcall(function()
+	winsStore = DataStoreService:GetDataStore("GuessAndDrawWins")
+end)
+
+local function loadWins(player: Player)
+	local store = winsStore
+	if not store then
+		return
+	end
+	local ok, saved = pcall(function()
+		return store:GetAsync(tostring(player.UserId))
+	end)
+	if ok and typeof(saved) == "number" and player.Parent == Players then
+		allTimeWins[player] = math.max(allTimeWins[player] or 0, saved)
+		setLeaderstat(player, "Wins", allTimeWins[player])
+		broadcastState()
+	elseif not ok then
+		warn("Couldn't load wins:", saved)
+	end
+end
+
+local function addWin(player: Player)
+	allTimeWins[player] = (allTimeWins[player] or 0) + 1
+	setLeaderstat(player, "Wins", allTimeWins[player])
+	local store = winsStore
+	if not store then
+		return
+	end
+	task.spawn(function()
+		local ok, total = pcall(function()
+			return store:UpdateAsync(tostring(player.UserId), function(old)
+				return (if typeof(old) == "number" then old else 0) + 1
+			end)
+		end)
+		if ok and typeof(total) == "number" and player.Parent == Players then
+			-- The saved total is the true count (the player may have won elsewhere too).
+			allTimeWins[player] = total
+			setLeaderstat(player, "Wins", total)
+			broadcastState()
+		elseif not ok then
+			warn("Couldn't save a win:", total)
+		end
+	end)
 end
 
 -- Canvas ---------------------------------------------------------------------------
@@ -677,11 +731,7 @@ local function finishMatch()
 			score = entry.score,
 		})
 		if place == 1 then
-			local stats = entry.player:FindFirstChild("leaderstats")
-			local wins = stats and stats:FindFirstChild("Wins") :: IntValue?
-			if wins then
-				wins.Value += 1
-			end
+			addWin(entry.player)
 		end
 	end
 	state.winners = winners
@@ -772,8 +822,10 @@ local function onPlayerAdded(player: Player)
 	stats.Parent = player
 
 	scores[player] = 0
+	allTimeWins[player] = 0
 	systemMessage(`{player.DisplayName} joined the room!`, "join")
 	broadcastState()
+	task.spawn(loadWins, player)
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
@@ -784,6 +836,7 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	systemMessage(`{player.DisplayName} left the room!`, "leave")
 	scores[player] = nil
+	allTimeWins[player] = nil
 	readyPlayers[player] = nil
 	drawRate[player] = nil
 	lastFillAt[player] = nil

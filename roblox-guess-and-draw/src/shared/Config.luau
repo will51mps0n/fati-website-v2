@@ -5,7 +5,7 @@ local Config = {}
 -- Match structure ----------------------------------------------------------
 
 -- A match is a batch of rounds. In each round every player draws once.
-Config.ROUNDS_PER_MATCH = 3
+Config.ROUNDS_PER_MATCH = 6
 Config.MIN_PLAYERS = 2
 
 -- Phase lengths, in seconds.

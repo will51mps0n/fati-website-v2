@@ -37,6 +37,7 @@ local Theme = {
 	red = Color3.fromRGB(230, 60, 60),
 
 	gold = Color3.fromRGB(255, 205, 50),
+	crownText = Color3.fromRGB(196, 140, 0), -- the win count beside the crown
 	silver = Color3.fromRGB(200, 210, 222),
 	bronze = Color3.fromRGB(222, 150, 92),
 
