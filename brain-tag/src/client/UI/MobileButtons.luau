@@ -18,7 +18,10 @@ local function round(parent: Instance, text: string, size: number, position: UDi
 		BackgroundTransparency = 0.15,
 		Parent = parent,
 	})
-	UIKit.corner(size // 2).Parent = button
+	local corner = button:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = UDim.new(0.5, 0) -- full circle
+	end
 	return button
 end
 
