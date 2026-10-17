@@ -12,6 +12,17 @@ local Util = require(ReplicatedStorage.Shared.Util)
 
 local BottomCenter = {}
 
+-- " x3" for peels, " 60%" for a water tank, "" for everything else.
+local function chargeText(item: Items.Item, charges: any): string
+	if typeof(charges) ~= "number" or charges <= 0 or not item.charges then
+		return ""
+	end
+	if item.kind == "Stream" then
+		return string.format(" %d%%", math.ceil(charges / item.charges * 100))
+	end
+	return " x" .. charges
+end
+
 local function nearestGroundItem(position: Vector3): string?
 	local folder = workspace:FindFirstChild("GroundItems")
 	if not folder then
@@ -127,9 +138,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 		end
 		local item = Items.get(itemId)
 		local charges = ClientState.my("HeldCharges")
-		itemName.Text = if item
-			then item.name .. (if typeof(charges) == "number" and charges > 0 then " x" .. charges else "")
-			else ""
+		itemName.Text = if item then item.name .. chargeText(item, charges) else ""
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)

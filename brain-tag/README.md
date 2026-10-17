@@ -21,8 +21,28 @@ spawns).*
 
 ## Getting it into Roblox Studio
 
-The built place is committed as `BrainTag.rbxlx`. One command downloads it and
-opens it in Studio (you only need [Roblox Studio](https://create.roblox.com/)):
+### From inside Studio (install and update)
+
+1. Open any place in Studio (a new **Baseplate** is fine, or your saved Brain Tag place).
+2. Open **View > Command Bar**.
+3. Paste this one line into the Command Bar and press **Enter**:
+
+```lua
+local H=game:GetService("HttpService") H.HttpEnabled=true local M=Instance.new("ModuleScript") M.Source=H:GetAsync("https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/studio/install.luau",true) require(M)()
+```
+
+4. Output says `[Brain Tag] installed build ...`. Press **Play**.
+
+Run the same line again whenever the game is updated: it replaces the Brain
+Tag scripts with the newest ones. (It also turns on HTTP requests for the
+place and removes the template's Baseplate and SpawnLocation, which would sit
+on top of the map.) Right after an update GitHub can serve the old file for a
+few minutes; the build time in Output tells you which one you got.
+
+### As a file
+
+The built place is also committed as `BrainTag.rbxlx`. One terminal command
+downloads it and opens it in Studio:
 
 - macOS:
   `curl -L -o ~/Desktop/BrainTag.rbxlx https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/BrainTag.rbxlx && open ~/Desktop/BrainTag.rbxlx`
@@ -91,7 +111,7 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | A zombie touching a human converts them. Late joiners spawn as zombies. Weapons only shove and stun. |
+| Infection (180 s) | A zombie touching a human converts them. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human. |
 
@@ -123,7 +143,7 @@ with its tip, and holding click hooks the nearest piece and drags it to you.
 | Baguette | 900 | Long and crusty, leaves crumbs |
 | Drumstick | 1,000 | Hold it at round end: +40% score (5% roll: Golden, +80%) |
 | Frying Pan | 1,200 | CLANG: big knockback, long daze (5% roll: Golden Frying Pan) |
-| Water Gun | 1,200 | Hold to spray zombies back |
+| Water Gun | 1,200 | Hold to spray zombies back (about 6 s of water) |
 | Potato Gun | 1,500 | Potato projectiles (5% roll: Rare Potato Gun) |
 | Crowbar | 1,600 | Hooks and drags furniture harder than anything |
 | Plunger | 1,800 | Sticks to a zombie's face and pins them |
@@ -134,7 +154,7 @@ with its tip, and holding click hooks the nearest piece and drags it to you.
 | Katana | 4,000 | Fast swings, long reach |
 | Confetti Cannon | 4,500 | Cone blast in a shower of confetti |
 | Bubble Gun | 5,000 | Traps a zombie in a bubble until it pops |
-| Leaf Blower | 7,000 | Hold to blow zombies and light furniture away |
+| Leaf Blower | 7,000 | Hold to blow zombies and light furniture away (about 9 s of fuel) |
 | Duck Launcher | 9,000 | Rubber duck that explodes and knocks back every zombie nearby |
 | Shotgun | 10,000 | Cone blast; also blows a hole in the wall in front of you until the round resets |
 
@@ -217,6 +237,7 @@ Everything lives in `src/shared/Config.luau`:
 - **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP`.
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
+- **Bushes:** `BUSH_HEIGHT`, `BUSH_REVEAL_DISTANCE` (how close a bot must get to spot you), `BUSH_SEE_THROUGH`.
 - **Sounds:** `SOUNDS` uses sounds that ship with the Roblox client. Set any to
   `""` to mute it, or paste your own `rbxassetid://` id. The furniture scrape
   loop is off until you add a sound id.
@@ -231,14 +252,16 @@ src/shared   Config, items, skins, map layout, character and item models
 src/server   map + furniture builders, rounds, items, shop, data, monetization, bots
 src/client   camera, movement, input, effects, chat, UI/ (HUD built in code)
 tests/       logic tests (round rules, items, skins, map geometry)
-tools/       test runner and map preview renderer (Python + standalone Luau)
+studio/      install.luau, the generated Command Bar installer
+tools/       test runner, map preview renderer, installer generator
 ```
 
 Developer checks (need the standalone `luau` binary from
 [luau-lang/luau releases](https://github.com/luau-lang/luau/releases)):
 
 ```
-python3 tools/run_tests.py path/to/luau      # 20 logic tests, incl. "every room is reachable"
+python3 tools/run_tests.py path/to/luau      # 31 logic tests, incl. "every room is reachable"
 python3 tools/render_map.py path/to/luau     # writes tools/out/map.png
+python3 tools/build_installer.py path/to/rojo   # regenerates studio/install.luau (the Command Bar installer)
 rojo sourcemap -o sourcemap.json && luau-lsp analyze --sourcemap sourcemap.json --definitions <roblox defs> src
 ```

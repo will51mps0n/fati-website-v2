@@ -422,6 +422,13 @@ local function streamStep()
 			continue
 		end
 		p.nextStreamTick = now + (item.tick or 0.12)
+		if item.charges then
+			p.heldCharges = (p.heldCharges or 1) - 1
+			p.state:SetAttribute("HeldCharges", p.heldCharges)
+			if p.heldCharges <= 0 then
+				ItemService.take(p) -- out of water
+			end
+		end
 		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
 		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)

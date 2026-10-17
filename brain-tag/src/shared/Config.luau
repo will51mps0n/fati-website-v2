@@ -99,6 +99,14 @@ Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
 Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
 
+-- Bushes ------------------------------------------------------------------------------------
+-- Walk into a bush to hide: it covers you from above, your name tag
+-- disappears for everyone outside it, and bots can't find you unless they
+-- come this close.
+Config.BUSH_HEIGHT = 9 -- canopy top, taller than the biggest character
+Config.BUSH_REVEAL_DISTANCE = 9
+Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your screen
+
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6

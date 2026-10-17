@@ -29,10 +29,12 @@ type Piece = FurnitureBuilder.Built & {
 	lastClaim: number,
 	pushers: { [string]: number }, -- participant id -> last time seen pushing
 	contestedUntil: number,
+	tugOfWar: boolean, -- contestedUntil came from two pushers, not a shove
 	burst: Vector3,
 	burstUntil: number,
 	burstLength: number,
 	lastGood: CFrame, -- last position that passed the anti-cheat checks
+	lastGoodAt: number, -- when the piece last moved to lastGood
 }
 
 -- Someone who can push furniture. `reach` is set while they hold a melee
@@ -122,10 +124,12 @@ function FurnitureService.build(layout: MapLayout.Layout)
 			piece.lastClaim = 0
 			piece.pushers = {}
 			piece.contestedUntil = 0
+			piece.tugOfWar = false
 			piece.burst = Vector3.zero
 			piece.burstUntil = 0
 			piece.burstLength = 1
 			piece.lastGood = built.home
+			piece.lastGoodAt = 0
 			table.insert(pieces, piece)
 			byBody[built.body] = piece
 			byModel[built.model] = piece
@@ -178,6 +182,7 @@ function FurnitureService.resetAll()
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0
+		piece.tugOfWar = false
 		piece.burstUntil = 0
 		table.clear(piece.pushers)
 		piece.model:PivotTo(piece.home)
@@ -270,7 +275,7 @@ local function collectPushes(now: number): FurniturePush.Pushes
 end
 
 -- Is a client-driven piece somewhere a legitimate push could have put it?
-local function plausible(piece: Piece, dt: number): boolean
+local function plausible(piece: Piece, now: number): boolean
 	local body = piece.body
 	local owner = piece.owner
 	local p = owner and Participants.fromPlayer(owner)
@@ -285,8 +290,12 @@ local function plausible(piece: Piece, dt: number): boolean
 	if body.AssemblyAngularVelocity.Magnitude > 3 then
 		return false
 	end
+	-- Client positions arrive in bursts, so compare against the time since
+	-- the piece last moved, not one server frame (capped so a piece that sat
+	-- still for a while can't jump far).
 	local moved = Util.flatDistance(body.Position, piece.lastGood.Position)
-	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * dt + 1 then
+	local elapsed = math.clamp(now - piece.lastGoodAt, 1 / 60, 0.3)
+	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * elapsed + 1.5 then
 		return false -- teleported
 	end
 	local range = body.Size.Magnitude / 2 + root.Size.X / 2 + 14 * math.max(1, p.scale) + 6
@@ -316,27 +325,34 @@ local function step(dt: number)
 				end
 			end
 		end
+		if now >= piece.contestedUntil then
+			piece.tugOfWar = false
+		end
 		if active >= 2 or someoneElse then
 			-- A tug of war: the server simulates it so both sides count.
+			piece.tugOfWar = true
 			revoke(piece, CONTEST_SECONDS, false)
-		elseif not owner and now < piece.contestedUntil and active >= 1 then
+		elseif not owner and piece.tugOfWar and now < piece.contestedUntil and active >= 1 then
 			-- Keep the server in charge until the tug of war is really over.
 			piece.contestedUntil = now + CONTEST_SECONDS
 		elseif owner then
 			if owner.Parent ~= Players or now - piece.lastClaim > Config.FURNITURE_RELEASE_SECONDS then
 				revoke(piece, 0)
-			elseif not plausible(piece, dt) then
+			elseif not plausible(piece, now) then
 				-- Moved in a way no push could: put it back and take it away.
 				revoke(piece, 1.5)
 				piece.model:PivotTo(piece.lastGood)
 			end
 		end
 		if piece.owner then
-			piece.lastGood = body.CFrame
+			-- Only advance when a new position has arrived (see plausible).
+			if (body.Position - piece.lastGood.Position).Magnitude > 0.01 then
+				piece.lastGood, piece.lastGoodAt = body.CFrame, now
+			end
 		end
 
 		if piece.owner == nil then
-			piece.lastGood = body.CFrame
+			piece.lastGood, piece.lastGoodAt = body.CFrame, now
 			local v = body.AssemblyLinearVelocity
 			if now < piece.burstUntil then
 				local k = (piece.burstUntil - now) / piece.burstLength

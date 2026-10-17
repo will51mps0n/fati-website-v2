@@ -1,8 +1,8 @@
 -- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
 -- ducks. Simulated on the server with sphere casts so hits are decided in
--- one place. Shots pass through humans and stop at the first zombie, wall,
--- bush or piece of furniture, then apply their effect (shove, freeze,
--- bubble trap or explosion).
+-- one place. Shots pass through humans and bushes and stop at the first
+-- zombie, wall or piece of furniture, then apply their effect (shove,
+-- freeze, bubble trap or explosion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

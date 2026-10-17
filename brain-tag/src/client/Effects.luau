@@ -236,7 +236,7 @@ local function updateSprays()
 			local held = character:FindFirstChild("HeldItem")
 			local handle = held and held:FindFirstChild("Handle")
 			if handle then
-				local emitter = handle:FindFirstChild("Spray") :: ParticleEmitter?
+				local emitter = handle:FindFirstChild("Spray", true) :: ParticleEmitter?
 				if spraying and not emitter then
 					local attachment = Instance.new("Attachment")
 					attachment.Name = "SprayAt"

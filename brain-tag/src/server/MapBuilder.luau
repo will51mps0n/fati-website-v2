@@ -5,6 +5,7 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 
@@ -360,7 +361,10 @@ end
 
 -- Bushes and boundary -------------------------------------------------------------
 
+-- Tall leaf cylinders you can walk into. Seen from the top-down camera they
+-- cover anyone standing inside (see Bushes.luau).
 local function buildBushes(parent: Instance, layout: Layout)
+	local height = Config.BUSH_HEIGHT
 	for _, bush in layout.bushes do
 		local base = if bush.color == "Orange" then COLORS.BushOrange else COLORS.BushGreen
 		local light = if bush.color == "Orange" then "F2AC62" else "5CBF67"
@@ -376,25 +380,38 @@ local function buildBushes(parent: Instance, layout: Layout)
 			-- A darker, slightly bigger, slightly lower disc draws the outline.
 			Parts.disc(
 				"Outline",
-				Vector3.new(bush.x + blob[1], 1.95, bush.z + blob[2]),
+				Vector3.new(bush.x + blob[1], (height - 0.1) / 2, bush.z + blob[2]),
 				blob[3] + 0.7,
-				3.9,
+				height - 0.1,
 				outline,
 				model
 			)
 		end
 		for _, blob in blobs do
-			Parts.disc("Leaves", Vector3.new(bush.x + blob[1], 2, bush.z + blob[2]), blob[3], 4, base, model)
-			local highlight = Parts.disc(
+			Parts.disc(
+				"Leaves",
+				Vector3.new(bush.x + blob[1], height / 2, bush.z + blob[2]),
+				blob[3],
+				height,
+				base,
+				model
+			)
+			Parts.disc(
 				"Highlight",
-				Vector3.new(bush.x + blob[1] - 0.2, 4.03, bush.z + blob[2] - 0.2),
+				Vector3.new(bush.x + blob[1] - 0.2, height + 0.03, bush.z + blob[2] - 0.2),
 				blob[3] * 0.6,
 				0.06,
 				light,
 				model
 			)
-			highlight.CanCollide = false
-			highlight.CanQuery = false
+		end
+		-- Walk-through and shoot-through: bushes only hide what's inside.
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+				part.CanQuery = false
+				part.CanTouch = false
+			end
 		end
 		model.Parent = parent
 	end
@@ -466,7 +483,6 @@ function MapBuilder.build(layout: Layout)
 		setPhysics(folder, SLIPPERY)
 	end
 	setPhysics(walls, GRIPPY)
-	setPhysics(bushes, GRIPPY)
 	setPhysics(pools, GRIPPY)
 	mapFolder:SetAttribute("MapName", layout.name)
 end

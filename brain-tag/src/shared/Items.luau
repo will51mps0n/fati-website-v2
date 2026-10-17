@@ -385,14 +385,15 @@ add({
 	id = "WaterGun",
 	name = "Water Gun",
 	kind = "Stream",
-	description = "Hold to spray. Keeps zombies pushed back while you have water.",
+	description = "Hold to spray. Keeps zombies pushed back while you have water (about 6 seconds).",
 	price = 1200,
 	groundWeight = 5,
 	reach = 16,
 	arc = 24,
 	knockback = 16,
-	stun = 0.1,
+	stun = 0,
 	tick = 0.12,
+	charges = 50, -- spray ticks in a full tank
 	fx = "Water",
 })
 
@@ -451,13 +452,14 @@ add({
 	id = "LeafBlower",
 	name = "Leaf Blower",
 	kind = "Stream",
-	description = "Hold to blow zombies (and light furniture) away in a wide cone.",
+	description = "Hold to blow zombies (and light furniture) away in a wide cone. About 9 seconds of fuel.",
 	price = 7000,
 	reach = 14,
 	arc = 40,
 	knockback = 24,
-	stun = 0.1,
+	stun = 0,
 	tick = 0.1,
+	charges = 90, -- blow ticks in a full tank
 	fx = "Leaves",
 })
 

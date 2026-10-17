@@ -36,6 +36,67 @@
       </Properties>
       <Item class="ModuleScript" referent="4">
         <Properties>
+          <string name="Name">Bushes</string>
+          <string name="Source"><![CDATA[-- Bushes hide whoever stands in them. Shared so the server (hidden flags for
+-- bots) and your client (see-through canopy, hidden name tags) agree on who
+-- is covered. A bush is a model of upright leaf discs in workspace.Map.Bushes.
+
+local Bushes = {}
+
+Bushes.ATTRIBUTE = "InBush" -- set on characters by the server
+
+local cachedFolder: Instance? = nil
+local cached: { BasePart } = {}
+local dirty = true
+
+-- Every leaf disc on the current map. Re-collected when the map is rebuilt.
+function Bushes.leaves(): { BasePart }
+	local map = workspace:FindFirstChild("Map")
+	local folder = map and map:FindFirstChild("Bushes")
+	if folder ~= cachedFolder then
+		cachedFolder = folder
+		dirty = true
+		if folder then
+			folder.DescendantAdded:Connect(function()
+				dirty = true
+			end)
+		end
+	end
+	if dirty then
+		dirty = false
+		cached = {}
+		if folder then
+			for _, part in folder:GetDescendants() do
+				if part.Name == "Leaves" and part:IsA("BasePart") then
+					table.insert(cached, part)
+				end
+			end
+		end
+	end
+	return cached
+end
+
+-- The bush model covering a position, if any. Leaf discs are upright
+-- cylinders, so their diameter is Size.Y.
+function Bushes.coverAt(position: Vector3): Model?
+	for _, part in Bushes.leaves() do
+		local center = part.Position
+		local radius = part.Size.Y / 2 - 0.4
+		local dx, dz = position.X - center.X, position.Z - center.Z
+		if dx * dx + dz * dz <= radius * radius then
+			local model = part.Parent
+			return if model and model:IsA("Model") then model else nil
+		end
+	end
+	return nil
+end
+
+return Bushes
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
           <string name="Name">CharacterLook</string>
           <string name="Source"><![CDATA[-- The top-down person from the original: a rounded body in the shirt color
 -- with a dark outline, a round head (hair on top) with a skin-colored face
@@ -561,7 +622,7 @@ return CharacterLook
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="5">
+      <Item class="ModuleScript" referent="6">
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--!strict
@@ -665,6 +726,14 @@ Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
 Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
 
+-- Bushes ------------------------------------------------------------------------------------
+-- Walk into a bush to hide: it covers you from above, your name tag
+-- disappears for everyone outside it, and bots can't find you unless they
+-- come this close.
+Config.BUSH_HEIGHT = 9 -- canopy top, taller than the biggest character
+Config.BUSH_REVEAL_DISTANCE = 9
+Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your screen
+
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
@@ -754,7 +823,7 @@ return Config
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="6">
+      <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">FurniturePush</string>
           <string name="Source"><![CDATA[-- Shared pushing rules, so your client (for the pieces it drives) and the
@@ -846,7 +915,7 @@ return FurniturePush
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="7">
+      <Item class="ModuleScript" referent="8">
         <Properties>
           <string name="Name">FurnitureSpecs</string>
           <string name="Source"><![CDATA[--!strict
@@ -924,7 +993,7 @@ return FurnitureSpecs
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="8">
+      <Item class="ModuleScript" referent="9">
         <Properties>
           <string name="Name">ItemModels</string>
           <string name="Source"><![CDATA[-- Builds the 3D look of every item from simple parts. The grip (where the
@@ -1283,7 +1352,7 @@ return ItemModels
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">Items</string>
           <string name="Source"><![CDATA[--!strict
@@ -1673,14 +1742,15 @@ add({
 	id = "WaterGun",
 	name = "Water Gun",
 	kind = "Stream",
-	description = "Hold to spray. Keeps zombies pushed back while you have water.",
+	description = "Hold to spray. Keeps zombies pushed back while you have water (about 6 seconds).",
 	price = 1200,
 	groundWeight = 5,
 	reach = 16,
 	arc = 24,
 	knockback = 16,
-	stun = 0.1,
+	stun = 0,
 	tick = 0.12,
+	charges = 50, -- spray ticks in a full tank
 	fx = "Water",
 })
 
@@ -1739,13 +1809,14 @@ add({
 	id = "LeafBlower",
 	name = "Leaf Blower",
 	kind = "Stream",
-	description = "Hold to blow zombies (and light furniture) away in a wide cone.",
+	description = "Hold to blow zombies (and light furniture) away in a wide cone. About 9 seconds of fuel.",
 	price = 7000,
 	reach = 14,
 	arc = 40,
 	knockback = 24,
-	stun = 0.1,
+	stun = 0,
 	tick = 0.1,
+	charges = 90, -- blow ticks in a full tank
 	fx = "Leaves",
 })
 
@@ -1854,7 +1925,7 @@ return module
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">Knockback</string>
           <string name="Source"><![CDATA[-- A short horizontal shove. Runs on whichever machine simulates the character:
@@ -1918,7 +1989,7 @@ return Knockback
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">MapLayout</string>
           <string name="Source"><![CDATA[--!strict
@@ -2826,7 +2897,7 @@ return MapLayout
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">Parts</string>
           <string name="Source"><![CDATA[-- Part factory with Brain Tag's flat cartoon defaults: SmoothPlastic, no
@@ -2948,7 +3019,7 @@ return Parts
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">Remotes</string>
           <string name="Source"><![CDATA[-- Every RemoteEvent and RemoteFunction the game uses. The server creates them
@@ -3031,7 +3102,7 @@ return Remotes
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">RoundRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -3168,7 +3239,7 @@ return RoundRules
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Skins</string>
           <string name="Source"><![CDATA[--!strict
@@ -3451,7 +3522,7 @@ return Skins
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">Util</string>
           <string name="Source"><![CDATA[-- Small helpers shared by server and client.
@@ -3512,15 +3583,15 @@ return Util
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="17">
+  <Item class="ServerScriptService" referent="18">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="18">
+    <Item class="Folder" referent="19">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">Announcer</string>
           <string name="Source"><![CDATA[-- Server -> client messages: yellow system lines in chat, short on-screen
@@ -3557,18 +3628,21 @@ return Announcer
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">BotService</string>
           <string name="Source"><![CDATA[-- Studio-only test bots so you can play a full round alone. They count as
 -- participants for every rule. Bot humans run from the nearest zombie (and
--- wander during prep); bot zombies chase the nearest human with
--- PathfindingService and press "Z" when stuck.
+-- wander during prep); bot zombies chase the nearest human they can see
+-- with PathfindingService and press "Z" when stuck. Anyone hiding in a bush
+-- is invisible to bots until they come close.
 
 local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Bushes = require(ReplicatedStorage.Shared.Bushes)
+local BushService = require(script.Parent.BushService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
@@ -3588,7 +3662,7 @@ local function nearest(me: Participant, from: Vector3, team: string): (Vector3?,
 	for _, other in Participants.onTeam(team :: Participants.Team) do
 		if other ~= me then
 			local root = Participants.body(other)
-			if root then
+			if root and BushService.visibleFrom(other, from) then
 				local d = Util.flatDistance(root.Position, from)
 				if d < bestDistance then
 					best, bestDistance = root.Position, d
@@ -3610,6 +3684,19 @@ local function inBounds(v: Vector3): boolean
 	return MapLayout.inRect(MapLayout.current().bounds, v.X, v.Z, -4)
 end
 
+-- Center of the nearest bush within `range`, to hide in.
+local function nearestBush(from: Vector3, range: number): Vector3?
+	local best: Vector3? = nil
+	local bestDistance = range
+	for _, leaves in Bushes.leaves() do
+		local d = Util.flatDistance(leaves.Position, from)
+		if d < bestDistance then
+			best, bestDistance = Vector3.new(leaves.Position.X, from.Y, leaves.Position.Z), d
+		end
+	end
+	return best
+end
+
 local function brain(p: Participant, rng: Random)
 	local path = PathfindingService:CreatePath({
 		AgentRadius = 2,
@@ -3625,6 +3712,7 @@ local function brain(p: Participant, rng: Random)
 	local wanderUntil = 0
 	local lastPosition = Vector3.zero
 	local stuckSince = os.clock()
+	local hider = rng:NextNumber() < 0.5 -- some bot humans run for the bushes
 
 	local function followPath(goal: Vector3, root: BasePart, humanoid: Humanoid)
 		local now = os.clock()
@@ -3664,6 +3752,14 @@ local function brain(p: Participant, rng: Random)
 			stuckSince = now
 		end
 
+		local function wander()
+			if not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, root.Position) < 3 then
+				wanderGoal = randomInside(rng)
+				wanderUntil = now + rng:NextNumber(6, 12)
+			end
+			followPath(wanderGoal :: Vector3, root, humanoid)
+		end
+
 		if p.team == "Zombie" then
 			local target, distance = nearest(p, root.Position, "Human")
 			if target then
@@ -3673,14 +3769,24 @@ local function brain(p: Participant, rng: Random)
 				else
 					followPath(target, root, humanoid)
 				end
+			else
+				wander() -- everyone left is hiding (or there's nobody yet)
 			end
 			if now - stuckSince > 6 then
 				RoundManager.zombieReturn(p)
 				stuckSince = now
+				lastPosition = root.Position
 			end
 		else
 			local threat, distance = nearest(p, root.Position, "Zombie")
-			if threat and distance < 45 then
+			local hidden = BushService.hidden(p)
+			local bush = if hider and not hidden then nearestBush(root.Position, 30) else nil
+			if hidden and (not threat or distance > Config.BUSH_REVEAL_DISTANCE) then
+				humanoid:MoveTo(root.Position) -- stay still and hope
+				stuckSince = now
+			elseif threat and distance < 45 and bush then
+				followPath(bush, root, humanoid)
+			elseif threat and distance < 45 then
 				-- Try 12 directions and run toward the one farthest from zombies.
 				local best: Vector3? = nil
 				local bestScore = -math.huge
@@ -3697,15 +3803,7 @@ local function brain(p: Participant, rng: Random)
 				humanoid:MoveTo(best or (root.Position + (root.Position - threat).Unit * 10))
 				pathGoal = nil
 			else
-				if
-					not wanderGoal
-					or now > wanderUntil
-					or Util.flatDistance(wanderGoal, root.Position) < 3
-				then
-					wanderGoal = randomInside(rng)
-					wanderUntil = now + rng:NextNumber(6, 12)
-				end
-				followPath(wanderGoal :: Vector3, root, humanoid)
+				wander()
 			end
 		end
 	end
@@ -3735,7 +3833,68 @@ return BotService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
+        <Properties>
+          <string name="Name">BushService</string>
+          <string name="Source"><![CDATA[-- Flags characters standing in a bush (character attribute "InBush") so bots
+-- can't see them. Clients work out the visual side (name tags, see-through
+-- canopy) themselves from the same shared geometry.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Bushes = require(ReplicatedStorage.Shared.Bushes)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Participants = require(script.Parent.Participants)
+local Util = require(ReplicatedStorage.Shared.Util)
+
+type Participant = Participants.Participant
+
+local BushService = {}
+
+local INTERVAL = 0.1
+
+function BushService.hidden(p: Participant): boolean
+	local character = p.character
+	return character ~= nil and character:GetAttribute(Bushes.ATTRIBUTE) == true
+end
+
+-- Whether someone at `from` can spot `p`: always, unless `p` is in a bush
+-- and the looker is farther than the reveal distance.
+function BushService.visibleFrom(p: Participant, from: Vector3): boolean
+	if not BushService.hidden(p) then
+		return true
+	end
+	local root = Participants.body(p)
+	return root ~= nil and Util.flatDistance(root.Position, from) <= Config.BUSH_REVEAL_DISTANCE
+end
+
+function BushService.init()
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed < INTERVAL then
+			return
+		end
+		elapsed = 0
+		for _, p in Participants.all() do
+			local character = p.character
+			if character then
+				local root = Participants.body(p)
+				local hidden = root ~= nil and Bushes.coverAt(root.Position) ~= nil
+				if character:GetAttribute(Bushes.ATTRIBUTE) ~= hidden then
+					character:SetAttribute(Bushes.ATTRIBUTE, hidden)
+				end
+			end
+		end
+	end)
+end
+
+return BushService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">CharacterService</string>
           <string name="Source"><![CDATA[-- Spawns and dresses characters. Every player and bot uses the same custom
@@ -4013,7 +4172,7 @@ return CharacterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- Shoves and stuns. Weapons never kill: they push zombies away and freeze
@@ -4145,7 +4304,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">DataService</string>
           <string name="Source"><![CDATA[-- Saves each player's score, stats, skins and purchases with DataStoreService.
@@ -4434,7 +4593,7 @@ return DataService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">FurnitureBuilder</string>
           <string name="Source"><![CDATA[-- Builds one furniture piece: an invisible-to-physics stack of colored details
@@ -5019,7 +5178,7 @@ return FurnitureBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">FurnitureService</string>
           <string name="Source"><![CDATA[-- Owns every furniture piece: builds them, decides who simulates each one,
@@ -5053,10 +5212,12 @@ type Piece = FurnitureBuilder.Built & {
 	lastClaim: number,
 	pushers: { [string]: number }, -- participant id -> last time seen pushing
 	contestedUntil: number,
+	tugOfWar: boolean, -- contestedUntil came from two pushers, not a shove
 	burst: Vector3,
 	burstUntil: number,
 	burstLength: number,
 	lastGood: CFrame, -- last position that passed the anti-cheat checks
+	lastGoodAt: number, -- when the piece last moved to lastGood
 }
 
 -- Someone who can push furniture. `reach` is set while they hold a melee
@@ -5146,10 +5307,12 @@ function FurnitureService.build(layout: MapLayout.Layout)
 			piece.lastClaim = 0
 			piece.pushers = {}
 			piece.contestedUntil = 0
+			piece.tugOfWar = false
 			piece.burst = Vector3.zero
 			piece.burstUntil = 0
 			piece.burstLength = 1
 			piece.lastGood = built.home
+			piece.lastGoodAt = 0
 			table.insert(pieces, piece)
 			byBody[built.body] = piece
 			byModel[built.model] = piece
@@ -5202,6 +5365,7 @@ function FurnitureService.resetAll()
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0
+		piece.tugOfWar = false
 		piece.burstUntil = 0
 		table.clear(piece.pushers)
 		piece.model:PivotTo(piece.home)
@@ -5294,7 +5458,7 @@ local function collectPushes(now: number): FurniturePush.Pushes
 end
 
 -- Is a client-driven piece somewhere a legitimate push could have put it?
-local function plausible(piece: Piece, dt: number): boolean
+local function plausible(piece: Piece, now: number): boolean
 	local body = piece.body
 	local owner = piece.owner
 	local p = owner and Participants.fromPlayer(owner)
@@ -5309,8 +5473,12 @@ local function plausible(piece: Piece, dt: number): boolean
 	if body.AssemblyAngularVelocity.Magnitude > 3 then
 		return false
 	end
+	-- Client positions arrive in bursts, so compare against the time since
+	-- the piece last moved, not one server frame (capped so a piece that sat
+	-- still for a while can't jump far).
 	local moved = Util.flatDistance(body.Position, piece.lastGood.Position)
-	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * dt + 1 then
+	local elapsed = math.clamp(now - piece.lastGoodAt, 1 / 60, 0.3)
+	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * elapsed + 1.5 then
 		return false -- teleported
 	end
 	local range = body.Size.Magnitude / 2 + root.Size.X / 2 + 14 * math.max(1, p.scale) + 6
@@ -5340,27 +5508,34 @@ local function step(dt: number)
 				end
 			end
 		end
+		if now >= piece.contestedUntil then
+			piece.tugOfWar = false
+		end
 		if active >= 2 or someoneElse then
 			-- A tug of war: the server simulates it so both sides count.
+			piece.tugOfWar = true
 			revoke(piece, CONTEST_SECONDS, false)
-		elseif not owner and now < piece.contestedUntil and active >= 1 then
+		elseif not owner and piece.tugOfWar and now < piece.contestedUntil and active >= 1 then
 			-- Keep the server in charge until the tug of war is really over.
 			piece.contestedUntil = now + CONTEST_SECONDS
 		elseif owner then
 			if owner.Parent ~= Players or now - piece.lastClaim > Config.FURNITURE_RELEASE_SECONDS then
 				revoke(piece, 0)
-			elseif not plausible(piece, dt) then
+			elseif not plausible(piece, now) then
 				-- Moved in a way no push could: put it back and take it away.
 				revoke(piece, 1.5)
 				piece.model:PivotTo(piece.lastGood)
 			end
 		end
 		if piece.owner then
-			piece.lastGood = body.CFrame
+			-- Only advance when a new position has arrived (see plausible).
+			if (body.Position - piece.lastGood.Position).Magnitude > 0.01 then
+				piece.lastGood, piece.lastGoodAt = body.CFrame, now
+			end
 		end
 
 		if piece.owner == nil then
-			piece.lastGood = body.CFrame
+			piece.lastGood, piece.lastGoodAt = body.CFrame, now
 			local v = body.AssemblyLinearVelocity
 			if now < piece.burstUntil then
 				local k = (piece.burstUntil - now) / piece.burstLength
@@ -5399,7 +5574,7 @@ return FurnitureService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">ItemService</string>
           <string name="Source"><![CDATA[-- Held items and items lying on the ground. Each human holds at most one
@@ -5826,6 +6001,13 @@ local function streamStep()
 			continue
 		end
 		p.nextStreamTick = now + (item.tick or 0.12)
+		if item.charges then
+			p.heldCharges = (p.heldCharges or 1) - 1
+			p.state:SetAttribute("HeldCharges", p.heldCharges)
+			if p.heldCharges <= 0 then
+				ItemService.take(p) -- out of water
+			end
+		end
 		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
 		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)
@@ -5891,7 +6073,7 @@ return ItemService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="27">
+      <Item class="Script" referent="29">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -5911,6 +6093,7 @@ local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 
 local BotService = require(script.Parent.BotService)
+local BushService = require(script.Parent.BushService)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local DataService = require(script.Parent.DataService)
@@ -5954,6 +6137,7 @@ end)
 Combat.init()
 Projectiles.init()
 Traps.init()
+BushService.init()
 ItemService.init()
 ShopService.init()
 DataService.init()
@@ -5996,7 +6180,7 @@ print("[Brain Tag] server ready")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">MapBuilder</string>
           <string name="Source"><![CDATA[-- Builds the neighborhood from MapLayout: grass with little details, dirt
@@ -6006,6 +6190,7 @@ print("[Brain Tag] server ready")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 
@@ -6361,7 +6546,10 @@ end
 
 -- Bushes and boundary -------------------------------------------------------------
 
+-- Tall leaf cylinders you can walk into. Seen from the top-down camera they
+-- cover anyone standing inside (see Bushes.luau).
 local function buildBushes(parent: Instance, layout: Layout)
+	local height = Config.BUSH_HEIGHT
 	for _, bush in layout.bushes do
 		local base = if bush.color == "Orange" then COLORS.BushOrange else COLORS.BushGreen
 		local light = if bush.color == "Orange" then "F2AC62" else "5CBF67"
@@ -6377,25 +6565,38 @@ local function buildBushes(parent: Instance, layout: Layout)
 			-- A darker, slightly bigger, slightly lower disc draws the outline.
 			Parts.disc(
 				"Outline",
-				Vector3.new(bush.x + blob[1], 1.95, bush.z + blob[2]),
+				Vector3.new(bush.x + blob[1], (height - 0.1) / 2, bush.z + blob[2]),
 				blob[3] + 0.7,
-				3.9,
+				height - 0.1,
 				outline,
 				model
 			)
 		end
 		for _, blob in blobs do
-			Parts.disc("Leaves", Vector3.new(bush.x + blob[1], 2, bush.z + blob[2]), blob[3], 4, base, model)
-			local highlight = Parts.disc(
+			Parts.disc(
+				"Leaves",
+				Vector3.new(bush.x + blob[1], height / 2, bush.z + blob[2]),
+				blob[3],
+				height,
+				base,
+				model
+			)
+			Parts.disc(
 				"Highlight",
-				Vector3.new(bush.x + blob[1] - 0.2, 4.03, bush.z + blob[2] - 0.2),
+				Vector3.new(bush.x + blob[1] - 0.2, height + 0.03, bush.z + blob[2] - 0.2),
 				blob[3] * 0.6,
 				0.06,
 				light,
 				model
 			)
-			highlight.CanCollide = false
-			highlight.CanQuery = false
+		end
+		-- Walk-through and shoot-through: bushes only hide what's inside.
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+				part.CanQuery = false
+				part.CanTouch = false
+			end
 		end
 		model.Parent = parent
 	end
@@ -6467,7 +6668,6 @@ function MapBuilder.build(layout: Layout)
 		setPhysics(folder, SLIPPERY)
 	end
 	setPhysics(walls, GRIPPY)
-	setPhysics(bushes, GRIPPY)
 	setPhysics(pools, GRIPPY)
 	mapFolder:SetAttribute("MapName", layout.name)
 end
@@ -6523,7 +6723,7 @@ return MapBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[-- Robux purchases: game passes (permanent perks) and developer products
@@ -6725,7 +6925,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">Participants</string>
           <string name="Source"><![CDATA[-- Everyone taking part in rounds: real players and Studio test bots, behind
@@ -7002,14 +7202,14 @@ return Participants
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
 -- ducks. Simulated on the server with sphere casts so hits are decided in
--- one place. Shots pass through humans and stop at the first zombie, wall,
--- bush or piece of furniture, then apply their effect (shove, freeze,
--- bubble trap or explosion).
+-- one place. Shots pass through humans and bushes and stop at the first
+-- zombie, wall or piece of furniture, then apply their effect (shove,
+-- freeze, bubble trap or explosion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -7236,7 +7436,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">RoundManager</string>
           <string name="Source"><![CDATA[-- The round loop: Waiting -> Prep -> Outbreak -> Infection -> End -> (reset) -> Prep.
@@ -7319,6 +7519,7 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 	end
 	p.team = team
 	p.state:SetAttribute("Team", team)
+	p.boostUntil, p.slowUntil = 0, 0 -- drinks and freezes don't carry across teams
 	if team == "Zombie" then
 		ItemService.onInfected(p)
 	end
@@ -7430,6 +7631,7 @@ local function resetWorld()
 	for _, p in Participants.all() do
 		p.team = "Human"
 		p.stunUntil = 0
+		p.boostUntil, p.slowUntil = 0, 0
 		p.dragging = false
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
@@ -7696,7 +7898,7 @@ return RoundManager
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">ShopService</string>
           <string name="Source"><![CDATA[-- Score shop (B), the wizard's shop, skins and the first-join tutorial flag.
@@ -7861,7 +8063,7 @@ return ShopService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">TopScores</string>
           <string name="Source"><![CDATA[-- All-time top 10 (across servers) for the trophy panel, refreshed every
@@ -7918,7 +8120,7 @@ return TopScores
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">Traps</string>
           <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for zombies. A zombie that steps
@@ -8025,7 +8227,7 @@ return Traps
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">Wizard</string>
           <string name="Source"><![CDATA[-- The wizard: shows up at a random moment during the prep phase in one of the
@@ -8161,7 +8363,7 @@ return Wizard
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">WorldSetup</string>
           <string name="Source"><![CDATA[-- One-time world settings: flat lighting, collision groups, the folders other
@@ -8244,7 +8446,7 @@ return WorldSetup
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="38">
+  <Item class="StarterPlayer" referent="40">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="AutoJumpEnabled">false</bool>
@@ -8253,11 +8455,11 @@ return WorldSetup
       <float name="CharacterWalkSpeed">16</float>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="39">
+    <Item class="StarterCharacterScripts" referent="41">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="40">
+      <Item class="LocalScript" referent="42">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[-- Intentionally empty. Brain Tag characters are flat top-down blobs with no
@@ -8266,15 +8468,110 @@ return WorldSetup
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="41">
+    <Item class="StarterPlayerScripts" referent="43">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="42">
+      <Item class="Folder" referent="44">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="45">
+          <Properties>
+            <string name="Name">BushController</string>
+            <string name="Source"><![CDATA[-- Hiding in bushes, on your screen: the bush you stand in fades so you can
+-- see yourself (and anyone hiding with you), and the name tags of players
+-- hiding in other bushes disappear.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Bushes = require(ReplicatedStorage.Shared.Bushes)
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local BushController = {}
+
+local player = Players.LocalPlayer
+local INTERVAL = 0.1
+
+local faded: Model? = nil
+
+local function fade(bush: Model?, amount: number)
+	if not bush then
+		return
+	end
+	for _, part in bush:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.LocalTransparencyModifier = amount
+		end
+	end
+end
+
+local function characters(): { Instance }
+	local list = workspace:GetChildren()
+	local bots = workspace:FindFirstChild("Bots")
+	if bots then
+		for _, bot in bots:GetChildren() do
+			table.insert(list, bot)
+		end
+	end
+	return list
+end
+
+local function rootOf(model: Instance): BasePart?
+	return model:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function step()
+	local me = player.Character
+	local myRoot = me and rootOf(me)
+	local mine = if myRoot then Bushes.coverAt(myRoot.Position) else nil
+	if mine ~= faded then
+		fade(faded, 0)
+		fade(mine, Config.BUSH_SEE_THROUGH)
+		faded = mine
+	end
+
+	for _, model in characters() do
+		if model:IsA("Model") and model:GetAttribute("ParticipantId") and model ~= me then
+			local head = model:FindFirstChild("Head")
+			local tag = head and head:FindFirstChild("NameTag")
+			local root = rootOf(model)
+			if tag and tag:IsA("BillboardGui") and root then
+				local theirs = Bushes.coverAt(root.Position)
+				local show = theirs == nil or theirs == mine
+				if tag.Enabled ~= show then
+					tag.Enabled = show
+				end
+			end
+		end
+	end
+end
+
+function BushController.start()
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed < INTERVAL then
+			return
+		end
+		elapsed = 0
+		local ok, err = pcall(function()
+			step()
+			return true
+		end)
+		if not ok then
+			warn("[Bushes] " .. tostring(err))
+		end
+	end)
+end
+
+return BushController
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">CameraController</string>
             <string name="Source"><![CDATA[-- Straight-down camera that follows your character. A narrow field of view
@@ -8337,7 +8634,7 @@ return CameraController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">ChatSetup</string>
             <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-left with channel tabs,
@@ -8424,7 +8721,7 @@ return ChatSetup
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">ClientState</string>
             <string name="Source"><![CDATA[-- Read-only view of the replicated game state for client code: the round
@@ -8536,7 +8833,7 @@ return ClientState
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- Plays what the server announces: your own knockback, item swings, potato
@@ -8777,7 +9074,7 @@ local function updateSprays()
 			local held = character:FindFirstChild("HeldItem")
 			local handle = held and held:FindFirstChild("Handle")
 			if handle then
-				local emitter = handle:FindFirstChild("Spray") :: ParticleEmitter?
+				local emitter = handle:FindFirstChild("Spray", true) :: ParticleEmitter?
 				if spraying and not emitter then
 					local attachment = Instance.new("Attachment")
 					attachment.Name = "SprayAt"
@@ -9080,7 +9377,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">FurnitureController</string>
             <string name="Source"><![CDATA[-- Drives the furniture YOU are pushing, on your own machine, so it responds
@@ -9296,7 +9593,7 @@ return FurnitureController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">InputController</string>
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
@@ -9399,7 +9696,7 @@ return InputController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="49">
+        <Item class="LocalScript" referent="52">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Client entry point.
@@ -9411,12 +9708,13 @@ require(Client.CameraController).start()
 require(Client.MovementController).start()
 require(Client.InputController).start()
 require(Client.FurnitureController).start()
+require(Client.BushController).start()
 require(Client.Effects).start()
 require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">MovementController</string>
             <string name="Source"><![CDATA[-- Moves the character in SCREEN directions (W = up the screen = world -Z)
@@ -9601,7 +9899,7 @@ return MovementController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[-- Plays short 2D sounds, quieter the farther they happen from you (the
@@ -9686,11 +9984,11 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="52">
+        <Item class="Folder" referent="55">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="53">
+          <Item class="ModuleScript" referent="56">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -9748,7 +10046,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="54">
+          <Item class="ModuleScript" referent="57">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
@@ -9764,6 +10062,17 @@ local UIKit = require(script.Parent.UIKit)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local BottomCenter = {}
+
+-- " x3" for peels, " 60%" for a water tank, "" for everything else.
+local function chargeText(item: Items.Item, charges: any): string
+	if typeof(charges) ~= "number" or charges <= 0 or not item.charges then
+		return ""
+	end
+	if item.kind == "Stream" then
+		return string.format(" %d%%", math.ceil(charges / item.charges * 100))
+	end
+	return " x" .. charges
+end
 
 local function nearestGroundItem(position: Vector3): string?
 	local folder = workspace:FindFirstChild("GroundItems")
@@ -9880,9 +10189,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 		end
 		local item = Items.get(itemId)
 		local charges = ClientState.my("HeldCharges")
-		itemName.Text = if item
-			then item.name .. (if typeof(charges) == "number" and charges > 0 then " x" .. charges else "")
-			else ""
+		itemName.Text = if item then item.name .. chargeText(item, charges) else ""
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)
@@ -9923,7 +10230,7 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="55">
+          <Item class="ModuleScript" referent="58">
             <Properties>
               <string name="Name">BottomRight</string>
               <string name="Source"><![CDATA[-- Bottom-right: "Score" and "Speed Multiplier" (plus a 2x boost timer when
@@ -9992,7 +10299,7 @@ return BottomRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="56">
+          <Item class="ModuleScript" referent="59">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -10106,7 +10413,7 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="57">
+          <Item class="ModuleScript" referent="60">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
@@ -10307,7 +10614,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="58">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -10388,7 +10695,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -10486,7 +10793,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -11018,7 +11325,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -11246,7 +11553,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Top-left: five square icon buttons (menu, shop, settings, trophy, chat).
@@ -11298,7 +11605,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="66">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -11478,7 +11785,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -11708,7 +12015,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="65">
+      <Item class="LocalScript" referent="68">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -11718,13 +12025,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="66">
+  <Item class="TextChatService" referent="69">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="67">
+  <Item class="Workspace" referent="70">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

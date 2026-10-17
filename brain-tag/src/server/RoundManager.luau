@@ -78,6 +78,7 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 	end
 	p.team = team
 	p.state:SetAttribute("Team", team)
+	p.boostUntil, p.slowUntil = 0, 0 -- drinks and freezes don't carry across teams
 	if team == "Zombie" then
 		ItemService.onInfected(p)
 	end
@@ -189,6 +190,7 @@ local function resetWorld()
 	for _, p in Participants.all() do
 		p.team = "Human"
 		p.stunUntil = 0
+		p.boostUntil, p.slowUntil = 0, 0
 		p.dragging = false
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
