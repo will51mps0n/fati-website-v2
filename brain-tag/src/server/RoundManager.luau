@@ -108,9 +108,16 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 end
 
 local function bonusesFor(p: Participant, includeDrumstick: boolean): RoundRules.RewardBonuses
-	local held = Items.get(p.heldItem)
+	-- A drumstick anywhere in your inventory counts (the best one).
+	local drumstick: number? = nil
+	for _, slot in p.slots do
+		local item = Items.get(slot.id)
+		if item and item.kind == "Passive" and item.rewardBonus then
+			drumstick = math.max(drumstick or 0, item.rewardBonus)
+		end
+	end
 	return {
-		drumstick = if includeDrumstick and held and held.kind == "Passive" then held.rewardBonus else nil,
+		drumstick = if includeDrumstick then drumstick else nil,
 		vip = p.passes.VIP == true,
 		doubleScore = p.passes.DoubleScore == true,
 		boosted = os.time() < p.boostEndsAt,
@@ -222,7 +229,7 @@ end
 -- World reset ---------------------------------------------------------------------------
 
 local function grantRoundStartItems(p: Participant)
-	if p.heldItem then
+	if not ItemService.hasFreeSlot(p) then
 		return
 	end
 	local profile = p.profile
@@ -240,7 +247,7 @@ local function grantRoundStartItems(p: Participant)
 			return
 		end
 	end
-	if p.passes.StarterKit then
+	if p.passes.StarterKit and not ItemService.carries(p, "Bat") then
 		ItemService.give(p, "Bat")
 	end
 end

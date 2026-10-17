@@ -81,14 +81,77 @@ local function setStreaming(p: Participant, itemId: string?)
 	end
 end
 
-local function setHeld(p: Participant, itemId: string?, charges: number?)
-	p.heldItem = itemId
-	local item = Items.get(itemId)
-	p.heldCharges = charges or (item and item.charges)
+-- Inventory ----------------------------------------------------------------------------
+-- Config.INVENTORY_SLOTS slots; the active one is in your hand. p.heldItem and
+-- p.heldCharges mirror the active slot, so everything else just reads those.
+
+local function publishSlots(p: Participant)
+	for i = 1, Config.INVENTORY_SLOTS do
+		local slot = p.slots[i]
+		p.state:SetAttribute("Slot" .. i, if slot then slot.id else "")
+		p.state:SetAttribute("Slot" .. i .. "Charges", if slot then slot.charges or 0 else 0)
+	end
+	p.state:SetAttribute("ActiveSlot", p.slot)
+end
+
+-- Puts the active slot's item in the hand.
+local function equipActive(p: Participant)
+	local slot = p.slots[p.slot]
+	p.heldItem = if slot then slot.id else nil
+	p.heldCharges = if slot then slot.charges else nil
 	setStreaming(p, nil)
-	p.state:SetAttribute("HeldItem", itemId or "")
+	p.state:SetAttribute("HeldItem", p.heldItem or "")
 	p.state:SetAttribute("HeldCharges", p.heldCharges or 0)
+	publishSlots(p)
 	attachHeld(p)
+end
+
+-- Sets (or empties) the active slot.
+local function setHeld(p: Participant, itemId: string?, charges: number?)
+	if itemId then
+		local item = Items.get(itemId)
+		p.slots[p.slot] = { id = itemId, charges = charges or (item and item.charges) }
+	else
+		p.slots[p.slot] = nil
+	end
+	equipActive(p)
+end
+
+-- Charges left on the item in hand (peels, water, fuel).
+local function setCharges(p: Participant, charges: number)
+	p.heldCharges = charges
+	local slot = p.slots[p.slot]
+	if slot then
+		slot.charges = charges
+	end
+	p.state:SetAttribute("HeldCharges", charges)
+	publishSlots(p)
+end
+
+function ItemService.hasFreeSlot(p: Participant): boolean
+	for i = 1, Config.INVENTORY_SLOTS do
+		if not p.slots[i] then
+			return true
+		end
+	end
+	return false
+end
+
+function ItemService.carries(p: Participant, itemId: string): boolean
+	for _, slot in p.slots do
+		if slot.id == itemId then
+			return true
+		end
+	end
+	return false
+end
+
+-- Switches which slot is in your hand.
+function ItemService.select(p: Participant, slot: number)
+	if slot >= 1 and slot <= Config.INVENTORY_SLOTS and slot ~= p.slot then
+		p.slot = slot
+		equipActive(p)
+	end
 end
 
 -- Ground items -----------------------------------------------------------------------
@@ -153,9 +216,18 @@ end
 
 -- Holding ----------------------------------------------------------------------------
 
--- Puts an item in the participant's hand, dropping what they held before.
+-- Adds an item: into your hand if it's empty, else into the first free
+-- slot. With every slot full, the item in your hand is dropped for it.
 function ItemService.give(p: Participant, itemId: string, charges: number?)
-	if p.heldItem then
+	if p.slots[p.slot] then
+		for i = 1, Config.INVENTORY_SLOTS do
+			if not p.slots[i] then
+				local item = Items.get(itemId)
+				p.slots[i] = { id = itemId, charges = charges or (item and item.charges) }
+				publishSlots(p)
+				return
+			end
+		end
 		ItemService.drop(p)
 	end
 	setHeld(p, itemId, charges)
@@ -206,11 +278,10 @@ function ItemService.pickUp(p: Participant)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
--- Getting eaten loses your item (items should be rare: mostly bought).
+-- Getting eaten loses everything you carry (items should be rare: mostly bought).
 function ItemService.onInfected(p: Participant)
-	if p.heldItem then
-		ItemService.take(p)
-	end
+	table.clear(p.slots)
+	equipActive(p)
 end
 
 -- Melee weapons without `hits` only keep zombies away while held; a click
@@ -292,9 +363,8 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Trap" then
 		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
-		p.heldCharges = (p.heldCharges or 1) - 1
-		p.state:SetAttribute("HeldCharges", p.heldCharges)
-		if p.heldCharges <= 0 then
+		setCharges(p, (p.heldCharges or 1) - 1)
+		if (p.heldCharges or 0) <= 0 then
 			ItemService.take(p)
 		end
 	elseif kind == "Consumable" and item.speedBoost then
@@ -463,9 +533,8 @@ local function streamStep()
 		end
 		p.nextStreamTick = now + (item.tick or 0.12)
 		if item.charges then
-			p.heldCharges = (p.heldCharges or 1) - 1
-			p.state:SetAttribute("HeldCharges", p.heldCharges)
-			if p.heldCharges <= 0 then
+			setCharges(p, (p.heldCharges or 1) - 1)
+			if (p.heldCharges or 0) <= 0 then
 				ItemService.take(p) -- out of water
 			end
 		end
@@ -520,6 +589,12 @@ function ItemService.init()
 		local p = Participants.fromPlayer(player)
 		if p and p.team == "Human" and not throttled(player) then
 			ItemService.drop(p)
+		end
+	end)
+	Remotes.event("SelectSlot").OnServerEvent:Connect(function(player, slot)
+		local p = Participants.fromPlayer(player)
+		if p and typeof(slot) == "number" and slot == math.floor(slot) then
+			ItemService.select(p, slot)
 		end
 	end)
 

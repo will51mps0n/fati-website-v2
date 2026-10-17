@@ -1,10 +1,12 @@
--- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
--- slot with a 3D preview of what you hold, and the "Immunity 0/100" bar.
+-- Bottom-center: a context hint ("Press E to pick up Bat"), the inventory
+-- (3 slots with 3D previews; the gold one is in your hand), and the
+-- "Immunity 0/100" bar.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
+local InputController = require(script.Parent.Parent.InputController)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local UIKit = require(script.Parent.UIKit)
@@ -74,26 +76,63 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 	})
 	UIKit.textStroke(1.5).Parent = hint
 
-	local slot = UIKit.new("Frame", {
-		Name = "Slot",
+	-- The inventory: one box per slot, the one in your hand outlined in gold.
+	-- Click a box (or press 1-3) to switch.
+	local row = UIKit.new("Frame", {
+		Name = "Inventory",
 		LayoutOrder = 2,
-		Size = UDim2.fromOffset(72, 72),
-		BackgroundColor3 = UIKit.PANEL,
-		BackgroundTransparency = UIKit.PANEL_TRANSPARENCY,
-		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(Config.INVENTORY_SLOTS * 80, 72),
+		BackgroundTransparency = 1,
 		Parent = column,
-	}, { UIKit.corner(10), UIKit.stroke(UIKit.WHITE, 2) })
-	local itemName = UIKit.label({
-		Name = "ItemName",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -2),
-		Size = UDim2.new(1, -4, 0, 14),
-		TextSize = 12,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		ZIndex = 3,
-		Parent = slot,
-	})
-	UIKit.textStroke(1).Parent = itemName
+	}, { UIKit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center) })
+	type SlotView = { box: Frame, stroke: UIStroke, name: TextLabel, shown: string?, preview: ViewportFrame? }
+	local views: { SlotView } = {}
+	for i = 1, Config.INVENTORY_SLOTS do
+		local stroke = UIKit.stroke(UIKit.WHITE, 2) :: UIStroke
+		local box = UIKit.new("Frame", {
+			Name = "Slot" .. i,
+			LayoutOrder = i,
+			Size = UDim2.fromOffset(72, 72),
+			BackgroundColor3 = UIKit.PANEL,
+			BackgroundTransparency = UIKit.PANEL_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Parent = row,
+		}, { UIKit.corner(10), stroke })
+		local number = UIKit.label({
+			Name = "Number",
+			Text = tostring(i),
+			Position = UDim2.fromOffset(5, 2),
+			Size = UDim2.fromOffset(16, 16),
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 4,
+			Parent = box,
+		})
+		UIKit.textStroke(1).Parent = number
+		local name = UIKit.label({
+			Name = "ItemName",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -2),
+			Size = UDim2.new(1, -4, 0, 14),
+			TextSize = 11,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 3,
+			Parent = box,
+		})
+		UIKit.textStroke(1).Parent = name
+		UIKit.new("TextButton", {
+			Name = "Pick",
+			Text = "",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 5,
+			Parent = box,
+		}).Activated
+			:Connect(function()
+				InputController.selectSlot(i)
+			end)
+		table.insert(views, { box = box, stroke = stroke, name = name, shown = nil, preview = nil })
+	end
 
 	local bar = UIKit.new("Frame", {
 		Name = "Immunity",
@@ -120,25 +159,32 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 	})
 	UIKit.textStroke(1).Parent = barText
 
-	local shownItem: string? = nil
-	local preview: ViewportFrame? = nil
-
 	return function()
-		local held = ClientState.my("HeldItem")
-		local itemId = if typeof(held) == "string" and held ~= "" then held else nil
-		if itemId ~= shownItem then
-			shownItem = itemId
-			if preview then
-				preview:Destroy()
-				preview = nil
+		local active = ClientState.my("ActiveSlot") or 1
+		for i, view in views do
+			local raw = ClientState.my("Slot" .. i)
+			local id = if typeof(raw) == "string" and raw ~= "" then raw else nil
+			if id ~= view.shown then
+				view.shown = id
+				if view.preview then
+					view.preview:Destroy()
+					view.preview = nil
+				end
+				if id then
+					view.preview = UIKit.viewport(view.box, ItemModels.build(id), { ZIndex = 2 })
+				end
 			end
-			if itemId then
-				preview = UIKit.viewport(slot, ItemModels.build(itemId), { ZIndex = 2 })
-			end
+			local slotItem = Items.get(id)
+			view.name.Text = if slotItem
+				then slotItem.name .. chargeText(slotItem, ClientState.my("Slot" .. i .. "Charges"))
+				else ""
+			local isActive = i == active
+			view.stroke.Color = if isActive then UIKit.GOLD else UIKit.WHITE
+			view.stroke.Thickness = if isActive then 3 else 1.5
+			view.stroke.Transparency = if isActive then 0 else 0.5
 		end
-		local item = Items.get(itemId)
-		local charges = ClientState.my("HeldCharges")
-		itemName.Text = if item then item.name .. chargeText(item, charges) else ""
+		local held = ClientState.my("HeldItem")
+		local item = Items.get(if typeof(held) == "string" and held ~= "" then held else nil)
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)
@@ -168,7 +214,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
 						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
-					text = verb .. "   [G] drop"
+					text = verb .. "   [G] drop   [1-3] switch"
 				end
 			end
 		end

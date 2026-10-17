@@ -92,7 +92,9 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
    two of you push together).
 3. Push the couch against the inside of a doorway so it covers the gap. Wait for
    the outbreak and check that a zombie bot can't get through.
-4. Press **E** on an item (yellow ring), click to swing it at a zombie, **G** to drop it.
+4. Press **E** on an item (yellow ring) to pick it up. You carry up to 3 items
+   (`INVENTORY_SLOTS`): press **1**, **2**, **3** (or click a slot) to choose which
+   one is in your hand, **G** drops it.
    A held weapon is solid: walk or turn so it touches furniture to push it.
 5. Press **B** to open the shop. When the wizard arrives (chat message), stand
    next to him and press **B** for his rare items.

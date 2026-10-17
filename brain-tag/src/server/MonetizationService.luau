@@ -75,7 +75,7 @@ local function giveOrQueue(p: Participant, itemId: string)
 	if p.team == "Human" and Participants.body(p) then
 		ItemService.give(p, itemId)
 		if p.player then
-			Announcer.toast(p.player, "Delivered! Check your hand.", Config.COLORS.Good)
+			Announcer.toast(p.player, "Delivered! It's in your inventory.", Config.COLORS.Good)
 		end
 	elseif p.profile then
 		table.insert(p.profile.PendingItems, itemId)

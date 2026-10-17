@@ -111,6 +111,7 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
+Config.INVENTORY_SLOTS = 3 -- items you can carry; keys 1-3 switch which one is in your hand
 Config.GROUND_ITEMS_MIN = 1 -- items are rare: mostly you buy them
 Config.GROUND_ITEMS_MAX = 2
 Config.RARE_CHANCE = 0.05

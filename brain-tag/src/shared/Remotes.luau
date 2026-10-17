@@ -9,6 +9,7 @@ local EVENTS = {
 	"UseItem", -- (action: "start" | "stop", aim: Vector3)
 	"PickUp",
 	"DropItem",
+	"SelectSlot", -- (slot: number) which inventory slot is in your hand
 	"ZombieReturn",
 	"TutorialDone",
 	-- server -> client

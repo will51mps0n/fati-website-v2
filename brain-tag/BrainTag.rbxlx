@@ -977,6 +977,7 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
+Config.INVENTORY_SLOTS = 3 -- items you can carry; keys 1-3 switch which one is in your hand
 Config.GROUND_ITEMS_MIN = 1 -- items are rare: mostly you buy them
 Config.GROUND_ITEMS_MAX = 2
 Config.RARE_CHANCE = 0.05
@@ -3383,6 +3384,7 @@ local EVENTS = {
 	"UseItem", -- (action: "start" | "stop", aim: Vector3)
 	"PickUp",
 	"DropItem",
+	"SelectSlot", -- (slot: number) which inventory slot is in your hand
 	"ZombieReturn",
 	"TutorialDone",
 	-- server -> client
@@ -6877,14 +6879,77 @@ local function setStreaming(p: Participant, itemId: string?)
 	end
 end
 
-local function setHeld(p: Participant, itemId: string?, charges: number?)
-	p.heldItem = itemId
-	local item = Items.get(itemId)
-	p.heldCharges = charges or (item and item.charges)
+-- Inventory ----------------------------------------------------------------------------
+-- Config.INVENTORY_SLOTS slots; the active one is in your hand. p.heldItem and
+-- p.heldCharges mirror the active slot, so everything else just reads those.
+
+local function publishSlots(p: Participant)
+	for i = 1, Config.INVENTORY_SLOTS do
+		local slot = p.slots[i]
+		p.state:SetAttribute("Slot" .. i, if slot then slot.id else "")
+		p.state:SetAttribute("Slot" .. i .. "Charges", if slot then slot.charges or 0 else 0)
+	end
+	p.state:SetAttribute("ActiveSlot", p.slot)
+end
+
+-- Puts the active slot's item in the hand.
+local function equipActive(p: Participant)
+	local slot = p.slots[p.slot]
+	p.heldItem = if slot then slot.id else nil
+	p.heldCharges = if slot then slot.charges else nil
 	setStreaming(p, nil)
-	p.state:SetAttribute("HeldItem", itemId or "")
+	p.state:SetAttribute("HeldItem", p.heldItem or "")
 	p.state:SetAttribute("HeldCharges", p.heldCharges or 0)
+	publishSlots(p)
 	attachHeld(p)
+end
+
+-- Sets (or empties) the active slot.
+local function setHeld(p: Participant, itemId: string?, charges: number?)
+	if itemId then
+		local item = Items.get(itemId)
+		p.slots[p.slot] = { id = itemId, charges = charges or (item and item.charges) }
+	else
+		p.slots[p.slot] = nil
+	end
+	equipActive(p)
+end
+
+-- Charges left on the item in hand (peels, water, fuel).
+local function setCharges(p: Participant, charges: number)
+	p.heldCharges = charges
+	local slot = p.slots[p.slot]
+	if slot then
+		slot.charges = charges
+	end
+	p.state:SetAttribute("HeldCharges", charges)
+	publishSlots(p)
+end
+
+function ItemService.hasFreeSlot(p: Participant): boolean
+	for i = 1, Config.INVENTORY_SLOTS do
+		if not p.slots[i] then
+			return true
+		end
+	end
+	return false
+end
+
+function ItemService.carries(p: Participant, itemId: string): boolean
+	for _, slot in p.slots do
+		if slot.id == itemId then
+			return true
+		end
+	end
+	return false
+end
+
+-- Switches which slot is in your hand.
+function ItemService.select(p: Participant, slot: number)
+	if slot >= 1 and slot <= Config.INVENTORY_SLOTS and slot ~= p.slot then
+		p.slot = slot
+		equipActive(p)
+	end
 end
 
 -- Ground items -----------------------------------------------------------------------
@@ -6949,9 +7014,18 @@ end
 
 -- Holding ----------------------------------------------------------------------------
 
--- Puts an item in the participant's hand, dropping what they held before.
+-- Adds an item: into your hand if it's empty, else into the first free
+-- slot. With every slot full, the item in your hand is dropped for it.
 function ItemService.give(p: Participant, itemId: string, charges: number?)
-	if p.heldItem then
+	if p.slots[p.slot] then
+		for i = 1, Config.INVENTORY_SLOTS do
+			if not p.slots[i] then
+				local item = Items.get(itemId)
+				p.slots[i] = { id = itemId, charges = charges or (item and item.charges) }
+				publishSlots(p)
+				return
+			end
+		end
 		ItemService.drop(p)
 	end
 	setHeld(p, itemId, charges)
@@ -7002,11 +7076,10 @@ function ItemService.pickUp(p: Participant)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
--- Getting eaten loses your item (items should be rare: mostly bought).
+-- Getting eaten loses everything you carry (items should be rare: mostly bought).
 function ItemService.onInfected(p: Participant)
-	if p.heldItem then
-		ItemService.take(p)
-	end
+	table.clear(p.slots)
+	equipActive(p)
 end
 
 -- Melee weapons without `hits` only keep zombies away while held; a click
@@ -7088,9 +7161,8 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Trap" then
 		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
-		p.heldCharges = (p.heldCharges or 1) - 1
-		p.state:SetAttribute("HeldCharges", p.heldCharges)
-		if p.heldCharges <= 0 then
+		setCharges(p, (p.heldCharges or 1) - 1)
+		if (p.heldCharges or 0) <= 0 then
 			ItemService.take(p)
 		end
 	elseif kind == "Consumable" and item.speedBoost then
@@ -7259,9 +7331,8 @@ local function streamStep()
 		end
 		p.nextStreamTick = now + (item.tick or 0.12)
 		if item.charges then
-			p.heldCharges = (p.heldCharges or 1) - 1
-			p.state:SetAttribute("HeldCharges", p.heldCharges)
-			if p.heldCharges <= 0 then
+			setCharges(p, (p.heldCharges or 1) - 1)
+			if (p.heldCharges or 0) <= 0 then
 				ItemService.take(p) -- out of water
 			end
 		end
@@ -7316,6 +7387,12 @@ function ItemService.init()
 		local p = Participants.fromPlayer(player)
 		if p and p.team == "Human" and not throttled(player) then
 			ItemService.drop(p)
+		end
+	end)
+	Remotes.event("SelectSlot").OnServerEvent:Connect(function(player, slot)
+		local p = Participants.fromPlayer(player)
+		if p and typeof(slot) == "number" and slot == math.floor(slot) then
+			ItemService.select(p, slot)
 		end
 	end)
 
@@ -8098,7 +8175,7 @@ local function giveOrQueue(p: Participant, itemId: string)
 	if p.team == "Human" and Participants.body(p) then
 		ItemService.give(p, itemId)
 		if p.player then
-			Announcer.toast(p.player, "Delivered! Check your hand.", Config.COLORS.Good)
+			Announcer.toast(p.player, "Delivered! It's in your inventory.", Config.COLORS.Good)
 		end
 	elseif p.profile then
 		table.insert(p.profile.PendingItems, itemId)
@@ -8237,6 +8314,8 @@ local Skins = require(ReplicatedStorage.Shared.Skins)
 
 export type Team = "Human" | "Zombie"
 
+export type Slot = { id: string, charges: number? }
+
 export type Participant = {
 	id: string,
 	name: string,
@@ -8247,7 +8326,9 @@ export type Participant = {
 	score: number,
 	immunity: number,
 	scale: number,
-	heldItem: string?,
+	heldItem: string?, -- the item in the active slot (in your hand)
+	slots: { [number]: Slot }, -- inventory: slot number -> item (missing = empty)
+	slot: number, -- active slot
 	humanSkin: string,
 	zombieSkin: string,
 	ownedSkins: { [string]: boolean },
@@ -8367,6 +8448,8 @@ function Participants.add(info: NewParticipant): Participant
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
+		slots = {},
+		slot = 1,
 		humanSkin = if profile then profile.HumanSkin or Skins.DEFAULT_HUMAN else Skins.DEFAULT_HUMAN,
 		zombieSkin = if profile then profile.ZombieSkin or Skins.DEFAULT_ZOMBIE else Skins.DEFAULT_ZOMBIE,
 		ownedSkins = owned,
@@ -8845,9 +8928,16 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 end
 
 local function bonusesFor(p: Participant, includeDrumstick: boolean): RoundRules.RewardBonuses
-	local held = Items.get(p.heldItem)
+	-- A drumstick anywhere in your inventory counts (the best one).
+	local drumstick: number? = nil
+	for _, slot in p.slots do
+		local item = Items.get(slot.id)
+		if item and item.kind == "Passive" and item.rewardBonus then
+			drumstick = math.max(drumstick or 0, item.rewardBonus)
+		end
+	end
 	return {
-		drumstick = if includeDrumstick and held and held.kind == "Passive" then held.rewardBonus else nil,
+		drumstick = if includeDrumstick then drumstick else nil,
 		vip = p.passes.VIP == true,
 		doubleScore = p.passes.DoubleScore == true,
 		boosted = os.time() < p.boostEndsAt,
@@ -8959,7 +9049,7 @@ end
 -- World reset ---------------------------------------------------------------------------
 
 local function grantRoundStartItems(p: Participant)
-	if p.heldItem then
+	if not ItemService.hasFreeSlot(p) then
 		return
 	end
 	local profile = p.profile
@@ -8977,7 +9067,7 @@ local function grantRoundStartItems(p: Participant)
 			return
 		end
 	end
-	if p.passes.StarterKit then
+	if p.passes.StarterKit and not ItemService.carries(p, "Bat") then
 		ItemService.give(p, "Bat")
 	end
 end
@@ -11040,6 +11130,7 @@ return FurnitureController
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
 --   Left click / R2: use item (hold to keep spraying)
 --   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
+--   1 2 3 / D-pad: switch inventory slot
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -11053,6 +11144,7 @@ local useRemote = Remotes.event("UseItem")
 local pickRemote = Remotes.event("PickUp")
 local dropRemote = Remotes.event("DropItem")
 local returnRemote = Remotes.event("ZombieReturn")
+local slotRemote = Remotes.event("SelectSlot")
 
 -- Set by the HUD.
 InputController.onShop = function() end
@@ -11087,6 +11179,10 @@ function InputController.drop()
 	dropRemote:FireServer()
 end
 
+function InputController.selectSlot(slot: number)
+	slotRemote:FireServer(slot)
+end
+
 function InputController.zombieReturn()
 	returnRemote:FireServer()
 end
@@ -11105,6 +11201,24 @@ local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.ButtonY] = InputController.shop,
 	[Enum.KeyCode.ButtonL1] = InputController.zombieReturn,
 	[Enum.KeyCode.ButtonR2] = InputController.useStart,
+	[Enum.KeyCode.One] = function()
+		InputController.selectSlot(1)
+	end,
+	[Enum.KeyCode.Two] = function()
+		InputController.selectSlot(2)
+	end,
+	[Enum.KeyCode.Three] = function()
+		InputController.selectSlot(3)
+	end,
+	[Enum.KeyCode.DPadLeft] = function()
+		InputController.selectSlot(1)
+	end,
+	[Enum.KeyCode.DPadUp] = function()
+		InputController.selectSlot(2)
+	end,
+	[Enum.KeyCode.DPadRight] = function()
+		InputController.selectSlot(3)
+	end,
 }
 
 function InputController.start()
@@ -12237,13 +12351,15 @@ return Banner
           <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">BottomCenter</string>
-              <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
--- slot with a 3D preview of what you hold, and the "Immunity 0/100" bar.
+              <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the inventory
+-- (3 slots with 3D previews; the gold one is in your hand), and the
+-- "Immunity 0/100" bar.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
+local InputController = require(script.Parent.Parent.InputController)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local UIKit = require(script.Parent.UIKit)
@@ -12313,26 +12429,63 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 	})
 	UIKit.textStroke(1.5).Parent = hint
 
-	local slot = UIKit.new("Frame", {
-		Name = "Slot",
+	-- The inventory: one box per slot, the one in your hand outlined in gold.
+	-- Click a box (or press 1-3) to switch.
+	local row = UIKit.new("Frame", {
+		Name = "Inventory",
 		LayoutOrder = 2,
-		Size = UDim2.fromOffset(72, 72),
-		BackgroundColor3 = UIKit.PANEL,
-		BackgroundTransparency = UIKit.PANEL_TRANSPARENCY,
-		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(Config.INVENTORY_SLOTS * 80, 72),
+		BackgroundTransparency = 1,
 		Parent = column,
-	}, { UIKit.corner(10), UIKit.stroke(UIKit.WHITE, 2) })
-	local itemName = UIKit.label({
-		Name = "ItemName",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -2),
-		Size = UDim2.new(1, -4, 0, 14),
-		TextSize = 12,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		ZIndex = 3,
-		Parent = slot,
-	})
-	UIKit.textStroke(1).Parent = itemName
+	}, { UIKit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center) })
+	type SlotView = { box: Frame, stroke: UIStroke, name: TextLabel, shown: string?, preview: ViewportFrame? }
+	local views: { SlotView } = {}
+	for i = 1, Config.INVENTORY_SLOTS do
+		local stroke = UIKit.stroke(UIKit.WHITE, 2) :: UIStroke
+		local box = UIKit.new("Frame", {
+			Name = "Slot" .. i,
+			LayoutOrder = i,
+			Size = UDim2.fromOffset(72, 72),
+			BackgroundColor3 = UIKit.PANEL,
+			BackgroundTransparency = UIKit.PANEL_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Parent = row,
+		}, { UIKit.corner(10), stroke })
+		local number = UIKit.label({
+			Name = "Number",
+			Text = tostring(i),
+			Position = UDim2.fromOffset(5, 2),
+			Size = UDim2.fromOffset(16, 16),
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 4,
+			Parent = box,
+		})
+		UIKit.textStroke(1).Parent = number
+		local name = UIKit.label({
+			Name = "ItemName",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -2),
+			Size = UDim2.new(1, -4, 0, 14),
+			TextSize = 11,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 3,
+			Parent = box,
+		})
+		UIKit.textStroke(1).Parent = name
+		UIKit.new("TextButton", {
+			Name = "Pick",
+			Text = "",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 5,
+			Parent = box,
+		}).Activated
+			:Connect(function()
+				InputController.selectSlot(i)
+			end)
+		table.insert(views, { box = box, stroke = stroke, name = name, shown = nil, preview = nil })
+	end
 
 	local bar = UIKit.new("Frame", {
 		Name = "Immunity",
@@ -12359,25 +12512,32 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 	})
 	UIKit.textStroke(1).Parent = barText
 
-	local shownItem: string? = nil
-	local preview: ViewportFrame? = nil
-
 	return function()
-		local held = ClientState.my("HeldItem")
-		local itemId = if typeof(held) == "string" and held ~= "" then held else nil
-		if itemId ~= shownItem then
-			shownItem = itemId
-			if preview then
-				preview:Destroy()
-				preview = nil
+		local active = ClientState.my("ActiveSlot") or 1
+		for i, view in views do
+			local raw = ClientState.my("Slot" .. i)
+			local id = if typeof(raw) == "string" and raw ~= "" then raw else nil
+			if id ~= view.shown then
+				view.shown = id
+				if view.preview then
+					view.preview:Destroy()
+					view.preview = nil
+				end
+				if id then
+					view.preview = UIKit.viewport(view.box, ItemModels.build(id), { ZIndex = 2 })
+				end
 			end
-			if itemId then
-				preview = UIKit.viewport(slot, ItemModels.build(itemId), { ZIndex = 2 })
-			end
+			local slotItem = Items.get(id)
+			view.name.Text = if slotItem
+				then slotItem.name .. chargeText(slotItem, ClientState.my("Slot" .. i .. "Charges"))
+				else ""
+			local isActive = i == active
+			view.stroke.Color = if isActive then UIKit.GOLD else UIKit.WHITE
+			view.stroke.Thickness = if isActive then 3 else 1.5
+			view.stroke.Transparency = if isActive then 0 else 0.5
 		end
-		local item = Items.get(itemId)
-		local charges = ClientState.my("HeldCharges")
-		itemName.Text = if item then item.name .. chargeText(item, charges) else ""
+		local held = ClientState.my("HeldItem")
+		local item = Items.get(if typeof(held) == "string" and held ~= "" then held else nil)
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)
@@ -12407,7 +12567,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
 						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
-					text = verb .. "   [G] drop"
+					text = verb .. "   [G] drop   [1-3] switch"
 				end
 			end
 		end

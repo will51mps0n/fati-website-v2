@@ -9,6 +9,8 @@ local Skins = require(ReplicatedStorage.Shared.Skins)
 
 export type Team = "Human" | "Zombie"
 
+export type Slot = { id: string, charges: number? }
+
 export type Participant = {
 	id: string,
 	name: string,
@@ -19,7 +21,9 @@ export type Participant = {
 	score: number,
 	immunity: number,
 	scale: number,
-	heldItem: string?,
+	heldItem: string?, -- the item in the active slot (in your hand)
+	slots: { [number]: Slot }, -- inventory: slot number -> item (missing = empty)
+	slot: number, -- active slot
 	humanSkin: string,
 	zombieSkin: string,
 	ownedSkins: { [string]: boolean },
@@ -139,6 +143,8 @@ function Participants.add(info: NewParticipant): Participant
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
+		slots = {},
+		slot = 1,
 		humanSkin = if profile then profile.HumanSkin or Skins.DEFAULT_HUMAN else Skins.DEFAULT_HUMAN,
 		zombieSkin = if profile then profile.ZombieSkin or Skins.DEFAULT_ZOMBIE else Skins.DEFAULT_ZOMBIE,
 		ownedSkins = owned,

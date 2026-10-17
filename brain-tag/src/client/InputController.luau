@@ -1,6 +1,7 @@
 -- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
 --   Left click / R2: use item (hold to keep spraying)
 --   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
+--   1 2 3 / D-pad: switch inventory slot
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -14,6 +15,7 @@ local useRemote = Remotes.event("UseItem")
 local pickRemote = Remotes.event("PickUp")
 local dropRemote = Remotes.event("DropItem")
 local returnRemote = Remotes.event("ZombieReturn")
+local slotRemote = Remotes.event("SelectSlot")
 
 -- Set by the HUD.
 InputController.onShop = function() end
@@ -48,6 +50,10 @@ function InputController.drop()
 	dropRemote:FireServer()
 end
 
+function InputController.selectSlot(slot: number)
+	slotRemote:FireServer(slot)
+end
+
 function InputController.zombieReturn()
 	returnRemote:FireServer()
 end
@@ -66,6 +72,24 @@ local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.ButtonY] = InputController.shop,
 	[Enum.KeyCode.ButtonL1] = InputController.zombieReturn,
 	[Enum.KeyCode.ButtonR2] = InputController.useStart,
+	[Enum.KeyCode.One] = function()
+		InputController.selectSlot(1)
+	end,
+	[Enum.KeyCode.Two] = function()
+		InputController.selectSlot(2)
+	end,
+	[Enum.KeyCode.Three] = function()
+		InputController.selectSlot(3)
+	end,
+	[Enum.KeyCode.DPadLeft] = function()
+		InputController.selectSlot(1)
+	end,
+	[Enum.KeyCode.DPadUp] = function()
+		InputController.selectSlot(2)
+	end,
+	[Enum.KeyCode.DPadRight] = function()
+		InputController.selectSlot(3)
+	end,
 }
 
 function InputController.start()
