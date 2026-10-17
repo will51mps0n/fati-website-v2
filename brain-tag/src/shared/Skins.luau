@@ -19,6 +19,7 @@ export type Skin = {
 	pass: string?,
 	default: boolean?,
 	special: boolean?, -- given by the game (the alpha zombie), never sold or picked
+	arms: string?, -- zombie forearms and hands (defaults to `skin`)
 }
 
 type Extra = {
@@ -29,6 +30,7 @@ type Extra = {
 	pass: string?,
 	default: boolean?,
 	special: boolean?,
+	arms: string?,
 }
 
 local function skin(
@@ -55,6 +57,7 @@ local function skin(
 		pass = e.pass,
 		default = e.default,
 		special = e.special,
+		arms = e.arms,
 	}
 end
 
@@ -111,7 +114,15 @@ local list: { Skin } = {
 		"C8955A",
 		{ hat = "Bear", accent = "5A3518", scorePrice = 7000 }
 	),
-	skin("Panda", "Panda", "Human", "1C1C1C", "F4F4F4", "F4F4F4", { hat = "Panda", product = "SkinPanda" }),
+	skin(
+		"Panda",
+		"Panda",
+		"Human",
+		"F4F4F4",
+		"F4F4F4",
+		"F4F4F4",
+		{ hat = "Panda", accent = "1C1C1C", product = "SkinPanda" }
+	),
 	skin(
 		"Frog",
 		"Frog",
@@ -247,11 +258,12 @@ local list: { Skin } = {
 		"F4F4F4",
 		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
 	),
-	-- The first zombies of each round: orange with red patches, a gray
-	-- screaming face and red claws.
-	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "77777D", "77777D", {
+	-- The first zombies of each round: orange with red blotches, a gray head
+	-- and red arms.
+	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "5E5E63", "8A8A90", {
 		hat = "Alpha",
 		accent = "B8323A",
+		arms = "C0453F",
 		special = true,
 	}),
 }

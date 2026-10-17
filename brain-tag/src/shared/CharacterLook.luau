@@ -122,14 +122,6 @@ local HATS: { [string]: HatBuilder } = {
 			model
 		)
 	end,
-	Bill = function(model, root, s)
-		attach(
-			root,
-			block("Hat", Vector3.new(0.9, 0.2, 0.8) * s, "F28C1C"),
-			CFrame.new(0, 0.85 * s, -1.15 * s),
-			model
-		)
-	end,
 	Visor = function(model, root, s)
 		attach(root, disc("Hat", 1.2 * s, 0.12 * s, "7FC8F8"), CFrame.new(0, 0.98 * s, -0.3 * s) * UP, model)
 		attach(root, ball("Hat", 0.32 * s, "9AA3AE"), CFrame.new(0.5 * s, 1.0 * s, 0.45 * s), model)
@@ -232,103 +224,20 @@ local function kit(model: Model, root: BasePart, s: number): Kit
 	return k
 end
 
--- Ears stick out from under the head; snouts and noses sit on top of it.
 type Style = (k: Kit, skin: Skins.Skin) -> ()
 
-local function snout(k: Kit, color: string, nose: string)
-	k.dot(0, -0.85, 0.95, 1.0, color)
-	k.dot(0, -1.15, 0.42, 1.04, nose)
-end
-
 local STYLES: { [string]: Style } = {
-	-- The first zombie: red patches and claws, googly eyes, screaming mouth.
+	-- The first zombie: red blotches on the body and arms (red hands come
+	-- from the skin's arm color).
 	Alpha = function(k, skin)
 		local red = skin.accent or "B8323A"
 		local spots: { { number } } =
-			{ { -0.95, 0.55, 0.9 }, { 1.0, 0.0, 0.7 }, { 0.25, 0.85, 0.55 }, { -0.3, -0.4, 0.45 } }
+			{ { -1.0, 0.55, 0.9 }, { 1.05, 0.05, 0.7 }, { 0.3, 0.8, 0.55 }, { -0.35, -0.45, 0.4 } }
 		for _, spot in spots do
 			k.dot(spot[1], spot[2], spot[3], 0.52, red)
 		end
 		for side = -1, 1, 2 do
-			k.dot(side * 1.3, -1.35, 0.5, 0.7, red) -- patch on the arm
-			k.dot(side * 1.3, -2.4, 0.95, 0.74, red) -- red hand
-			for i = -1, 1 do
-				k.bar(side * 1.3 + i * 0.28, -2.95, 0.16, 0.5, 0.75, "5A1010") -- claws
-			end
-			k.dot(side * 0.45, -0.42, 0.86, 1.0, "1C1C1C") -- googly eyes
-			k.dot(side * 0.45, -0.42, 0.72, 1.02, "FFFFFF")
-			k.dot(side * 0.53, -0.55, 0.3, 1.04, "1C1C1C")
-		end
-		k.pill(0, 0.4, 0.95, 0.55, 1.0, "5A1010") -- screaming mouth
-		k.bar(0, 0.22, 0.6, 0.12, 1.03, "FFFFFF") -- teeth
-		k.bar(0, 0.58, 0.5, 0.1, 1.03, "FFFFFF")
-	end,
-	Donkey = function(k, skin)
-		local dark = skin.accent or "3F3631"
-		k.pill(0, 1.45, 2.4, 2.3, 0.45, skin.shirt) -- long back end
-		k.bar(0, 0.8, 0.35, 2.6, 0.53, dark) -- mane down the back
-		k.pill(0, 2.75, 0.3, 1.0, 0.45, dark) -- tail
-		k.dot(0, 3.3, 0.55, 0.45, dark)
-		for side = -1, 1, 2 do
-			k.pill(side * 0.85, 1.0, 0.6, 2.0, 1.0, dark) -- long ears, laid back and out
-			k.pill(side * 0.85, 1.05, 0.3, 1.5, 1.02, "C9B8A8")
-			k.dot(side * 0.22, -1.3, 0.2, 1.03, "2B2B2B") -- nostrils
-		end
-		k.pill(0, -1.05, 1.1, 1.0, 1.0, "B5A69A") -- light muzzle
-	end,
-	Dog = function(k, skin)
-		local ear = skin.accent or "6B4226"
-		for side = -1, 1, 2 do
-			k.pill(side * 1.05, 0.15, 0.7, 1.3, 0.92, ear) -- floppy ears
-		end
-		snout(k, skin.skin, "1C1C1C")
-		k.pill(0, 1.7, 0.5, 1.2, 0.55, skin.shirt) -- tail
-		k.dot(0, 2.25, 0.5, 0.55, skin.shirt)
-	end,
-	Cat = function(k, skin)
-		local ear = skin.accent or "6E6E73"
-		for side = -1, 1, 2 do
-			k.bar(side * 0.72, -0.45, 0.75, 0.75, 0.85, ear, math.rad(45)) -- pointy ears
-			for _, angle in { -0.15, 0.15 } do
-				k.bar(side * 0.55, -1.15 + angle, 0.9, 0.05, 1.06, "1C1C1C", side * angle) -- whiskers
-			end
-		end
-		k.dot(0, -1.1, 0.3, 1.05, "FF8FAB")
-		k.bar(0.4, 1.7, 0.3, 1.4, 0.55, skin.shirt, 0.5) -- tail
-	end,
-	Bunny = function(k, skin)
-		for side = -1, 1, 2 do
-			k.pill(side * 0.42, 1.05, 0.55, 1.9, 1.05, skin.hair) -- long ears
-			k.pill(side * 0.42, 1.05, 0.28, 1.4, 1.07, skin.accent or "FFB3C7")
-		end
-		k.dot(0, -1.12, 0.32, 1.05, "FF8FAB")
-		k.dot(0, 1.4, 0.75, 0.56, "FFFFFF") -- fluffy tail
-	end,
-	Bear = function(k, skin)
-		for side = -1, 1, 2 do
-			k.dot(side * 0.9, 0.2, 0.75, 0.86, skin.accent or "5A3518")
-		end
-		snout(k, skin.skin, "1C1C1C")
-	end,
-	Panda = function(k, skin)
-		for side = -1, 1, 2 do
-			k.dot(side * 0.9, 0.15, 0.75, 0.86, "1C1C1C") -- ears
-			k.pill(side * 0.38, -0.55, 0.38, 0.55, 1.0, "1C1C1C") -- eye patches
-		end
-		k.dot(0, -1.12, 0.3, 1.04, "1C1C1C")
-	end,
-	Frog = function(k, skin)
-		for side = -1, 1, 2 do
-			k.dot(side * 0.5, -0.55, 0.8, 1.1, "FFFFFF") -- big eyes
-			k.dot(side * 0.5, -0.65, 0.35, 1.14, "1C1C1C")
-		end
-		k.bar(0, -0.95, 0.9, 0.08, 1.03, skin.accent or "2E7D32") -- smile
-	end,
-	Penguin = function(k, skin)
-		k.pill(0, -0.4, 2.0, 1.0, 0.53, "F4F4F4") -- white belly on the chest
-		k.bar(0, -1.25, 0.5, 0.45, 1.03, skin.accent or "F39C12", math.rad(45)) -- beak
-		for side = -1, 1, 2 do
-			k.dot(side * 0.35, -0.6, 0.25, 1.02, "1C1C1C")
+			k.dot(side * 1.35, -0.75, 0.45, 0.7, red)
 		end
 	end,
 	Robot = function(k, skin)
@@ -362,15 +271,6 @@ local STYLES: { [string]: Style } = {
 		k.dot(0, 0, 2.45, 1.05, "BDC3C7") -- helmet
 		k.bar(0, -0.75, 1.4, 0.14, 1.07, "2B2B30") -- visor slit
 		k.pill(0, 0.5, 0.45, 1.4, 1.12, skin.accent or "C0392B") -- plume
-	end,
-	Shark = function(k, skin)
-		local fin = skin.accent or "4A6378"
-		k.bar(0, 0.2, 0.55, 0.55, 1.12, fin, math.rad(45)) -- dorsal fin
-		for side = -1, 1, 2 do
-			k.bar(side * 2.0, 0.1, 0.8, 0.8, 0.45, fin, math.rad(45)) -- side fins
-			k.bar(side * 0.45, 1.75, 0.7, 0.7, 0.45, fin, math.rad(45)) -- tail fin
-		end
-		k.bar(0, -0.95, 1.2, 0.1, 1.03, "F4F4F4") -- teeth
 	end,
 	Hotdog = function(k, skin)
 		for i = -2, 2 do
@@ -424,6 +324,293 @@ end
 
 -- Builds (or rebuilds) the look on `model`. Keeps an existing part named
 -- "Head" so anything attached to it (name tag, chat bubbles) survives.
+-- The part named "Head" (name tags hang off it), reused across rebuilds.
+local function placeHead(
+	model: Model,
+	root: BasePart,
+	diameter: number,
+	thickness: number,
+	color: string,
+	at: CFrame
+)
+	local head = model:FindFirstChild("Head") :: Part?
+	if head then
+		local oldWeld = head:FindFirstChild("Weld")
+		if oldWeld then
+			oldWeld:Destroy()
+		end
+	else
+		head = Instance.new("Part")
+	end
+	assert(head, "head")
+	head.Name = "Head"
+	head.Shape = Enum.PartType.Cylinder
+	head.Size = Vector3.new(thickness, diameter, diameter)
+	head.Color = Color3.fromHex(color)
+	head.Material = Enum.Material.SmoothPlastic
+	head.CastShadow = false
+	head.TopSurface = Enum.SurfaceType.Smooth
+	head.BottomSurface = Enum.SurfaceType.Smooth
+	attach(root, head, at * UP, model)
+end
+
+local function lighter(hex: string, amount: number): Color3
+	local c = Color3.fromHex(hex)
+	return Color3.new(c.R + (1 - c.R) * amount, c.G + (1 - c.G) * amount, c.B + (1 - c.B) * amount)
+end
+
+-- Animals ----------------------------------------------------------------------------
+-- Animal skins get their own body instead of the person shape: long and thin
+-- from above with the head in front (-Z), paws, ears and a tail. Sizes are
+-- studs at scale 1. Colors: shirt = body, hair = head, skin = muzzle / light
+-- parts, accent = ears, paws and other dark parts.
+
+type Animal = {
+	body: "Quadruped" | "Bird" | "Fish" | "Frog",
+	width: number, -- torso, side to side
+	length: number, -- torso, front to back
+	head: number, -- head diameter
+	snout: { number }?, -- muzzle { width, length } in front of the head
+	ears: string?, -- Floppy | Pointy | Tall | Round | Long
+	tail: string?, -- Wag | Long | Stub | Cotton | Tuft | Duck
+	stripe: boolean?, -- dark line down the back
+	whiskers: boolean?,
+	patches: boolean?, -- panda markings
+}
+
+local ANIMALS: { [string]: Animal } = {
+	Dog = {
+		body = "Quadruped",
+		width = 2.0,
+		length = 3.6,
+		head = 1.7,
+		snout = { 0.8, 0.9 },
+		ears = "Floppy",
+		tail = "Wag",
+	},
+	Cat = {
+		body = "Quadruped",
+		width = 1.75,
+		length = 3.3,
+		head = 1.55,
+		snout = { 0.6, 0.45 },
+		ears = "Pointy",
+		tail = "Long",
+		whiskers = true,
+	},
+	Bunny = {
+		body = "Quadruped",
+		width = 1.95,
+		length = 2.9,
+		head = 1.55,
+		snout = { 0.5, 0.35 },
+		ears = "Tall",
+		tail = "Cotton",
+	},
+	Bear = {
+		body = "Quadruped",
+		width = 2.5,
+		length = 3.6,
+		head = 1.9,
+		snout = { 0.95, 0.8 },
+		ears = "Round",
+		tail = "Stub",
+	},
+	Panda = {
+		body = "Quadruped",
+		width = 2.5,
+		length = 3.5,
+		head = 1.9,
+		snout = { 0.85, 0.7 },
+		ears = "Round",
+		tail = "Stub",
+		patches = true,
+	},
+	Donkey = {
+		body = "Quadruped",
+		width = 1.8,
+		length = 3.9,
+		head = 1.45,
+		snout = { 0.95, 1.25 },
+		ears = "Long",
+		tail = "Tuft",
+		stripe = true,
+	},
+	Frog = { body = "Frog", width = 2.3, length = 2.5, head = 2.0 },
+	Penguin = { body = "Bird", width = 2.2, length = 2.8, head = 1.65 },
+	Bill = { body = "Bird", width = 2.2, length = 2.8, head = 1.55, tail = "Duck" }, -- the Duck skin
+	Shark = { body = "Fish", width = 1.9, length = 4.6, head = 1.9 },
+}
+
+local function buildAnimal(model: Model, root: BasePart, s: number, skin: Skins.Skin, a: Animal)
+	local k = kit(model, root, s)
+	local main, head, light = skin.shirt, skin.hair, skin.skin
+	local dark = skin.accent or darker(main)
+	local edge = darker(main, 0.7)
+	local W, L = a.width, a.length
+	local headZ = if a.body == "Frog" then -0.85 elseif a.body == "Fish" then -1.35 else -1.5
+	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
+	local back = bodyZ + L / 2 -- rear end of the torso
+	local function torso()
+		k.pill(0, bodyZ, W + 0.24, L + 0.24, 0.47, edge)
+		k.pill(0, bodyZ, W, L, 0.5, main)
+		k.pill(-W * 0.12, bodyZ - L * 0.1, W * 0.42, L * 0.55, 0.51, lighter(main, 0.14)) -- soft sheen
+	end
+	local function eyes(spread: number, z: number, size: number)
+		for side = -1, 1, 2 do
+			k.dot(side * spread, z, size, 0.95, "1C1C1C")
+			k.dot(side * spread - 0.04, z - 0.04, size * 0.35, 0.97, "FFFFFF")
+		end
+	end
+
+	if a.body == "Quadruped" then
+		for side = -1, 1, 2 do
+			for _, z in { bodyZ - L * 0.3, bodyZ + L * 0.32 } do
+				k.pill(side * (W / 2 - 0.02), z, 0.6, 0.8, 0.36, dark) -- paws
+			end
+		end
+		local tail = a.tail
+		if tail == "Wag" then
+			k.pill(0.2, back + 0.55, 0.42, 1.3, 0.4, main)
+		elseif tail == "Long" then
+			k.pill(0, back + 0.8, 0.3, 1.7, 0.4, main)
+			k.pill(0.35, back + 1.55, 0.3, 0.7, 0.41, dark)
+		elseif tail == "Stub" then
+			k.dot(0, back + 0.05, 0.6, 0.4, dark)
+		elseif tail == "Tuft" then
+			k.pill(0, back + 0.65, 0.22, 1.4, 0.4, main)
+			k.pill(0, back + 1.35, 0.42, 0.6, 0.41, dark)
+		end
+		torso()
+		if a.stripe then
+			k.pill(0, bodyZ - 0.1, 0.3, L * 0.85, 0.53, dark) -- mane / spine stripe
+		end
+		if a.patches then
+			k.bar(0, bodyZ - L * 0.22, W, 0.95, 0.52, dark) -- panda shoulder band
+		end
+		if tail == "Cotton" then
+			k.dot(0, back - 0.05, 0.85, 0.54, "FFFFFF")
+		end
+	elseif a.body == "Bird" then
+		local beak = skin.accent or "F28C1C"
+		for side = -1, 1, 2 do
+			k.pill(side * 0.45, back + 0.2, 0.42, 0.65, 0.36, beak) -- feet
+		end
+		if a.tail == "Duck" then
+			k.bar(0, back + 0.1, 0.75, 0.75, 0.42, main, math.rad(45))
+		end
+		torso()
+		for side = -1, 1, 2 do
+			k.pill(side * (W / 2 - 0.05), bodyZ + 0.15, 0.6, L * 0.72, 0.53, darker(main, 0.8)) -- wings
+		end
+	elseif a.body == "Fish" then
+		local fin = skin.accent or darker(main)
+		for side = -1, 1, 2 do
+			k.bar(side * 0.5, back + 0.45, 0.45, 1.35, 0.42, fin, side * 0.6) -- tail fin
+			k.bar(side * (W / 2 + 0.35), headZ + 1.0, 0.5, 1.5, 0.42, fin, side * 0.8) -- side fins
+		end
+		torso()
+		k.pill(0, headZ - W / 2 + 0.1, W * 0.62, 1.0, 0.5, main) -- pointed nose
+		k.pill(0, bodyZ + 0.2, 0.28, 1.3, 0.56, fin) -- dorsal fin
+		for side = -1, 1, 2 do
+			for i = 0, 2 do
+				k.bar(side * W * 0.38, headZ + 0.75 + i * 0.2, 0.05, 0.42, 0.53, edge) -- gills
+			end
+		end
+	else -- Frog
+		for side = -1, 1, 2 do
+			k.pill(side * 1.2, bodyZ + 0.55, 0.75, 1.7, 0.38, main) -- folded back legs
+			k.dot(side * 1.45, bodyZ + 1.45, 0.85, 0.39, dark) -- webbed feet
+			k.pill(side * 1.1, -0.55, 0.45, 0.9, 0.38, main) -- front legs
+			k.dot(side * 1.25, -1.0, 0.5, 0.39, dark)
+		end
+		torso()
+		for _, spot in { { -0.5, 0.6 }, { 0.55, 0.9 }, { 0.1, 1.25 } } do
+			k.dot(spot[1], bodyZ + spot[2] - 0.6, 0.4, 0.52, dark)
+		end
+	end
+
+	-- Head, with an outline ring.
+	local fish = a.body == "Fish"
+	local headSize = if fish then W else a.head
+	k.dot(0, headZ, headSize + 0.22, if fish then 0.49 else 0.86, if fish then edge else darker(head, 0.7))
+	placeHead(
+		model,
+		root,
+		headSize * s,
+		0.3 * s,
+		if fish then main else head,
+		CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
+	)
+
+	if a.body == "Quadruped" then
+		local ears = a.ears
+		local hr = a.head / 2
+		for side = -1, 1, 2 do
+			if ears == "Floppy" then
+				k.pill(side * (hr - 0.02), headZ + 0.15, 0.55, 1.25, 0.8, dark)
+			elseif ears == "Pointy" then
+				k.bar(side * hr * 0.78, headZ + hr * 0.5, 0.72, 0.72, 0.84, dark, math.rad(45))
+			elseif ears == "Round" then
+				k.dot(side * hr * 0.8, headZ + hr * 0.45, 0.72, 0.84, dark)
+			elseif ears == "Tall" then
+				k.pill(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.9, head)
+				k.pill(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.91, skin.accent or "FFB3C7")
+			elseif ears == "Long" then
+				-- Donkey ears stick out to the sides, swept a little back.
+				k.bar(side * (hr + 0.45), headZ + 0.35, 0.42, 1.35, 0.84, dark, side * math.rad(68))
+				k.bar(
+					side * (hr + 0.5),
+					headZ + 0.37,
+					0.18,
+					0.95,
+					0.85,
+					lighter(main, 0.35),
+					side * math.rad(68)
+				)
+			end
+		end
+		if a.patches then
+			for side = -1, 1, 2 do
+				k.pill(side * hr * 0.42, headZ - hr * 0.15, 0.45, 0.6, 0.93, dark) -- eye patches
+			end
+		end
+		local snout = a.snout
+		local front = headZ - hr
+		if snout then
+			local sw, sl = snout[1], snout[2]
+			k.pill(0, front + 0.25 - sl / 2 + sl * 0.35, sw, sl, 0.92, light) -- muzzle
+			k.dot(0, front + 0.25 - sl + sl * 0.35 + 0.15, math.min(0.36, sw * 0.5), 0.95, "2B2B2B") -- nose
+		end
+		if a.whiskers then
+			for side = -1, 1, 2 do
+				for _, tilt in { -0.15, 0.15 } do
+					k.bar(side * 0.5, front + tilt, 0.85, 0.05, 0.96, "1C1C1C", side * tilt)
+				end
+			end
+		end
+		eyes(hr * 0.42, headZ - hr * 0.2, 0.2)
+	elseif a.body == "Bird" then
+		local hr = a.head / 2
+		local beak = skin.accent or "F28C1C"
+		if a.tail == "Duck" then
+			k.pill(0, headZ - hr - 0.1, 0.95, 0.75, 0.92, beak) -- flat bill
+		else
+			k.pill(0, headZ - hr * 0.35, a.head * 0.7, a.head * 0.45, 0.9, light) -- white face
+			k.bar(0, headZ - hr - 0.05, 0.42, 0.42, 0.92, beak, math.rad(45)) -- pointy beak
+		end
+		eyes(hr * 0.4, headZ - hr * 0.3, 0.2)
+	elseif fish then
+		eyes(W * 0.32, headZ - 0.25, 0.18)
+	else -- Frog
+		for side = -1, 1, 2 do
+			k.dot(side * 0.62, headZ - 0.45, 0.8, 0.93, light) -- bulging eyes
+			k.dot(side * 0.62, headZ - 0.55, 0.36, 0.96, "1C1C1C")
+		end
+		k.bar(0, headZ - 0.85, 1.1, 0.07, 0.92, dark) -- wide mouth
+	end
+end
+
 function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team: Skins.Team, scale: number)
 	local skin = Skins.resolve(skinId, team)
 	local s = scale
@@ -439,6 +626,12 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 	shadow.Transparency = 0.72
 	-- Floor level is HipHeight below the root's bottom (hip height doesn't scale).
 	attach(root, shadow, CFrame.new(0, -(C.RootHeight / 2 * s + C.HipHeight) + 0.14, 0) * UP, model)
+
+	local animal = skin.hat and ANIMALS[skin.hat]
+	if animal then
+		buildAnimal(model, root, s, skin, animal)
+		return
+	end
 
 	-- Body: outline first (bigger, lower), then the shirt on top.
 	local w, d, r, o = C.BodyWidth * s, C.BodyDepth * s, 0.7 * s, 0.14 * s
@@ -458,23 +651,25 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 	roundedRect(model, root, "Body", 0, 0.1 * s, w, d, r, 0.5 * s, 0.6 * s, skin.shirt)
 
 	if team == "Zombie" then
-		-- Arms reaching straight forward from the shoulders, past the head:
-		-- sleeves in the shirt color, hands at the ends. The head is drawn
-		-- over their inner edge.
-		local armW, armLength, shoulderZ = 0.82 * s, 2.3 * s, -0.25 * s
+		-- Arms reaching straight forward from the shoulders, like the original:
+		-- one thick arm in the shirt color with the hand at the end in the
+		-- skin color (red claws on the alpha).
+		local hands = skin.arms or skin.skin
+		local armW, armL, armZ = 0.88 * s, 2.45 * s, -1.35 * s
+		local handL = 0.85 * s
 		for side = -1, 1, 2 do
-			local x, z = side * 1.3 * s, shoulderZ - armLength / 2
+			local x = side * 1.36 * s
 			roundedRect(
 				model,
 				root,
 				"ArmOutline",
 				x,
-				z,
+				armZ,
 				armW + 2 * o,
-				armLength + 2 * o,
+				armL + 2 * o,
 				armW / 2 + o,
-				0.64 * s,
-				0.3 * s,
+				0.62 * s,
+				0.25 * s,
 				darker(skin.shirt)
 			)
 			roundedRect(
@@ -482,25 +677,32 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 				root,
 				"Arm",
 				x,
-				z,
+				armZ,
 				armW,
-				armLength,
+				armL,
 				armW / 2 * 0.999,
-				0.68 * s,
-				0.3 * s,
+				0.66 * s,
+				0.25 * s,
 				skin.shirt
 			)
-			local handZ = shoulderZ - armLength + 0.15 * s
-			attach(
+			local handZ = armZ - armL / 2 + handL / 2
+			roundedRect(
+				model,
 				root,
-				disc("HandOutline", 0.9 * s + 2 * o, 0.3 * s, darker(skin.skin, 0.75)),
-				CFrame.new(x, 0.55 * s, handZ) * UP,
-				model
+				"Hand",
+				x,
+				handZ,
+				armW,
+				handL,
+				armW / 2 * 0.999,
+				0.67 * s,
+				0.05 * s,
+				hands
 			)
 			attach(
 				root,
-				disc("Hand", 0.9 * s, 0.3 * s, skin.skin),
-				CFrame.new(x, 0.56 * s, handZ) * UP,
+				block("Cuff", Vector3.new(armW, 0.05 * s, 0.08 * s), darker(skin.shirt)),
+				CFrame.new(x, 0.655 * s, handZ + handL / 2),
 				model
 			)
 		end
@@ -508,44 +710,23 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 
 	-- Head: hair-colored disc (kept as "Head"), with the face crescent at the
 	-- front made by a skin disc partly covered by a hair disc set back.
-	local head = model:FindFirstChild("Head") :: Part?
-	if head then
-		local oldWeld = head:FindFirstChild("Weld")
-		if oldWeld then
-			oldWeld:Destroy()
-		end
-	else
-		head = Instance.new("Part")
-	end
-	assert(head, "head")
 	local hd = C.HeadDiameter * s
-	head.Name = "Head"
-	head.Shape = Enum.PartType.Cylinder
-	head.Size = Vector3.new(0.3 * s, hd, hd)
-	head.Color = Color3.fromHex(skin.hair)
-	head.Material = Enum.Material.SmoothPlastic
-	head.CastShadow = false
-	head.TopSurface = Enum.SurfaceType.Smooth
-	head.BottomSurface = Enum.SurfaceType.Smooth
-	attach(root, head, CFrame.new(0, 0.75 * s, 0) * UP, model)
+	placeHead(model, root, hd, 0.3 * s, skin.hair, CFrame.new(0, 0.75 * s, 0))
 	attach(
 		root,
 		disc("HeadOutline", hd + 0.1 * s, 0.3 * s, darker(skin.hair, 0.8)),
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
-	-- A little nose poking out past the front of the head, like the original
-	-- (the alpha zombie has a screaming mouth there instead).
-	if skin.hat ~= "Alpha" then
-		local nose = 0.3 * hd
-		attach(
-			root,
-			disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
-			CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
-			model
-		)
-		attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
-	end
+	-- A little nose poking out past the front of the head, like the original.
+	local nose = 0.3 * hd
+	attach(
+		root,
+		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+		model
+	)
+	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 
