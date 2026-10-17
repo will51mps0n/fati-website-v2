@@ -4,6 +4,7 @@
 --   Items:  give any item (or drop it in front of you)
 --   Speed, points, immunity, team, bring / go to / respawn
 --   Round:  skip phase, add time, next map, reset furniture, clear items
+--   Maps:   pick the map for the next round (yours from Studio too)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -282,6 +283,32 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 		send("clearItems")
 	end)
 
+	-- Maps --------------------------------------------------------------------------------------
+	heading("Play map next round (yours from Studio come first)")
+	local mapRow = row(30)
+	local shownMaps = ""
+	local function refreshMaps()
+		local state = ReplicatedStorage:FindFirstChild("BrainTagState")
+		local raw = state and state:GetAttribute("Maps")
+		local list = if typeof(raw) == "string" then raw else ""
+		if list == shownMaps then
+			return
+		end
+		shownMaps = list
+		for _, child in mapRow:GetChildren() do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+		for i, name in string.split(list, "|") do
+			if name ~= "" then
+				button(mapRow, name, nil, function()
+					send("map", { map = name })
+				end).LayoutOrder = i
+			end
+		end
+	end
+
 	-- Open button (admins only) ----------------------------------------------------------------
 	local openButton = UIKit.button({
 		Name = "AdminButton",
@@ -305,6 +332,7 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 			if isAdmin() then
 				lastCount = #ClientState.rows()
 				refreshTargets()
+				refreshMaps()
 				window.Visible = true
 			end
 		end,

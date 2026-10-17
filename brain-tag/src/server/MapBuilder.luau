@@ -488,6 +488,42 @@ end
 
 -- Builds `layout`, replacing whatever map was there. The Walls folder is
 -- kept (only emptied) so raycast filters that point at it stay valid.
+-- Extra parts a map built in Studio brought along (anything not named as a
+-- map part: statues, trees, signs...), by map name. Main wires this to
+-- MapStudio.
+local decorFor: (string) -> Instance? = function()
+	return nil
+end
+
+function MapBuilder.setDecor(lookup: (string) -> Instance?)
+	decorFor = lookup
+end
+
+local function collides(instance: Instance): boolean
+	if instance:IsA("BasePart") and instance.CanCollide then
+		return true
+	end
+	for _, d in instance:GetDescendants() do
+		if d:IsA("BasePart") and d.CanCollide then
+			return true
+		end
+	end
+	return false
+end
+
+-- Solid ones go with the walls (bots see them as walls; they never break).
+local function buildDecor(layout: Layout, walls: Folder)
+	local template = decorFor(layout.name)
+	if not template then
+		return
+	end
+	local open = sub("Custom", mapFolder)
+	local solid = sub("Custom", walls)
+	for _, child in template:GetChildren() do
+		child:Clone().Parent = if collides(child) then solid else open
+	end
+end
+
 function MapBuilder.build(layout: Layout)
 	mapFolder = workspace:WaitForChild("Map") :: Folder
 	local walls = wallsFolder or sub("Walls", mapFolder)
@@ -512,6 +548,7 @@ function MapBuilder.build(layout: Layout)
 	local bushes = sub("Bushes", mapFolder)
 	buildBushes(bushes, layout)
 	buildBoundary(sub("Boundary", mapFolder), layout)
+	buildDecor(layout, walls)
 	for _, folder in { ground, road, floors } do
 		setPhysics(folder, SLIPPERY)
 	end

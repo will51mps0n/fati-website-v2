@@ -747,8 +747,45 @@ MapLayout.maps = {
 	Mansion = buildMansion(),
 } :: { [string]: Layout }
 MapLayout.names = { "Neighborhood", "Mansion" }
+MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood
+
+-- An empty layout, for maps built from Studio parts (MapMarks).
+function MapLayout.blank(name: string, title: string): Layout
+	return newLayout(name, title)
+end
+
+-- Adds a map built in Studio. One named like a built-in map replaces it.
+function MapLayout.register(layout: Layout)
+	if not MapLayout.maps[layout.name] then
+		table.insert(MapLayout.names, layout.name)
+	end
+	if not table.find(MapLayout.custom, layout.name) then
+		table.insert(MapLayout.custom, layout.name)
+	end
+	MapLayout.maps[layout.name] = layout
+	if current.name == layout.name then
+		current = layout
+	end
+end
+
+-- The maps to take turns on: new maps built in Studio first (so pressing
+-- Play shows yours), then `configured` (Config.MAP_ROTATION).
+function MapLayout.rotation(configured: { string }): { string }
+	local out = {}
+	for _, name in MapLayout.custom do
+		if not table.find(configured, name) then
+			table.insert(out, name)
+		end
+	end
+	for _, name in configured do
+		if MapLayout.maps[name] then
+			table.insert(out, name)
+		end
+	end
+	return out
+end
 
 function MapLayout.current(): Layout
 	return current

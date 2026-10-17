@@ -240,6 +240,14 @@ function ACTIONS.nextMap()
 	return false, "Only one map is in the rotation"
 end
 
+function ACTIONS.map(_admin, data)
+	local name = if typeof(data.map) == "string" then data.map else ""
+	if RoundManager.queueMap(name) then
+		return true, "Next round plays " .. name .. " (Skip phase to get there now)"
+	end
+	return false, "No map called " .. name
+end
+
 function ACTIONS.resetFurniture()
 	FurnitureService.resetAll()
 	return true, "Furniture put back"

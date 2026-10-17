@@ -1,6 +1,7 @@
 """Draw MapLayout.luau as a top-down PNG, roughly how the game camera sees it.
 
 Usage: python3 tools/render_map.py [path/to/luau] [out.png] [MapName]
+(MapName "Starter" draws the starter map Studio's map helper makes.)
 """
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ from luau_bundle import ROOT, bundle  # noqa: E402
 DUMP = """
 local MapLayout = require(script.Parent.MapLayout)
 local FurnitureSpecs = require(script.Parent.FurnitureSpecs)
-local layout = MapLayout.get("__MAP__")
+local MapMarks = require(script.Parent.MapMarks)
+-- "Starter" is the map MapStudio.new() makes in Studio.
+local layout = MapLayout.get("__MAP__") or MapMarks.toLayout("__MAP__", "__MAP__", MapMarks.starter())
 
 local function encode(value)
 	local t = typeof(value)

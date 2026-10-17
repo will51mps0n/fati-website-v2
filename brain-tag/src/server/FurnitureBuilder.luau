@@ -520,7 +520,8 @@ export type Built = {
 	home: CFrame,
 }
 
-function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance): Built
+-- The piece's parts, posed at its spot (body first, no physics yet).
+local function draw(spot: MapLayout.FurnitureSpot): (Model, Part, CFrame)
 	local spec = FurnitureSpecs.get(spot.kind)
 	local design = DESIGNS[spot.kind]
 	local floorTop = MapLayout.HEIGHTS.Floor
@@ -554,6 +555,26 @@ function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance)
 			parent = model,
 		})
 	end
+	return model, body, home
+end
+
+-- A still, anchored copy for editing maps in Studio (MapStudio). Its pivot
+-- is the spot: move or turn it and the map follows.
+function FurnitureBuilder.preview(spot: MapLayout.FurnitureSpot, parent: Instance): Model
+	local model = draw(spot)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+		end
+	end
+	model.Parent = parent
+	return model
+end
+
+function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance): Built
+	local spec = FurnitureSpecs.get(spot.kind)
+	local decor = spec.decor == true
+	local model, body, home = draw(spot)
 
 	if decor then
 		for _, part in model:GetDescendants() do

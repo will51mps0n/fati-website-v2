@@ -116,9 +116,92 @@ rank 254+ in the owning group) in live servers, and to any UserId listed in
 - **Points:** +1,000 / +10,000 / +100,000 / -1,000, or reset to 0 (size and speed follow).
 - **Player:** make human or zombie, immunity 100, bring to you, go to them, respawn.
 - **Round:** skip the phase, +60 / -30 seconds, next map next round, reset furniture, clear ground items.
+- **Maps:** pick the map the next round plays on (your own maps too), then **Skip phase** to get there.
 
 The server checks every request, so the panel can't be used by anyone else
 even if they find it.
+
+## Making your own maps
+
+You build maps right in Studio, out of ordinary parts. Each part's **name**
+says what it is; its position and size (seen from above) say where. When the
+game starts it turns every map folder into a real map (the same brick walls,
+floors, breakable windows and pushable furniture as the built-in maps), and
+the bots understand it too.
+
+### Start one
+
+With the game installed, stop playing and paste one of these into the
+**Command Bar**:
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).new("MyMap")
+```
+A small starter map: a house with two rooms, a shed, a road, spawns.
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).copy("Mansion", "Castle")
+```
+A copy of a built-in map (`Neighborhood` or `Mansion`) under a new name, to
+change into your own.
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).copy("Neighborhood")
+```
+Keeps the name: your edited copy **replaces** the built-in Neighborhood.
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).palette()
+```
+One of every part and every furniture piece, laid out beside your maps
+(folder `_Palette`). Select one, press **Ctrl+D** to duplicate it, and drag
+the copy into your map's folder in the Explorer.
+
+Each map is a folder in **Workspace > BrainTagMaps**. The camera jumps to it.
+
+### Edit it
+
+Move, resize, duplicate and delete parts with Studio's normal tools. What
+each name means:
+
+| Part name | What it is |
+| --- | --- |
+| `Bounds` | The play area (the big grass plate). A brick wall goes around its edge. One per map. Locked: select it in the Explorer. |
+| `Wall` | A wall. Draw it long and thin; it is always rebuilt 3 studs thick, centered where you put it. Shotguns can break it. |
+| `Door` (green) | Put it on a wall: it cuts a doorway as wide as the part. |
+| `Window` (light blue) | Put it on a wall: that stretch becomes a breakable window. |
+| `Floor` | A room's floor. Attribute `Floor`: `Brick`, `Tile`, `Wood` or `Concrete` (or just set the part's Material). |
+| `House` | A house's outline (flat plate under the floors): walls on it get blue or orange trim (attribute `Outline`). Optional. |
+| `HumanSpawn` (blue) | Where humans appear. At least one. |
+| `ZombieSpawn` (red) | Where zombies appear (a red pit). At least one. |
+| `Start` (white) | Where everyone starts the round, together. Optional (else the first human spawn). |
+| `ItemSpot` (yellow) | Where items can lie on the ground. |
+| `WizardSpot` (purple) | Where the wizard can show up. |
+| `Bush` | A bush to hide in. Its width is the bush's size. Attribute `Color`: `Green` or `Orange`. |
+| `Road`, `Sidewalk`, `CenterLine`, `EdgeLine`, `Path`, `Patio`, `Pool`, `IslandWalk`, `IslandGrass` | Ground you walk on (pools you can't). |
+| `Couch`, `PoolTable`, `Fridge`, `Car`... | Furniture: any piece from the palette. Move and turn it freely. |
+
+Anything else you put in the folder (a statue, a tree, a sign, a toolbox
+model) appears in the game exactly as you built it. If it can be bumped into
+(`CanCollide` on), it works like a wall that never breaks. Sub-folders are
+fine for keeping things tidy.
+
+Folder attributes: `Title` (the name shown in game) and `Enabled` (untick to
+leave a map out without deleting it). A folder whose name starts with `_` is
+ignored.
+
+### Check and play
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).check()
+```
+prints what each map has (walls, doors, rooms, spawns...) and anything wrong,
+like a door that isn't on a wall or a missing spawn. Then press **Play**: your
+new maps come first in the rotation, then the built-in ones. In the admin
+panel (F2), **Maps** lets you jump to any map (pick it, then **Skip phase**).
+
+Your maps are saved in your place file. Updating the game with the Command
+Bar line never touches them.
 
 ## Saving progress
 
@@ -300,7 +383,7 @@ Everything lives in `src/shared/Config.luau`:
   walk speed), `FURNITURE_SPIN` (how
   much off-center pushes turn a piece). "Can't move the fridge": lower `Heavy`.
 - **Size:** `SIZE_MULTIPLIER` and `MAX_SCALE`.
-- **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP`.
+- **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP` (your own maps from Studio play first; see "Making your own maps").
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
 - **Collisions:** `PLAYERS_COLLIDE` (characters bump into each other), `CHARACTER.ShellDiameter`.
@@ -323,7 +406,7 @@ a piece pressed against walls stays put. That is what makes a barricade hold.
 src/shared   Config, items, skins, map layout, character and item models
 src/server   map + furniture builders, rounds, items, shop, data, monetization, bots
 src/client   camera, movement, input, effects, chat, UI/ (HUD built in code)
-tests/       logic tests (round rules, items, skins, map geometry)
+tests/       logic tests (round rules, items, skins, map geometry, Studio maps)
 studio/      the Command Bar installer (install.luau) and the scripts it installs (bundle.json), both generated
 tools/       test runner, map preview renderer, installer generator
 ```
@@ -332,8 +415,8 @@ Developer checks (need the standalone `luau` binary from
 [luau-lang/luau releases](https://github.com/luau-lang/luau/releases)):
 
 ```
-python3 tools/run_tests.py path/to/luau      # 31 logic tests, incl. "every room is reachable"
-python3 tools/render_map.py path/to/luau     # writes tools/out/map.png
+python3 tools/run_tests.py path/to/luau      # 35 logic tests, incl. "every room is reachable" and Studio map round trips
+python3 tools/render_map.py path/to/luau     # writes tools/out/map.png ("Starter" draws the Studio starter map)
 python3 tools/build_installer.py path/to/rojo   # regenerates studio/ (the Command Bar installer)
 python3 tools/render_looks.py path/to/luau out.png Alpha:Zombie Furniture:Car   # top-down previews
 rojo sourcemap -o sourcemap.json && luau-lsp analyze --sourcemap sourcemap.json --definitions <roblox defs> src

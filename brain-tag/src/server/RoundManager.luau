@@ -408,8 +408,10 @@ end
 
 -- Map rotation ------------------------------------------------------------------------------
 
+local rotation: { string } = {} -- built-in maps plus yours (MapLayout.rotation)
 local mapIndex = 1
 local roundsOnMap = 0
+local pendingMap: string? = nil -- an admin picked the next map
 
 local function loadMap(name: string)
 	local layout = MapLayout.use(name)
@@ -421,10 +423,16 @@ local function loadMap(name: string)
 end
 
 local function nextMapIfDue()
-	if roundsOnMap >= Config.ROUNDS_PER_MAP and #Config.MAP_ROTATION > 1 then
+	local picked = pendingMap
+	if picked then
+		pendingMap = nil
 		roundsOnMap = 0
-		mapIndex = mapIndex % #Config.MAP_ROTATION + 1
-		loadMap(Config.MAP_ROTATION[mapIndex])
+		mapIndex = table.find(rotation, picked) or mapIndex
+		loadMap(picked)
+	elseif roundsOnMap >= Config.ROUNDS_PER_MAP and #rotation > 1 then
+		roundsOnMap = 0
+		mapIndex = mapIndex % #rotation + 1
+		loadMap(rotation[mapIndex])
 	end
 	roundsOnMap += 1
 end
@@ -536,10 +544,20 @@ end
 
 -- The next round starts on the next map in the rotation.
 function RoundManager.queueNextMap(): boolean
-	if #Config.MAP_ROTATION < 2 then
+	if #rotation < 2 then
 		return false
 	end
+	pendingMap = nil
 	roundsOnMap = Config.ROUNDS_PER_MAP
+	return true
+end
+
+-- The next round starts on this map.
+function RoundManager.queueMap(name: string): boolean
+	if not MapLayout.get(name) then
+		return false
+	end
+	pendingMap = name
 	return true
 end
 
@@ -559,6 +577,9 @@ end
 function RoundManager.start()
 	state = ReplicatedStorage:WaitForChild("BrainTagState") :: Folder
 	state:SetAttribute("Map", MapLayout.current().title)
+	rotation = MapLayout.rotation(Config.MAP_ROTATION)
+	mapIndex = table.find(rotation, MapLayout.current().name) or 1
+	state:SetAttribute("Maps", table.concat(rotation, "|")) -- for the admin panel
 
 	CharacterService.onNeedRespawn = function(p)
 		CharacterService.spawn(p, spawnFrame(p.team, p.scale))

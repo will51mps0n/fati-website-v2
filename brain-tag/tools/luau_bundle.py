@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SHARED = ROOT / "src" / "shared"
 
-PURE_MODULES = ["Config", "Items", "Skins", "RoundRules", "FurnitureSpecs", "MapLayout"]
+PURE_MODULES = ["Config", "Items", "Skins", "RoundRules", "FurnitureSpecs", "MapLayout", "MapMarks"]
 
 PRELUDE = """
 local __sources = {}
