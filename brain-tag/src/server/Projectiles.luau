@@ -70,7 +70,7 @@ local function step(dt: number)
 			elseif
 				result.Instance:IsA("BasePart") and FurnitureService.weightOf(result.Instance) == "Light"
 			then
-				FurnitureService.addPush(result.Instance, shot.direction * 10, result.Position)
+				FurnitureService.shove(result.Instance, shot.direction * 12, 0.25)
 			end
 			finish(shot, result.Position)
 			done = true

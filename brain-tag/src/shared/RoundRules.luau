@@ -97,8 +97,22 @@ function RoundRules.reward(base: number, bonuses: RewardBonuses): number
 	return math.floor(base * RoundRules.rewardMultiplier(bonuses) + 0.5)
 end
 
-function RoundRules.scaleForWins(wins: number): number
-	return math.min(Config.MAX_SCALE, 1 + math.max(0, wins) * Config.GROWTH_PER_WIN)
+function RoundRules.scaleForScore(score: number): number
+	return Config.SIZE_MULTIPLIER(score)
+end
+
+-- Pushing strength of one player: grows with the square of their size.
+function RoundRules.pushStrength(scale: number): number
+	return scale * scale
+end
+
+-- Fraction of walk speed a piece of `mass` moves at under `strength` (the
+-- summed strength of everyone pushing it). 0 means it won't budge.
+function RoundRules.pushFraction(mass: number, strength: number): number
+	if strength <= 0 then
+		return 0
+	end
+	return math.clamp(1 - mass / strength, 0, Config.PUSH_MAX_FRACTION)
 end
 
 function RoundRules.walkSpeed(score: number, isZombie: boolean): number

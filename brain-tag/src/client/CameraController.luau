@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClientState = require(script.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local CameraController = {}
@@ -42,7 +43,10 @@ local function update(dt: number)
 		end
 	end
 	if focus then
-		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, height, 0), focus, SCREEN_UP)
+		-- Bigger players see a little more around them.
+		local scale = ClientState.my("Scale") or 1
+		local eye = height * (1 + (scale - 1) * Config.CAMERA_GROWTH)
+		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, eye, 0), focus, SCREEN_UP)
 	end
 end
 

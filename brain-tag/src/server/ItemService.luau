@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureService = require(script.Parent.FurnitureService)
@@ -19,6 +20,7 @@ local Parts = require(ReplicatedStorage.Shared.Parts)
 local Participants = require(script.Parent.Participants)
 local Projectiles = require(script.Parent.Projectiles)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 type Participant = Participants.Participant
@@ -50,7 +52,7 @@ local function attachHeld(p: Participant)
 	model.Name = "HeldItem"
 	local handle = model.PrimaryPart :: BasePart
 	local s = p.scale
-	local grip = CFrame.new(0.95 * s, 0.35 * s, -1.45 * s)
+	local grip = CharacterLook.grip(s)
 	model:PivotTo(root.CFrame * grip)
 	for _, part in model:GetDescendants() do
 		if part:IsA("BasePart") then
@@ -115,7 +117,7 @@ end
 
 function ItemService.scatter()
 	local count = rng:NextInteger(Config.GROUND_ITEMS_MIN, Config.GROUND_ITEMS_MAX)
-	local spots = table.clone(MapLayout.itemSpots)
+	local spots = table.clone(MapLayout.current().itemSpots)
 	local pool = Items.groundTable()
 	local total = 0
 	for _, entry in pool do
@@ -238,11 +240,22 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 			if item.breaksWalls then
 				breakWallAhead(p, aim, reach)
 			end
+			-- The blast also throws furniture around (heavier pieces less).
+			local center = root.Position + aim * (reach / 2)
+			for _, body in
+				FurnitureService.findInBox(
+					CFrame.lookAt(center, center + aim),
+					Vector3.new(reach * 0.9, 4, reach)
+				)
+			do
+				local away = Util.flatUnit(body.Position - root.Position) or aim
+				local mass = (Config.FURNITURE_MASS :: { [string]: number })[FurnitureService.weightOf(body) or "Medium"]
+					or 0.45
+				FurnitureService.shove(body, away * 28 * math.clamp(1 - mass / 1.6, 0.15, 1), 0.35)
+			end
 		else
 			Announcer.fx("Swing", { character = p.character, item = item.id })
-		end
-		if item.dragsFurniture then
-			p.dragging = true
+			p.dragging = true -- held click hooks furniture (see dragStep)
 		end
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
@@ -298,33 +311,42 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	use(p, item, direction)
 end
 
--- Swordfish: while the button is held, pull the nearest light piece in front.
+-- Holding click with a melee weapon hooks the nearest piece the weapon
+-- touches and pulls it toward you. Your own client does this instantly for
+-- pieces it drives; this server copy covers pieces the server is driving
+-- (for example during a tug of war at a barricade).
 local function dragStep()
 	for _, p in Participants.onTeam("Human") do
 		if p.dragging then
 			local item = Items.get(p.heldItem)
 			local root, humanoid = Participants.body(p)
-			if not item or not item.dragsFurniture or not root or not humanoid then
+			if not item or item.kind ~= "Melee" or not root or not humanoid then
 				p.dragging = false
 				continue
 			end
-			local reach = item.reach or 8
-			local center = root.Position + p.aim * (root.Size.X / 2 + reach / 2)
+			local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+			local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
+			local center = Vector3.new(hand.X, root.Position.Y, hand.Z) + p.aim * (reach / 2)
 			local box = CFrame.lookAt(center, center + p.aim)
 			local nearest: BasePart? = nil
 			local nearestDistance = math.huge
-			for _, body in FurnitureService.findInBox(box, Vector3.new(3, 4, reach)) do
-				if FurnitureService.weightOf(body) == "Light" then
-					local d = Util.flatDistance(body.Position, root.Position)
-					if d < nearestDistance then
-						nearest, nearestDistance = body, d
-					end
+			for _, body in FurnitureService.findInBox(box, Vector3.new(1, root.Size.Y + 1, reach)) do
+				local d = Util.flatDistance(body.Position, root.Position)
+				if d < nearestDistance then
+					nearest, nearestDistance = body, d
 				end
 			end
 			if nearest and nearestDistance > root.Size.X / 2 + 2 then
 				local toward = Util.flatUnit(root.Position - nearest.Position)
 				if toward then
-					FurnitureService.addPush(nearest, toward * humanoid.WalkSpeed * 0.7, nil)
+					local hook = if item.dragsFurniture then 1.5 else 1
+					local strength = RoundRules.pushStrength(p.scale) * hook
+					FurnitureService.addPush(
+						nearest,
+						toward * humanoid.WalkSpeed * Config.ITEM_DRAG_FACTOR,
+						strength,
+						nil
+					)
 				end
 			end
 		end

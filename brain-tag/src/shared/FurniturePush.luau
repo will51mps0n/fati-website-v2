@@ -1,0 +1,86 @@
+-- Shared pushing rules, so your client (for the pieces it drives) and the
+-- server (for bots and contested pieces) move furniture identically.
+--
+-- Each pusher adds a desired velocity weighted by their strength (size
+-- squared). A piece moves at the strength-weighted average of those
+-- velocities, slowed by its mass: equal pushes from opposite sides cancel,
+-- and a big player shoves what a small one can't. With nobody pushing, a
+-- piece stops dead: there is no sliding.
+
+local Config = require(script.Parent.Config)
+local RoundRules = require(script.Parent.RoundRules)
+
+local FurniturePush = {}
+
+FurniturePush.OWNER_ATTRIBUTE = "OwnerUserId" -- UserId of the client driving a piece (0 = server)
+
+export type Push = { weighted: Vector3, strength: number, torque: number }
+export type Pushes = { [BasePart]: Push }
+
+function FurniturePush.weightOf(body: BasePart): string
+	local model = body.Parent
+	local weight = model and model:GetAttribute("Weight")
+	return if typeof(weight) == "string" then weight else "Medium"
+end
+
+function FurniturePush.mass(body: BasePart): number
+	return (Config.FURNITURE_MASS :: { [string]: number })[FurniturePush.weightOf(body)] or 0.45
+end
+
+-- Box just in front of a mover heading `dir`, a little wider than the
+-- collision box so shoulder contact counts.
+function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): (CFrame, Vector3)
+	local depth = Config.PUSH_PROBE_DEPTH
+	local center = root.Position + dir * (root.Size.X / 2 + depth / 2 - 0.3)
+	local size = Vector3.new(Config.CHARACTER.BodyWidth * scale * 0.8, root.Size.Y + 1, depth)
+	return CFrame.lookAt(center, center + dir), size
+end
+
+-- Thin box along a held weapon, from the hand to the tip.
+function FurniturePush.itemProbe(root: BasePart, grip: CFrame, aim: Vector3, reach: number): (CFrame, Vector3)
+	local hand = (root.CFrame * grip).Position
+	local start = Vector3.new(hand.X, root.Position.Y, hand.Z)
+	local center = start + aim * (reach / 2)
+	return CFrame.lookAt(center, center + aim), Vector3.new(1, root.Size.Y + 1, reach)
+end
+
+function FurniturePush.add(pushes: Pushes, body: BasePart, desired: Vector3, strength: number, at: Vector3?)
+	local flat = Vector3.new(desired.X, 0, desired.Z)
+	local push = pushes[body]
+	if not push then
+		push = { weighted = Vector3.zero, strength = 0, torque = 0 }
+		pushes[body] = push
+	end
+	assert(push, "push")
+	push.weighted += flat * strength
+	push.strength += strength
+	if at then
+		-- Vertical part of (r x v): off-center pushes turn the piece a little.
+		local r = at - body.Position
+		push.torque += (r.Z * flat.X - r.X * flat.Z) * strength
+	end
+end
+
+-- The velocity and spin (radians/second about Y) a piece should have.
+function FurniturePush.resolve(body: BasePart, push: Push): (Vector3, number)
+	if push.strength <= 0 then
+		return Vector3.zero, 0
+	end
+	local fraction = RoundRules.pushFraction(FurniturePush.mass(body), push.strength)
+	local velocity = push.weighted / push.strength * fraction
+	if velocity.Magnitude > Config.FURNITURE_MAX_SPEED then
+		velocity = velocity.Unit * Config.FURNITURE_MAX_SPEED
+	end
+	local size = math.max(1, body.Size.Magnitude / 4)
+	local spin = math.clamp(push.torque / push.strength * Config.FURNITURE_SPIN * fraction / size, -1.5, 1.5)
+	return velocity, spin
+end
+
+-- How far an oriented piece reaches from its center along a flat direction.
+function FurniturePush.extent(body: BasePart, dir: Vector3): number
+	local cf = body.CFrame
+	return math.abs(dir:Dot(cf.RightVector)) * body.Size.X / 2
+		+ math.abs(dir:Dot(cf.LookVector)) * body.Size.Z / 2
+end
+
+return FurniturePush

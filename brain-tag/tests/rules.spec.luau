@@ -91,10 +91,27 @@ test("rewards stack additively", function()
 	)
 end)
 
-test("growth is capped", function()
-	expectEq(RoundRules.scaleForWins(0), 1, "start size")
-	expect(math.abs(RoundRules.scaleForWins(5) - 1.2) < 1e-9, "5 wins")
-	expectEq(RoundRules.scaleForWins(1000), Config.MAX_SCALE, "cap")
+test("size grows with score and is capped", function()
+	expectEq(RoundRules.scaleForScore(0), 1, "start size")
+	expect(RoundRules.scaleForScore(6340) > 1.6, "6,340 points is clearly bigger")
+	expect(RoundRules.scaleForScore(12855) >= 2.4, "top player is much bigger")
+	expectEq(RoundRules.scaleForScore(10 ^ 9), Config.MAX_SCALE, "cap")
+end)
+
+test("bigger players push heavier furniture", function()
+	local mass = Config.FURNITURE_MASS
+	local small = RoundRules.pushStrength(1)
+	local big = RoundRules.pushStrength(2)
+	expect(RoundRules.pushFraction(mass.Light, small) > 0.8, "light moves fast")
+	expect(RoundRules.pushFraction(mass.Heavy, small) > 0.25, "a newcomer can still move a couch")
+	expectEq(RoundRules.pushFraction(mass.Massive, small), 0, "a newcomer can't move a piano")
+	expect(RoundRules.pushFraction(mass.Massive, big) > 0.6, "a big player can")
+	expect(RoundRules.pushFraction(mass.Massive, small + small) > 0, "two newcomers together can")
+	expect(
+		RoundRules.pushFraction(mass.Heavy, big) > RoundRules.pushFraction(mass.Heavy, small),
+		"size helps"
+	)
+	expect(RoundRules.pushFraction(mass.Light, 100) <= Config.PUSH_MAX_FRACTION, "capped")
 end)
 
 test("zombies are a little faster", function()
@@ -165,7 +182,7 @@ test("skin data is consistent", function()
 			+ (if skin.product then 1 else 0)
 			+ (if skin.pass then 1 else 0)
 		expectEq(unlocks, 1, skin.id .. " has exactly one way to unlock")
-		expect(#skin.head == 6 and #skin.fist == 6, skin.id .. " colors are hex")
+		expect(#skin.shirt == 6 and #skin.hair == 6 and #skin.skin == 6, skin.id .. " colors are hex")
 	end
 	expectEq(defaults.Human, 1, "one default human skin")
 	expectEq(defaults.Zombie, 1, "one default zombie skin")

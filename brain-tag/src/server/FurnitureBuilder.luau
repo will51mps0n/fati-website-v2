@@ -155,8 +155,8 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:top(0, -c.d / 2 + 0.25, c.w, 0.5, 0.6, 0.7, "6B4226") -- headboard
 			c:top(0, 0.1, c.w - 0.6, c.d - 0.8, 0.2, 0.3, "F5F5F5") -- mattress
-			c:top(0, c.d * 0.18, c.w - 0.5, c.d * 0.6, 0.3, 0.35, "5B7FD6") -- blanket
-			c:top(0, c.d * 0.18 - c.d * 0.3 + 0.2, c.w - 0.5, 0.4, 0.32, 0.36, "4A6BC0") -- fold
+			c:top(0, c.d * 0.18, c.w - 0.5, c.d * 0.6, 0.3, 0.35, "2FA84F") -- blanket (green, like the original)
+			c:top(0, c.d * 0.18 - c.d * 0.3 + 0.2, c.w - 0.5, 0.4, 0.32, 0.36, "F2F2F2") -- folded sheet
 			for side = -1, 1, 2 do
 				c:top(side * 1.55, -c.d / 2 + 1.3, 2.6, 1.4, 0.45, 0.4, "FFFFFF") -- pillows
 			end
@@ -206,6 +206,117 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, 0, c.w, 0.08, 0.02, 0.04, "A88350") -- flap seam
 		end,
 	},
+	-- Wooden crate with a diagonal brace, like the original's.
+	Crate = {
+		body = "C8955A",
+		draw = function(c)
+			local t = 0.4
+			c:top(0, -c.d / 2 + t / 2, c.w, t, 0.03, 0.06, "8E5F33")
+			c:top(0, c.d / 2 - t / 2, c.w, t, 0.03, 0.06, "8E5F33")
+			c:top(-c.w / 2 + t / 2, 0, t, c.d, 0.03, 0.06, "8E5F33")
+			c:top(c.w / 2 - t / 2, 0, t, c.d, 0.03, 0.06, "8E5F33")
+			c:top(0, 0, (c.w - t) * 1.3, t, 0.03, 0.06, "8E5F33", math.rad(45))
+		end,
+	},
+	Barrel = {
+		body = "8B5A2B",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -0.05, c.h - 0.1, "8B5A2B")
+			c:disc(0, 0, c.w * 0.82, 0.01, 0.06, "A0703F")
+			c:disc(0, 0, c.w * 0.3, 0.03, 0.06, "6B4226")
+		end,
+	},
+	Wardrobe = {
+		body = "7A4A2A",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.5, c.d - 0.5, 0.02, 0.04, "8E5A32")
+			c:top(0, 0, 0.12, c.d - 0.5, 0.04, 0.06, "5A3520") -- door split
+		end,
+	},
+	Piano = {
+		body = "222222",
+		draw = function(c)
+			c:top(0, c.d / 2 - 0.55, c.w - 0.6, 0.9, 0.04, 0.06, "F4F4F4") -- keys
+			for i = 1, 9 do
+				local x = -c.w / 2 + 0.3 + (c.w - 0.6) * (i / 10)
+				c:top(x, c.d / 2 - 0.75, 0.18, 0.5, 0.07, 0.06, "111111") -- black keys
+			end
+			c:top(0, -0.6, c.w - 1.2, 1.6, 0.03, 0.06, "333333") -- lid
+		end,
+	},
+	PoolTable = {
+		body = "6B4226",
+		draw = function(c)
+			c:top(0, 0, c.w - 1.2, c.d - 1.2, 0.03, 0.06, "2E8B57") -- felt
+			for _, x in { -1, 0, 1 } do
+				for _, z in { -1, 1 } do
+					c:disc(x * (c.w / 2 - 0.6), z * (c.d / 2 - 0.6), 0.6, 0.06, 0.06, "111111") -- pockets
+				end
+			end
+			c:disc(-2, 0, 0.45, 0.1, 0.1, "FFFFFF")
+			c:disc(1.5, 0.4, 0.45, 0.1, 0.1, "E5484D")
+			c:disc(2, -0.5, 0.45, 0.1, 0.1, "F2C230")
+		end,
+	},
+	Car = {
+		body = "D9443B",
+		draw = function(c)
+			c:top(0, -0.6, c.w - 1.2, 5.2, 0.3, 0.4, "B8352E") -- roof
+			c:top(0, -3.6, c.w - 1.4, 1.2, 0.32, 0.4, "9FD8F5") -- windshield
+			c:top(0, 2.3, c.w - 1.4, 1.0, 0.32, 0.4, "9FD8F5") -- rear window
+			for _, x in { -1, 1 } do
+				c:top(x * (c.w / 2 - 0.9), -c.d / 2 + 0.3, 0.9, 0.4, 0.05, 0.06, "FFF3B0") -- headlights
+			end
+		end,
+	},
+	Dresser = {
+		body = "8E5A32",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.4, c.d - 0.4, 0.02, 0.04, "A0703F")
+			c:disc(-1, 0.3, 0.7, 0.04, 0.06, "D9E0E6") -- mirror stand
+			c:disc(1.2, 0.2, 0.5, 0.06, 0.06, "E8C26A")
+		end,
+	},
+	Washer = {
+		body = "E8ECEF",
+		draw = function(c)
+			c:disc(0, 0.2, 2.0, 0.03, 0.06, "B9C3CC") -- door rim
+			c:disc(0, 0.2, 1.5, 0.05, 0.06, "7FB8E0") -- window
+			c:top(0, -c.d / 2 + 0.3, c.w, 0.5, 0.06, 0.08, "C9D1D9") -- control strip
+		end,
+	},
+	Desk = {
+		body = "A0703F",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.4, c.d - 0.4, 0.02, 0.04, "B88A55")
+			c:top(-1.2, -0.3, 1.8, 1.2, 0.06, 0.08, "2B2B30") -- laptop
+			c:top(1.4, 0.2, 1.2, 0.9, 0.05, 0.06, "F4F4F4") -- papers
+		end,
+	},
+	TVStand = {
+		body = "5A3A22",
+		draw = function(c)
+			c:top(0, -0.2, c.w - 0.8, 0.6, 0.15, 0.2, "1C1C20") -- TV
+		end,
+	},
+	Bench = {
+		body = "A0703F",
+		draw = function(c)
+			for i = -1, 1 do
+				c:top(0, i * 0.6, c.w, 0.45, 0.02, 0.04, "B88A55") -- slats
+			end
+		end,
+	},
+	Lamp = {
+		body = "F2E2A0",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, 0.9, -c.h + 0.6, 0.3, "6B6B6B") -- base
+			c:disc(0, 0, c.w, -0.2, 0.6, "F2E2A0") -- shade
+			c:disc(0, 0, 0.5, 0.0, 0.06, "FFF8D6")
+		end,
+	},
 	Plant = {
 		body = "B5653A",
 		transparentBody = true,
@@ -232,12 +343,20 @@ local DESIGNS: { [string]: Design } = {
 			c:disc(0.9, -0.35, 0.6, 0.07, 0.06, "FFD54A") -- sun
 		end,
 	},
+	-- Green rug with a pale border and a fringe on the short ends, like the original.
 	Rug = {
-		body = "B5443B",
+		body = "A9C7B8",
 		draw = function(c)
-			c:top(0, 0, c.w - 1.0, c.d - 1.0, 0.02, 0.02, "D46A5E")
-			c:top(0, 0, c.w - 3.0, c.d - 3.0, 0.04, 0.02, "B5443B")
-			c:top(0, 0, c.w - 5.0, c.d - 5.0, 0.06, 0.02, "E8C26A")
+			c:top(0, 0, c.w - 0.8, c.d - 0.8, 0.02, 0.02, "2DB35A")
+			c:top(0, 0, c.w - 1.6, c.d - 1.6, 0.04, 0.02, "34BF62")
+			for i = 0, 11 do
+				local z = -c.d / 2 + 0.5 + (c.d - 1) * i / 11
+				for _, side in { -1, 1 } do
+					c:top(side * (c.w / 2 + 0.25), z, 0.5, 0.08, 0.0, 0.02, "C9D9CF")
+				end
+			end
+			c:disc(-c.w / 4, c.d / 5, 0.5, 0.06, 0.02, "1F8F45")
+			c:disc(c.w / 4, -c.d / 5, 0.4, 0.06, 0.02, "1F8F45")
 		end,
 	},
 }
@@ -324,6 +443,7 @@ function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance)
 	align.Parent = body
 
 	model:SetAttribute("Weight", spec.weight)
+	model:SetAttribute("OwnerUserId", 0)
 	model.Parent = parent
 	return { model = model, body = body, kind = spot.kind, weight = spec.weight, decor = false, home = home }
 end

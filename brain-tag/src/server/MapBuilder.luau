@@ -15,9 +15,10 @@ local H = MapLayout.HEIGHTS
 local WALL_HEIGHT = MapLayout.WALL_HEIGHT
 
 type Rect = MapLayout.Rect
+type Layout = MapLayout.Layout
 
 local mapFolder: Folder
-local wallsFolder: Folder
+local wallsFolder: Folder? = nil
 local brokenSegments: { Model } = {}
 
 local function sub(name: string, parent: Instance): Folder
@@ -72,15 +73,38 @@ end
 
 -- Ground, decorations, paths -----------------------------------------------------
 
-local function buildGround(parent: Instance)
-	-- Much bigger than the playable area so the camera never sees past it.
-	local ground = Parts.slab("Grass", -360, -360, 360, 360, H.Grass, 4, COLORS.Grass, parent)
+local function speckle(
+	r: Rect,
+	surfaceY: number,
+	color: string,
+	perArea: number,
+	rng: Random,
+	parent: Instance
+)
+	local count = math.floor((r.x2 - r.x1) * (r.z2 - r.z1) / perArea)
+	for _ = 1, count do
+		flatDisc(
+			"Speck",
+			rng:NextNumber(r.x1 + 0.4, r.x2 - 0.4),
+			rng:NextNumber(r.z1 + 0.4, r.z2 - 0.4),
+			rng:NextNumber(0.25, 0.5),
+			surfaceY,
+			color,
+			parent
+		)
+	end
+end
+
+local function buildGround(parent: Instance, layout: Layout)
+	-- Far bigger than the playable area so the camera never sees past it
+	-- (beyond the ground you would see the dark underside of the sky).
+	local ground = Parts.slab("Grass", -900, -900, 900, 900, H.Grass, 4, COLORS.Grass, parent)
 	ground.Name = "Ground"
 
 	local decor = sub("GrassDetails", parent)
 	local rng = Random.new(1337)
-	local blocked = MapLayout.noDecorRects()
-	local bounds = MapLayout.BOUNDS
+	local blocked = MapLayout.noDecorRects(layout)
+	local bounds = layout.bounds
 	local function isFree(x: number, z: number): boolean
 		for _, r in blocked do
 			if MapLayout.inRect(r, x, z, 1) then
@@ -129,27 +153,57 @@ local function buildGround(parent: Instance)
 	end
 
 	local paths = sub("Paths", parent)
-	for _, r in MapLayout.paths do
+	for _, r in layout.paths do
 		slab("Dirt", r, H.Dirt, COLORS.Dirt, paths)
-		local count = math.floor((r.x2 - r.x1) * (r.z2 - r.z1) / 14)
-		for _ = 1, count do
-			flatDisc(
-				"Speck",
-				rng:NextNumber(r.x1 + 0.4, r.x2 - 0.4),
-				rng:NextNumber(r.z1 + 0.4, r.z2 - 0.4),
-				rng:NextNumber(0.25, 0.5),
-				H.Dirt,
-				COLORS.DirtSpeck,
-				paths
-			)
-		end
+		speckle(r, H.Dirt, COLORS.DirtSpeck, 14, rng, paths)
+	end
+
+	local patios = sub("Patios", parent)
+	for _, r in layout.patios do
+		slab("Patio", r, H.Patio, COLORS.Concrete, patios)
+		speckle(r, H.Patio, COLORS.ConcreteSpeck, 30, rng, patios)
 	end
 end
 
-local function buildRoad(parent: Instance)
-	local road = MapLayout.road
+-- Pools: a white rim, blue water with light ripples, and an invisible wall
+-- so nobody walks across the water.
+local function buildPools(parent: Instance, layout: Layout)
+	for _, r in layout.pools do
+		local rim = { x1 = r.x1 - 1.5, z1 = r.z1 - 1.5, x2 = r.x2 + 1.5, z2 = r.z2 + 1.5 }
+		slab("PoolRim", rim, H.PoolRim, COLORS.PoolRim, parent)
+		slab("PoolWater", r, H.PoolRim + 0.02, COLORS.PoolWater, parent)
+		local z = r.z1 + 3
+		while z < r.z2 - 2 do
+			detail(
+				"Ripple",
+				(r.x1 + r.x2) / 2 + math.sin(z) * 4,
+				z,
+				(r.x2 - r.x1) * 0.6,
+				0.3,
+				H.PoolRim + 0.02,
+				"8FD3F5",
+				parent
+			)
+			z += 5
+		end
+		Parts.make({
+			name = "PoolWall",
+			size = Vector3.new(r.x2 - r.x1 + 2, 6, r.z2 - r.z1 + 2),
+			cframe = CFrame.new((r.x1 + r.x2) / 2, 3, (r.z1 + r.z2) / 2),
+			color = "000000",
+			transparency = 1,
+			canQuery = false,
+			parent = parent,
+		})
+	end
+end
+
+local function buildRoad(parent: Instance, layout: Layout)
+	local road = layout.road
+	local rng = Random.new(99)
 	for _, r in road.sidewalks do
 		slab("Sidewalk", r, H.Sidewalk, COLORS.Sidewalk, parent)
+		speckle(r, H.Sidewalk, COLORS.SidewalkSpeck, 40, rng, parent)
 	end
 	for _, r in road.asphalt do
 		slab("Asphalt", r, H.Asphalt, COLORS.Asphalt, parent)
@@ -160,10 +214,12 @@ local function buildRoad(parent: Instance)
 	for _, r in road.edgeLines do
 		slab("EdgeLine", r, H.RoadLine, COLORS.EdgeLine, parent)
 	end
-	slab("IslandWalk", road.islandWalk, H.IslandWalk, COLORS.Sidewalk, parent)
-	slab("IslandGrass", road.islandGrass, H.IslandGrass, COLORS.Grass, parent)
+	for _, island in layout.islands do
+		slab("IslandWalk", island.walk, H.IslandWalk, COLORS.Sidewalk, parent)
+		slab("IslandGrass", island.grass, H.IslandGrass, COLORS.Grass, parent)
+	end
 
-	for _, spawn in MapLayout.zombieSpawns do
+	for _, spawn in layout.zombieSpawns do
 		flatDisc("ZombiePit", spawn.x, spawn.z, 11, H.RoadLine, COLORS.ZombiePit, parent)
 		flatDisc("ZombiePitInner", spawn.x, spawn.z, 7, H.RoadLine + 0.03, "4A1C1C", parent)
 	end
@@ -176,14 +232,14 @@ local function brickFloor(r: Rect, parent: Instance)
 	local row = 0
 	local z = r.z1
 	while z < r.z2 - 0.5 do
-		local nextZ = math.min(z + 4, r.z2)
+		local nextZ = math.min(z + 2.5, r.z2)
 		if nextZ < r.z2 then
-			detail("Mortar", (r.x1 + r.x2) / 2, nextZ, r.x2 - r.x1, 0.25, H.Floor, COLORS.BrickMortar, parent)
+			detail("Mortar", (r.x1 + r.x2) / 2, nextZ, r.x2 - r.x1, 0.22, H.Floor, COLORS.BrickMortar, parent)
 		end
-		local x = r.x1 + (if row % 2 == 0 then 8 else 4)
+		local x = r.x1 + (if row % 2 == 0 then 5 else 2.5)
 		while x < r.x2 - 0.5 do
-			detail("Joint", x, (z + nextZ) / 2, 0.25, nextZ - z, H.Floor, COLORS.BrickMortar, parent)
-			x += 8
+			detail("Joint", x, (z + nextZ) / 2, 0.22, nextZ - z, H.Floor, COLORS.BrickMortar, parent)
+			x += 5
 		end
 		z = nextZ
 		row += 1
@@ -226,14 +282,21 @@ local function woodFloor(r: Rect, parent: Instance, rng: Random)
 	end
 end
 
-local function buildFloors(parent: Instance)
+local function concreteFloor(r: Rect, parent: Instance, rng: Random)
+	slab("Concrete", r, H.Floor, COLORS.Concrete, parent)
+	speckle(r, H.Floor, COLORS.ConcreteSpeck, 12, rng, parent)
+end
+
+local function buildFloors(parent: Instance, layout: Layout)
 	local rng = Random.new(7)
-	for _, room in MapLayout.rooms do
+	for _, room in layout.rooms do
 		local folder = sub(room.house .. " " .. room.name, parent)
 		if room.floor == "Brick" then
 			brickFloor(room.rect, folder)
 		elseif room.floor == "Tile" then
 			tileFloor(room.rect, folder)
+		elseif room.floor == "Concrete" then
+			concreteFloor(room.rect, folder, rng)
 		else
 			woodFloor(room.rect, folder, rng)
 		end
@@ -242,8 +305,8 @@ end
 
 -- Walls ----------------------------------------------------------------------------
 
-local function outlineColor(houseId: string): string
-	for _, house in MapLayout.houses do
+local function outlineColor(layout: Layout, houseId: string): string
+	for _, house in layout.houses do
 		if house.id == houseId then
 			return if house.outline == "Orange" then COLORS.OutlineOrange else COLORS.OutlineBlue
 		end
@@ -251,8 +314,8 @@ local function outlineColor(houseId: string): string
 	return COLORS.OutlineBlue
 end
 
-local function buildWalls(parent: Instance)
-	for i, piece in MapLayout.allWallPieces() do
+local function buildWalls(parent: Instance, layout: Layout)
+	for i, piece in MapLayout.allWallPieces(layout) do
 		local r = piece.rect
 		local sx, sz = r.x2 - r.x1, r.z2 - r.z1
 		local cx, cz = (r.x1 + r.x2) / 2, (r.z1 + r.z2) / 2
@@ -272,7 +335,7 @@ local function buildWalls(parent: Instance)
 			name = "Outline",
 			size = Vector3.new(sx + 1, WALL_HEIGHT - 0.1, sz + 1),
 			cframe = CFrame.new(cx, (WALL_HEIGHT - 0.1) / 2, cz),
-			color = outlineColor(piece.house),
+			color = outlineColor(layout, piece.house),
 			canCollide = false, -- keeps doorways at their designed width
 			canQuery = false,
 			parent = segment,
@@ -297,8 +360,8 @@ end
 
 -- Bushes and boundary -------------------------------------------------------------
 
-local function buildBushes(parent: Instance)
-	for _, bush in MapLayout.bushes do
+local function buildBushes(parent: Instance, layout: Layout)
+	for _, bush in layout.bushes do
 		local base = if bush.color == "Orange" then COLORS.BushOrange else COLORS.BushGreen
 		local light = if bush.color == "Orange" then "F2AC62" else "5CBF67"
 		local model = Instance.new("Model")
@@ -308,6 +371,18 @@ local function buildBushes(parent: Instance)
 			{ math.cos(0.7) * bush.r * 0.6, math.sin(0.7) * bush.r * 0.6, bush.r * 1.4 },
 			{ math.cos(3.5) * bush.r * 0.6, math.sin(3.5) * bush.r * 0.6, bush.r * 1.3 },
 		}
+		local outline = if bush.color == "Orange" then "B5651E" else "2E7D3E"
+		for _, blob in blobs do
+			-- A darker, slightly bigger, slightly lower disc draws the outline.
+			Parts.disc(
+				"Outline",
+				Vector3.new(bush.x + blob[1], 1.95, bush.z + blob[2]),
+				blob[3] + 0.7,
+				3.9,
+				outline,
+				model
+			)
+		end
 		for _, blob in blobs do
 			Parts.disc("Leaves", Vector3.new(bush.x + blob[1], 2, bush.z + blob[2]), blob[3], 4, base, model)
 			local highlight = Parts.disc(
@@ -325,8 +400,8 @@ local function buildBushes(parent: Instance)
 	end
 end
 
-local function buildBoundary(parent: Instance)
-	local b = MapLayout.BOUNDS
+local function buildBoundary(parent: Instance, layout: Layout)
+	local b = layout.bounds
 	local height, t = 40, 4
 	local function wall(cx: number, cz: number, sx: number, sz: number)
 		Parts.make({
@@ -361,28 +436,43 @@ local function setPhysics(folder: Instance, properties: PhysicalProperties)
 	end
 end
 
-function MapBuilder.build()
+-- Builds `layout`, replacing whatever map was there. The Walls folder is
+-- kept (only emptied) so raycast filters that point at it stay valid.
+function MapBuilder.build(layout: Layout)
 	mapFolder = workspace:WaitForChild("Map") :: Folder
-	mapFolder:ClearAllChildren()
+	local walls = wallsFolder or sub("Walls", mapFolder)
+	wallsFolder = walls
+	for _, child in mapFolder:GetChildren() do
+		if child ~= walls then
+			child:Destroy()
+		end
+	end
+	walls:ClearAllChildren()
+	table.clear(brokenSegments)
+
 	local ground = sub("Ground", mapFolder)
-	buildGround(ground)
+	buildGround(ground, layout)
 	local road = sub("Road", mapFolder)
-	buildRoad(road)
+	buildRoad(road, layout)
+	local pools = sub("Pools", mapFolder)
+	buildPools(pools, layout)
 	local floors = sub("Floors", mapFolder)
-	buildFloors(floors)
-	wallsFolder = sub("Walls", mapFolder)
-	buildWalls(wallsFolder)
+	buildFloors(floors, layout)
+	buildWalls(walls, layout)
 	local bushes = sub("Bushes", mapFolder)
-	buildBushes(bushes)
-	buildBoundary(sub("Boundary", mapFolder))
+	buildBushes(bushes, layout)
+	buildBoundary(sub("Boundary", mapFolder), layout)
 	for _, folder in { ground, road, floors } do
 		setPhysics(folder, SLIPPERY)
 	end
-	setPhysics(wallsFolder, GRIPPY)
+	setPhysics(walls, GRIPPY)
 	setPhysics(bushes, GRIPPY)
+	setPhysics(pools, GRIPPY)
+	mapFolder:SetAttribute("MapName", layout.name)
 end
 
 function MapBuilder.wallsFolder(): Folder
+	assert(wallsFolder, "MapBuilder.build has not run yet")
 	return wallsFolder
 end
 

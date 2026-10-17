@@ -3,7 +3,7 @@
 -- 0 a piece is `w` wide along X and `d` deep along Z, with its back toward -Z
 -- (top of the screen) and its front facing +Z.
 
-export type Weight = "Light" | "Medium" | "Heavy"
+export type Weight = "Light" | "Medium" | "Heavy" | "Massive"
 
 export type Spec = {
 	w: number,
@@ -30,6 +30,19 @@ local Specs: { [string]: Spec } = {
 	Plant = { w = 2.2, d = 2.2, h = 3, weight = "Light" },
 	Picture = { w = 4, d = 3, h = 2.2, weight = "Light" },
 	Rug = { w = 12, d = 8, h = 0.06, weight = "Light", decor = true },
+	-- Added after looking at the original: more, and heavier, things to move.
+	Wardrobe = { w = 6, d = 2.6, h = 8, weight = "Massive" },
+	Piano = { w = 8, d = 4.5, h = 4, weight = "Massive" },
+	PoolTable = { w = 10, d = 6, h = 3, weight = "Massive" },
+	Car = { w = 6, d = 12, h = 4, weight = "Massive" },
+	Dresser = { w = 5, d = 2.4, h = 4, weight = "Heavy" },
+	Washer = { w = 3, d = 3, h = 3.5, weight = "Heavy" },
+	Desk = { w = 6, d = 3, h = 3, weight = "Medium" },
+	TVStand = { w = 6, d = 2, h = 2.4, weight = "Medium" },
+	Crate = { w = 3.4, d = 3.4, h = 3.4, weight = "Medium" },
+	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
+	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
+	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },
 }
 
 local FurnitureSpecs = { specs = Specs }

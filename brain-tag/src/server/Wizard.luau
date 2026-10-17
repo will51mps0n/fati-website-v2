@@ -22,13 +22,16 @@ local function build(at: Vector3): Model
 	local function disc(name: string, offset: Vector3, diameter: number, height: number, color: string): Part
 		return Parts.disc(name, at + offset, diameter, height, color, m)
 	end
-	local robe = disc("Robe", Vector3.new(0, 2, 0), 3.8, 4, "6C3FB5")
-	disc("RobeTrim", Vector3.new(0, 4.03, 0), 3.0, 0.06, "8E5CD9")
-	disc("HatBrim", Vector3.new(0, 4.6, 0), 3.3, 0.3, "4B2A86")
-	disc("HatMid", Vector3.new(0, 5.1, 0), 2.1, 0.7, "5A33A0")
-	disc("HatTip", Vector3.new(0, 5.6, 0), 0.9, 0.3, "6C3FB5")
+	-- Like the original: a blue robe, a big brown pointy hat, a grey beard.
+	disc("RobeOutline", Vector3.new(0, 1.95, 0), 4.3, 3.9, "2C5866")
+	local robe = disc("Robe", Vector3.new(0, 2, 0), 3.9, 4, "4F8FA3")
+	disc("RobeTrim", Vector3.new(0, 4.03, 0), 3.1, 0.06, "6FB0C2")
+	disc("HatBrimOutline", Vector3.new(0, 4.55, 0), 3.7, 0.3, "4A2C17")
+	disc("HatBrim", Vector3.new(0, 4.6, 0), 3.4, 0.3, "6B4226")
+	disc("HatMid", Vector3.new(0, 5.1, 0), 2.2, 0.7, "8B5A2B")
+	disc("HatTip", Vector3.new(0, 5.6, 0), 0.9, 0.3, "A0703F")
 	disc("Star", Vector3.new(0.5, 5.5, 0.3), 0.5, 0.25, "FFD54A")
-	disc("Beard", Vector3.new(0, 4.3, -1.5), 1.2, 0.3, "F2F2F2")
+	disc("Beard", Vector3.new(0, 4.3, -1.6), 1.4, 0.3, "B8BEC4")
 	-- Staff with a glowing orb.
 	Parts.make({
 		name = "Staff",
@@ -79,7 +82,8 @@ function Wizard.arrive()
 	if model then
 		return
 	end
-	local spot = MapLayout.wizardSpots[rng:NextInteger(1, #MapLayout.wizardSpots)]
+	local spots = MapLayout.current().wizardSpots
+	local spot = spots[rng:NextInteger(1, #spots)]
 	local m = build(Vector3.new(spot.x, 0, spot.z))
 	m.Parent = workspace
 	model = m

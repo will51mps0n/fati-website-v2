@@ -103,7 +103,7 @@ local function updateNameTag(p: Participant)
 	assert(tag, "tag")
 	tag.Adornee = head
 	-- World offset toward -Z = "up" on the top-down screen.
-	tag.StudsOffsetWorldSpace = Vector3.new(0, 1, -(C.HeadDiameter * 0.5 + 1.1) * p.scale)
+	tag.StudsOffsetWorldSpace = Vector3.new(0, 1, -(C.BodyWidth * 0.5 + 0.7) * p.scale)
 	tag:SetAttribute("ParticipantId", p.id)
 	local label = tag:FindFirstChild("Label") :: TextLabel
 	label.Text = (if p.passes.VIP then "[VIP] " else "") .. p.name

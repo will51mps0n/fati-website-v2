@@ -1,7 +1,8 @@
--- The top-down "blob" look: a flat round head with two round fists in front,
--- plus an optional skin hat. Used on live characters (server) and for skin
--- previews in the shop (client). Front is -Z of the root, like every Roblox
--- character.
+-- The top-down person from the original: a rounded body in the shirt color
+-- with a dark outline, a round head (hair on top) with a skin-colored face
+-- crescent at the front, and a soft shadow. Zombies add two arms reaching
+-- forward. Used on live characters (server) and skin previews (client).
+-- Front is -Z of the root, like every Roblox character.
 
 local Config = require(script.Parent.Config)
 local Parts = require(script.Parent.Parts)
@@ -10,6 +11,14 @@ local Skins = require(script.Parent.Skins)
 local C = Config.CHARACTER
 
 local CharacterLook = {}
+
+local UP = Parts.UPRIGHT
+
+local function darker(hex: string, amount: number?): Color3
+	local c = Color3.fromHex(hex)
+	local k = amount or 0.62
+	return Color3.new(c.R * k, c.G * k, c.B * k)
+end
 
 local function attach(root: BasePart, part: BasePart, offset: CFrame, model: Instance)
 	Parts.makeVisual(part)
@@ -23,7 +32,7 @@ local function attach(root: BasePart, part: BasePart, offset: CFrame, model: Ins
 	weld.Parent = part
 end
 
-local function disc(name: string, diameter: number, height: number, color: string): Part
+local function disc(name: string, diameter: number, height: number, color: string | Color3): Part
 	return Parts.make({
 		name = name,
 		shape = Enum.PartType.Cylinder,
@@ -34,7 +43,7 @@ local function disc(name: string, diameter: number, height: number, color: strin
 	})
 end
 
-local function block(name: string, size: Vector3, color: string): Part
+local function block(name: string, size: Vector3, color: string | Color3): Part
 	return Parts.make({ name = name, size = size, cframe = CFrame.identity, color = color, anchored = false })
 end
 
@@ -49,109 +58,132 @@ local function ball(name: string, diameter: number, color: string): Part
 	})
 end
 
-local UP = Parts.UPRIGHT
+-- A flat rounded rectangle (w along X, d along Z) whose top is at `top`.
+local function roundedRect(
+	model: Model,
+	root: BasePart,
+	name: string,
+	cx: number,
+	cz: number,
+	w: number,
+	d: number,
+	r: number,
+	top: number,
+	thickness: number,
+	color: string | Color3
+)
+	local y = top - thickness / 2
+	attach(root, block(name, Vector3.new(w, thickness, d - 2 * r), color), CFrame.new(cx, y, cz), model)
+	attach(root, block(name, Vector3.new(w - 2 * r, thickness, d), color), CFrame.new(cx, y, cz), model)
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local corner = disc(name, r * 2, thickness, color)
+			attach(root, corner, CFrame.new(cx + sx * (w / 2 - r), y, cz + sz * (d / 2 - r)) * UP, model)
+		end
+	end
+end
 
--- Hats are drawn on top of the head. `s` is the character scale; the head's
--- top surface is at y = s above the root center.
+-- Hats sit on the head. `s` is the character scale; the hair's top surface
+-- is at y = 0.96 * s above the root center and the head is 1.9 * s wide (the
+-- caller passes s already scaled for the real head size).
 type HatBuilder = (model: Model, root: BasePart, s: number) -> ()
 
 local HATS: { [string]: HatBuilder } = {
 	ChefHat = function(model, root, s)
-		attach(root, disc("Hat", 2.6 * s, 0.3 * s, "D8DCE2"), CFrame.new(0, 1.1 * s, 0) * UP, model)
-		attach(root, disc("Hat", 2.2 * s, 0.6 * s, "FFFFFF"), CFrame.new(0, 1.45 * s, 0.1 * s) * UP, model)
+		attach(root, disc("Hat", 1.75 * s, 0.25 * s, "D8DCE2"), CFrame.new(0, 0.95 * s, 0.05 * s) * UP, model)
+		attach(root, disc("Hat", 1.45 * s, 0.5 * s, "FFFFFF"), CFrame.new(0, 1.15 * s, 0.12 * s) * UP, model)
 	end,
 	Headband = function(model, root, s)
-		attach(root, disc("Hat", 3.3 * s, 0.35 * s, "D7263D"), CFrame.new(0, 0.7 * s, 0) * UP, model)
+		attach(root, disc("Hat", 2.08 * s, 0.25 * s, "D7263D"), CFrame.new(0, 0.72 * s, 0) * UP, model)
 		for side = -1, 1, 2 do
-			local tail = block("Hat", Vector3.new(0.3, 0.2, 1.3) * s, "D7263D")
+			local tail = block("Hat", Vector3.new(0.22, 0.15, 0.9) * s, "D7263D")
 			attach(
 				root,
 				tail,
-				CFrame.new(side * 0.25 * s, 0.75 * s, 1.95 * s) * CFrame.Angles(0, side * 0.35, 0),
+				CFrame.new(side * 0.18 * s, 0.75 * s, 1.3 * s) * CFrame.Angles(0, side * 0.35, 0),
 				model
 			)
 		end
 	end,
 	Stem = function(model, root, s)
-		for _, x in { -0.6, 0.6 } do
+		for _, x in { -0.35, 0.35 } do
 			attach(
 				root,
-				block("Hat", Vector3.new(0.16, 0.05, 2.4) * s, "C86412"),
-				CFrame.new(x * s, 1.02 * s, 0),
+				block("Hat", Vector3.new(0.12, 0.04, 1.2) * s, "C86412"),
+				CFrame.new(x * s, 0.98 * s, 0.08 * s),
 				model
 			)
 		end
-		attach(root, disc("Hat", 0.55 * s, 0.6 * s, "3E8E3A"), CFrame.new(0, 1.25 * s, 0) * UP, model)
+		attach(root, disc("Hat", 0.35 * s, 0.4 * s, "3E8E3A"), CFrame.new(0, 1.12 * s, 0.08 * s) * UP, model)
 		attach(
 			root,
-			block("Hat", Vector3.new(0.7, 0.08, 0.4) * s, "4CAF50"),
-			CFrame.new(0.45 * s, 1.3 * s, 0.1 * s),
+			block("Hat", Vector3.new(0.5, 0.06, 0.28) * s, "4CAF50"),
+			CFrame.new(0.3 * s, 1.14 * s, 0.15 * s),
 			model
 		)
 	end,
 	Bill = function(model, root, s)
 		attach(
 			root,
-			block("Hat", Vector3.new(1.3, 0.25, 1.2) * s, "F28C1C"),
-			CFrame.new(0, 0.6 * s, -1.75 * s),
+			block("Hat", Vector3.new(0.9, 0.2, 0.8) * s, "F28C1C"),
+			CFrame.new(0, 0.85 * s, -1.15 * s),
 			model
 		)
 	end,
 	Visor = function(model, root, s)
-		attach(root, disc("Hat", 1.7 * s, 0.2 * s, "7FC8F8"), CFrame.new(0, 1.05 * s, -0.45 * s) * UP, model)
-		attach(root, ball("Hat", 0.45 * s, "9AA3AE"), CFrame.new(0.75 * s, 1.1 * s, 0.6 * s), model)
+		attach(root, disc("Hat", 1.2 * s, 0.12 * s, "7FC8F8"), CFrame.new(0, 0.98 * s, -0.3 * s) * UP, model)
+		attach(root, ball("Hat", 0.32 * s, "9AA3AE"), CFrame.new(0.5 * s, 1.0 * s, 0.45 * s), model)
 	end,
 	Crown = function(model, root, s)
-		attach(root, disc("Hat", 2.0 * s, 0.4 * s, "F5C542"), CFrame.new(0, 1.15 * s, 0) * UP, model)
-		attach(root, disc("Hat", 1.5 * s, 0.42 * s, "B3242F"), CFrame.new(0, 1.16 * s, 0) * UP, model)
+		attach(root, disc("Hat", 1.3 * s, 0.35 * s, "F5C542"), CFrame.new(0, 1.08 * s, 0.08 * s) * UP, model)
+		attach(root, disc("Hat", 1.0 * s, 0.37 * s, "B3242F"), CFrame.new(0, 1.09 * s, 0.08 * s) * UP, model)
 		for i = 0, 4 do
 			local angle = i / 5 * math.pi * 2
-			local point = ball("Hat", 0.42 * s, "F5C542")
+			local point = ball("Hat", 0.3 * s, "F5C542")
 			attach(
 				root,
 				point,
-				CFrame.new(math.sin(angle) * 0.95 * s, 1.4 * s, math.cos(angle) * 0.95 * s),
+				CFrame.new(math.sin(angle) * 0.62 * s, 1.3 * s, 0.08 * s + math.cos(angle) * 0.62 * s),
 				model
 			)
 		end
 	end,
 	Spots = function(model, root, s)
-		for _, spot in { { -0.5, -0.3, 0.6 }, { 0.6, 0.2, 0.45 }, { -0.1, 0.7, 0.35 } } do
-			attach(
-				root,
-				disc("Hat", spot[3] * s, 0.05 * s, "5E9E22"),
-				CFrame.new(spot[1] * s, 1.02 * s, spot[2] * s) * UP,
-				model
-			)
+		for _, spot in { { -0.35, 0.1, 0.4 }, { 0.35, 0.35, 0.3 }, { 0, 0.55, 0.25 } } do
+			local part = disc("Hat", spot[3] * s, 0.04 * s, "3E7F12")
+			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
 		end
 	end,
 	Frost = function(model, root, s)
-		for _, spot in { { -0.6, -0.2, 0.55 }, { 0.5, 0.5, 0.4 }, { 0.3, -0.7, 0.35 }, { -0.2, 0.6, 0.3 } } do
-			attach(
-				root,
-				disc("Hat", spot[3] * s, 0.05 * s, "F2FBFF"),
-				CFrame.new(spot[1] * s, 1.02 * s, spot[2] * s) * UP,
-				model
-			)
+		for _, spot in { { -0.4, 0.05, 0.38 }, { 0.3, 0.4, 0.3 }, { 0.25, -0.25, 0.25 } } do
+			local part = disc("Hat", spot[3] * s, 0.04 * s, "FFFFFF")
+			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
 		end
 	end,
 	Bandage = function(model, root, s)
 		for i, angle in { -0.5, 0.15, 0.8 } do
-			local strip = block("Hat", Vector3.new(2.5, 0.05, 0.38) * s, "F4EFE1")
+			local strip = block("Hat", Vector3.new(1.5, 0.04, 0.24) * s, "F7F2E4")
 			attach(
 				root,
 				strip,
-				CFrame.new(0, (1.01 + i * 0.01) * s, (i - 2) * 0.5 * s) * CFrame.Angles(0, angle, 0),
+				CFrame.new(0, (0.97 + i * 0.01) * s, (i - 2) * 0.35 * s + 0.1 * s)
+					* CFrame.Angles(0, angle, 0),
 				model
 			)
 		end
 	end,
 }
 
--- Builds (or rebuilds) the head, fists and hat on `model`. Keeps an existing
--- part named "Head" so anything attached to it (name tag, chat bubbles) survives.
+-- Where the right hand holds an item, relative to the root (front is -Z).
+function CharacterLook.grip(scale: number): CFrame
+	return CFrame.new(1.2 * scale, 0.6 * scale, -0.95 * scale)
+end
+
+-- Builds (or rebuilds) the look on `model`. Keeps an existing part named
+-- "Head" so anything attached to it (name tag, chat bubbles) survives.
 function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team: Skins.Team, scale: number)
 	local skin = Skins.resolve(skinId, team)
+	local s = scale
 
 	for _, child in model:GetChildren() do
 		if child:GetAttribute("LookPart") and child.Name ~= "Head" then
@@ -159,6 +191,51 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		end
 	end
 
+	-- Soft shadow on the floor under the character.
+	local shadow = disc("Shadow", 3.1 * s, 0.05, Color3.new(0, 0, 0))
+	shadow.Transparency = 0.72
+	attach(root, shadow, CFrame.new(0, -(C.RootHeight / 2 + C.HipHeight) * s + 0.08, 0) * UP, model)
+
+	-- Body: outline first (bigger, lower), then the shirt on top.
+	local w, d, r, o = C.BodyWidth * s, C.BodyDepth * s, 0.7 * s, 0.14 * s
+	roundedRect(
+		model,
+		root,
+		"BodyOutline",
+		0,
+		0.1 * s,
+		w + 2 * o,
+		d + 2 * o,
+		r + o,
+		0.42 * s,
+		0.6 * s,
+		darker(skin.shirt)
+	)
+	roundedRect(model, root, "Body", 0, 0.1 * s, w, d, r, 0.5 * s, 0.6 * s, skin.shirt)
+
+	if team == "Zombie" then
+		-- Arms reaching forward, drawn over the body.
+		for side = -1, 1, 2 do
+			local x, z = side * 0.85 * s, -1.45 * s
+			roundedRect(
+				model,
+				root,
+				"ArmOutline",
+				x,
+				z,
+				0.86 * s,
+				2.0 * s,
+				0.43 * s,
+				0.62 * s,
+				0.3 * s,
+				darker(skin.skin)
+			)
+			roundedRect(model, root, "Arm", x, z, 0.62 * s, 1.76 * s, 0.31 * s, 0.68 * s, 0.3 * s, skin.skin)
+		end
+	end
+
+	-- Head: hair-colored disc (kept as "Head"), with the face crescent at the
+	-- front made by a skin disc partly covered by a hair disc set back.
 	local head = model:FindFirstChild("Head") :: Part?
 	if head then
 		local oldWeld = head:FindFirstChild("Weld")
@@ -169,28 +246,28 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		head = Instance.new("Part")
 	end
 	assert(head, "head")
+	local hd = C.HeadDiameter * s
 	head.Name = "Head"
 	head.Shape = Enum.PartType.Cylinder
-	head.Size = Vector3.new(C.HeadThickness, C.HeadDiameter, C.HeadDiameter) * scale
-	head.Color = Color3.fromHex(skin.head)
+	head.Size = Vector3.new(0.3 * s, hd, hd)
+	head.Color = Color3.fromHex(skin.hair)
 	head.Material = Enum.Material.SmoothPlastic
 	head.CastShadow = false
 	head.TopSurface = Enum.SurfaceType.Smooth
 	head.BottomSurface = Enum.SurfaceType.Smooth
-	attach(root, head, CFrame.new(0, 0.5 * scale, 0) * UP, model)
-
-	local zombie = team == "Zombie"
-	local fx = if zombie then 0.75 else 0.95
-	local fz = if zombie then -2.05 else -1.45
-	for side = -1, 1, 2 do
-		local fist = ball("Fist", C.FistDiameter * scale, skin.fist)
-		fist.Name = if side < 0 then "LeftFist" else "RightFist"
-		attach(root, fist, CFrame.new(side * fx * scale, 0.1 * scale, fz * scale), model)
-	end
+	attach(root, head, CFrame.new(0, 0.75 * s, 0) * UP, model)
+	attach(
+		root,
+		disc("HeadOutline", hd + 0.1 * s, 0.3 * s, darker(skin.hair, 0.8)),
+		CFrame.new(0, 0.72 * s, 0) * UP,
+		model
+	)
+	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
+	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 
 	local hat = skin.hat and HATS[skin.hat]
 	if hat then
-		hat(model, root, scale)
+		hat(model, root, s * C.HeadDiameter / 1.9) -- hats were sized for a 1.9-stud head
 	end
 end
 
@@ -211,6 +288,9 @@ function CharacterLook.preview(skinId: string, team: Skins.Team): Model
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
+			if d.Name == "Shadow" then
+				d:Destroy()
+			end
 		end
 	end
 	return model

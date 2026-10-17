@@ -28,6 +28,11 @@ function InputController.useStart()
 	useRemote:FireServer("start", MovementController.aim())
 end
 
+-- True while the use button is held (hooking furniture with a weapon).
+function InputController.isUsing(): boolean
+	return using
+end
+
 function InputController.useStop()
 	if using then
 		using = false

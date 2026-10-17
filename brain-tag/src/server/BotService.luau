@@ -38,13 +38,14 @@ local function nearest(me: Participant, from: Vector3, team: string): (Vector3?,
 end
 
 local function randomInside(rng: Random): Vector3
-	local list = if rng:NextNumber() < 0.6 then MapLayout.itemSpots else MapLayout.humanSpawns
+	local layout = MapLayout.current()
+	local list = if rng:NextNumber() < 0.6 then layout.itemSpots else layout.humanSpawns
 	local spot = list[rng:NextInteger(1, #list)]
 	return Vector3.new(spot.x, 2, spot.z)
 end
 
 local function inBounds(v: Vector3): boolean
-	return MapLayout.inRect(MapLayout.BOUNDS, v.X, v.Z, -4)
+	return MapLayout.inRect(MapLayout.current().bounds, v.X, v.Z, -4)
 end
 
 local function brain(p: Participant, rng: Random)

@@ -1,6 +1,6 @@
 """Draw MapLayout.luau as a top-down PNG, roughly how the game camera sees it.
 
-Usage: python3 tools/render_map.py [path/to/luau] [out.png]
+Usage: python3 tools/render_map.py [path/to/luau] [out.png] [MapName]
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from luau_bundle import ROOT, bundle  # noqa: E402
 DUMP = """
 local MapLayout = require(script.Parent.MapLayout)
 local FurnitureSpecs = require(script.Parent.FurnitureSpecs)
+local layout = MapLayout.get("__MAP__")
 
 local function encode(value)
 	local t = typeof(value)
@@ -49,26 +50,29 @@ local function encode(value)
 end
 
 local furniture = {}
-for _, spot in MapLayout.furniture do
+for _, spot in layout.furniture do
 	local w, d = FurnitureSpecs.footprint(spot.kind, spot.rot)
 	local spec = FurnitureSpecs.get(spot.kind)
 	table.insert(furniture, { kind = spot.kind, rect = MapLayout.footprint(spot, w, d), weight = spec.weight, rot = spot.rot, x = spot.x, z = spot.z })
 end
 
 print(encode({
-	bounds = MapLayout.BOUNDS,
+	bounds = layout.bounds,
 	colors = MapLayout.COLORS,
-	road = MapLayout.road,
-	paths = MapLayout.paths,
-	bushes = MapLayout.bushes,
-	houses = MapLayout.houses,
-	rooms = MapLayout.rooms,
-	pieces = MapLayout.allWallPieces(),
+	road = layout.road,
+	islands = layout.islands,
+	paths = layout.paths,
+	patios = layout.patios,
+	pools = layout.pools,
+	bushes = layout.bushes,
+	houses = layout.houses,
+	rooms = layout.rooms,
+	pieces = MapLayout.allWallPieces(layout),
 	furniture = furniture,
-	humanSpawns = MapLayout.humanSpawns,
-	zombieSpawns = MapLayout.zombieSpawns,
-	itemSpots = MapLayout.itemSpots,
-	wizardSpots = MapLayout.wizardSpots,
+	humanSpawns = layout.humanSpawns,
+	zombieSpawns = layout.zombieSpawns,
+	itemSpots = layout.itemSpots,
+	wizardSpots = layout.wizardSpots,
 }))
 """
 
@@ -88,7 +92,19 @@ FURNITURE_COLORS = {
     "Box": "C9A06A",
     "Plant": "B5653A",
     "Picture": "D4A93A",
-    "Rug": "B5443B",
+    "Rug": "3FAE5C",
+    "Wardrobe": "7A4A2A",
+    "Piano": "222222",
+    "PoolTable": "2E8B57",
+    "Car": "D9443B",
+    "Dresser": "8E5A32",
+    "Washer": "E8ECEF",
+    "Desk": "A0703F",
+    "TVStand": "5A3A22",
+    "Crate": "C8955A",
+    "Barrel": "8B5A2B",
+    "Bench": "A0703F",
+    "Lamp": "F2E2A0",
 }
 
 
@@ -99,11 +115,12 @@ def hex_color(value: str) -> tuple[int, int, int]:
 def main() -> int:
     luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau")
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "tools" / "out" / "map.png"
+    map_name = sys.argv[3] if len(sys.argv) > 3 else "Neighborhood"
     if not luau:
         print("luau not found")
         return 2
     with tempfile.NamedTemporaryFile("w", suffix=".luau", delete=False) as handle:
-        handle.write(bundle(DUMP))
+        handle.write(bundle(DUMP.replace("__MAP__", map_name)))
         script = handle.name
     result = subprocess.run([luau, script], capture_output=True, text=True, check=True)
     data = json.loads(result.stdout)
@@ -130,6 +147,8 @@ def main() -> int:
 
     for r in data["paths"]:
         box(r, c["Dirt"])
+    for r in data["patios"]:
+        box(r, c["Concrete"])
     for r in data["road"]["sidewalks"]:
         box(r, c["Sidewalk"])
     for r in data["road"]["asphalt"]:
@@ -138,10 +157,14 @@ def main() -> int:
         box(r, c["CenterLine"])
     for r in data["road"]["edgeLines"]:
         box(r, c["EdgeLine"])
-    box(data["road"]["islandWalk"], c["Sidewalk"])
-    box(data["road"]["islandGrass"], c["Grass"])
+    for island in data["islands"]:
+        box(island["walk"], c["Sidewalk"])
+        box(island["grass"], c["Grass"])
+    for r in data["pools"]:
+        box({"x1": r["x1"] - 1.5, "z1": r["z1"] - 1.5, "x2": r["x2"] + 1.5, "z2": r["z2"] + 1.5}, c["PoolRim"])
+        box(r, c["PoolWater"])
 
-    floor_colors = {"Brick": c["Brick"], "Tile": c["Tile"], "Wood": c["Wood"]}
+    floor_colors = {"Brick": c["Brick"], "Tile": c["Tile"], "Wood": c["Wood"], "Concrete": c["Concrete"]}
     for room in data["rooms"]:
         box(room["rect"], floor_colors[room["floor"]])
 

@@ -9,11 +9,15 @@ The art is original (simple parts and colors in a flat cartoon style). The name
 "Brain Tag" is used in-game; the original name, logo and sprites belong to their
 owner.
 
-![Top-down map preview](docs/map-preview.png)
+Two maps take turns every two rounds:
 
-*Map preview drawn from `src/shared/MapLayout.luau` (yellow dots are item
-spots, white dots human spawns, purple dots wizard spots, dark red circles the
-zombie spawns).*
+| The Neighborhood | The Mansion |
+| --- | --- |
+| ![Neighborhood](docs/map-neighborhood.png) | ![Mansion](docs/map-mansion.png) |
+
+*Previews drawn from `src/shared/MapLayout.luau` (yellow dots are item spots,
+white dots human spawns, purple dots wizard spots, dark red circles the zombie
+spawns).*
 
 ## Getting it into Roblox Studio
 
@@ -42,10 +46,14 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 ### What to try in the first round
 
 1. Read the quick-start card, click **Got it**.
-2. Walk into a couch: it should slide, slower than you walk, and stop when you stop.
+2. Walk into a couch: it should move with you, slower than you walk, and stop
+   dead when you stop. A piano or wardrobe won't budge until you're bigger (or
+   two of you push together).
 3. Push the couch against the inside of a doorway so it covers the gap. Wait for
    the outbreak and check that a zombie bot can't get through.
 4. Press **E** on an item (yellow ring), click to swing it at a zombie, **G** to drop it.
+   Walk with a stick so its tip touches furniture to push it; hold click to hook
+   a piece and drag it toward you.
 5. Press **B** to open the shop. When the wizard arrives (chat message), stand
    next to him and press **B** for his rare items.
 6. As a zombie, press **Z** to jump back to the zombie spawn.
@@ -75,14 +83,21 @@ hiccup can't wipe real progress.
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human. |
 
-Score persists, buys items, and sets your speed: multiplier = 1 + score / 30,000
-(capped at 1.6). Survivors grow a little each win (this session only).
+Score persists, buys items, and sets your speed and size. Speed multiplier =
+1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
+12,000-point player is about 2.5x a newcomer, like in the original. Bigger
+players push heavier furniture faster: each pusher's strength is size squared,
+and a piece moves at walk speed x (1 - mass / total strength). Light, medium,
+heavy and massive pieces (piano, wardrobe, pool table, car) need more and more
+strength. Pushing is simulated on your own machine while you are the only one
+pushing a piece, so it responds instantly; when someone pushes back, the server
+settles the tug of war.
 
 ### Items (score prices)
 
 | Item | Price | Effect |
 | --- | --- | --- |
-| Stick | 100 | Short shove |
+| Stick | 100 | Short shove; pushes and drags furniture |
 | Pill | 300 | +25 immunity (less likely to start as a zombie) |
 | Bat | 750 | Short swing, solid knockback |
 | Drumstick | 1,000 | Hold it at round end: +40% score (5% roll: Golden, +80%) |
@@ -159,19 +174,20 @@ it feels unfair, lower `SPEED_MULTIPLIER_CAP`.
 
 Everything lives in `src/shared/Config.luau`:
 
-- **Furniture feel:** `FURNITURE_PUSH_FACTOR` (how fast each weight class moves
-  when pushed, as a fraction of walk speed), `FURNITURE_DRAG` (how fast it stops),
-  `FURNITURE_SPIN` (how much off-center pushes turn it).
-  "Couch slides too far": lower `FURNITURE_DRAG`. "Can't move the fridge": raise `Heavy`.
+- **Furniture feel:** `FURNITURE_MASS` (how hard each weight class is to move;
+  lower = easier), `PUSH_MAX_FRACTION` (fastest a piece can go, as a share of
+  walk speed), `ITEM_DRAG_FACTOR` (weapon drag speed), `FURNITURE_SPIN` (how
+  much off-center pushes turn a piece). "Can't move the fridge": lower `Heavy`.
+- **Size:** `SIZE_MULTIPLIER` and `MAX_SCALE`.
+- **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP`.
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
 - **Sounds:** `SOUNDS` uses sounds that ship with the Roblox client. Set any to
   `""` to mute it, or paste your own `rbxassetid://` id. The furniture scrape
   loop is off until you add a sound id.
 
-Furniture is simulated on the server so humans and zombies push by the same
-rules: a piece moves when pushed, opposite pushes cancel, and a piece pressed
-against walls stays put. That is what makes a barricade hold.
+Furniture never slides: it moves only while pushed. Opposite pushes cancel, and
+a piece pressed against walls stays put. That is what makes a barricade hold.
 
 ## Project layout
 

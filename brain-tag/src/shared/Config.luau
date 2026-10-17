@@ -15,6 +15,10 @@ Config.ZOMBIE_RATIO = 0.2 -- first zombies = max(1, floor(players * ratio))
 Config.FIRST_ZOMBIES_TO_SPAWN = true -- teleport first zombies to the zombie spawn at outbreak
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
+-- Maps take turns. Each name is a layout in MapLayout.luau.
+Config.MAP_ROTATION = { "Neighborhood", "Mansion" }
+Config.ROUNDS_PER_MAP = 2
+
 -- Movement and size ------------------------------------------------------------
 
 Config.BASE_WALKSPEED = 16
@@ -26,8 +30,12 @@ function Config.SPEED_MULTIPLIER(score: number): number
 	return math.min(Config.SPEED_MULTIPLIER_CAP, 1 + math.max(0, score) / 30000)
 end
 
-Config.GROWTH_PER_WIN = 0.04 -- size gained per survived round (this session)
-Config.MAX_SCALE = 1.6
+-- Size also grows with score, much faster than speed: in the original the top
+-- player (12,855 points) was about 2.7x the size of a newcomer.
+Config.MAX_SCALE = 2.5
+function Config.SIZE_MULTIPLIER(score: number): number
+	return math.min(Config.MAX_SCALE, 1 + math.max(0, score) / 8000)
+end
 
 -- Rewards (score) --------------------------------------------------------------
 
@@ -50,16 +58,19 @@ Config.CAMERA_HEIGHT = 150
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
 Config.CAMERA_SMOOTHING = 12 -- higher follows tighter
 Config.CAMERA_ZOOMS = { Close = 120, Normal = 150, Far = 195 }
+Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
 
 -- Character look (studs, at scale 1) -------------------------------------------------
 
 Config.CHARACTER = {
-	RootWidth = 2.6,
+	-- The collision box is narrower than the drawn body so even the biggest
+	-- players (MAX_SCALE) still fit through a 7-stud doorway.
+	RootWidth = 2.2,
 	RootHeight = 2,
 	HipHeight = 1,
-	HeadDiameter = 3,
-	HeadThickness = 1,
-	FistDiameter = 1.1,
+	BodyWidth = 3.6, -- shoulders, side to side
+	BodyDepth = 2.1, -- front to back
+	HeadDiameter = 2.3,
 }
 
 Config.COLORS = {
@@ -75,12 +86,16 @@ Config.COLORS = {
 
 -- Furniture physics ---------------------------------------------------------------------
 
-Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8 }
--- Fraction of the pusher's walk speed a piece moves at while being pushed.
-Config.FURNITURE_PUSH_FACTOR = { Light = 0.85, Medium = 0.55, Heavy = 0.32 }
-Config.FURNITURE_DRAG = 0.85 -- horizontal velocity kept per 1/60 s when nobody pushes
-Config.FURNITURE_ANGULAR_DRAG = 0.8
-Config.FURNITURE_MAX_SPEED = 14
+-- How hard each weight class is to move. Pushers add their strength (size
+-- squared), and a piece moves at walk speed * (1 - mass / strength), capped
+-- at PUSH_MAX_FRACTION. At size 1 a couch moves at a third of your speed and a
+-- piano not at all; at size 2 both move easily. Two players can team up.
+Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 1.15 }
+Config.PUSH_MAX_FRACTION = 0.9
+Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
+Config.FURNITURE_MAX_SPEED = 22
+Config.ITEM_DRAG_FACTOR = 0.7 -- hooking furniture with a weapon pulls slower than pushing
+Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
 Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
 

@@ -37,7 +37,8 @@ local rng = Random.new()
 -- Spawning ---------------------------------------------------------------------------
 
 local function spawnFrame(team: string, scale: number): CFrame
-	local list = if team == "Zombie" then MapLayout.zombieSpawns else MapLayout.humanSpawns
+	local layout = MapLayout.current()
+	local list = if team == "Zombie" then layout.zombieSpawns else layout.humanSpawns
 	local spot = list[rng:NextInteger(1, #list)]
 	local jitter = if team == "Zombie" then 3 else 5
 	local x = spot.x + rng:NextNumber(-jitter, jitter)
@@ -186,7 +187,7 @@ local function resetWorld()
 		p.team = "Human"
 		p.stunUntil = 0
 		p.dragging = false
-		p.scale = RoundRules.scaleForWins(p.sessionWins)
+		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
 		p.state:SetAttribute("Scale", p.scale)
 		CharacterService.place(p, spawnFrame("Human", p.scale))
@@ -285,7 +286,6 @@ local function finishRound(winner: Winner)
 		end
 		if winner == "Survivors" and p.team == "Human" then
 			award(p, Config.SURVIVOR_WIN_REWARD, true, "survived!")
-			p.sessionWins += 1
 			if p.profile then
 				p.profile.Wins = (p.profile.Wins or 0) + 1
 				p.state:SetAttribute("Wins", p.profile.Wins)
@@ -325,16 +325,45 @@ local function runInfection(): Winner?
 	end
 end
 
+-- Map rotation ------------------------------------------------------------------------------
+
+local mapIndex = 1
+local roundsOnMap = 0
+
+local function loadMap(name: string)
+	local layout = MapLayout.use(name)
+	ItemService.clearGround()
+	MapBuilder.build(layout)
+	FurnitureService.build(layout)
+	state:SetAttribute("Map", layout.title)
+	Announcer.chat("* Next map: " .. layout.title .. " *")
+end
+
+local function nextMapIfDue()
+	if roundsOnMap >= Config.ROUNDS_PER_MAP and #Config.MAP_ROTATION > 1 then
+		roundsOnMap = 0
+		mapIndex = mapIndex % #Config.MAP_ROTATION + 1
+		loadMap(Config.MAP_ROTATION[mapIndex])
+	end
+	roundsOnMap += 1
+end
+
 local function runRound()
 	waitForPlayers()
 
+	nextMapIfDue()
 	resetWorld()
 	local round = state:GetAttribute("Round")
 	state:SetAttribute("Round", (if typeof(round) == "number" then round else 0) + 1)
 	ItemService.scatter()
 	setPhase("Prep", Config.PREP_SECONDS)
 	Wizard.schedule()
-	Announcer.chat("Outbreak in " .. Config.PREP_SECONDS .. " seconds. Barricade a room and grab items!")
+	Announcer.chat(
+		MapLayout.current().title
+			.. ": outbreak in "
+			.. Config.PREP_SECONDS
+			.. " seconds. Barricade a room and grab items!"
+	)
 	if waitPhase() then
 		outbreak()
 		local winner = runInfection()
@@ -361,6 +390,8 @@ end
 -- Joining, leaving, respawning ----------------------------------------------------------------
 
 local function spawnNew(p: Participant)
+	p.scale = RoundRules.scaleForScore(p.score)
+	p.state:SetAttribute("Scale", p.scale)
 	-- Late joiners become zombies once the outbreak has happened.
 	if phase == "Infection" then
 		p.team = "Zombie"
@@ -397,6 +428,7 @@ end
 
 function RoundManager.start()
 	state = ReplicatedStorage:WaitForChild("BrainTagState") :: Folder
+	state:SetAttribute("Map", MapLayout.current().title)
 
 	CharacterService.onNeedRespawn = function(p)
 		CharacterService.spawn(p, spawnFrame(p.team, p.scale))

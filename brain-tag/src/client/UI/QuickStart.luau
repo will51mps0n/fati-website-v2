@@ -62,7 +62,7 @@ function QuickStart.build(parent: Instance, touchMode: boolean, onDone: () -> ()
 	end
 	line(
 		10,
-		"Tip: walk into furniture to push it. Jam a couch into a doorway to build a barricade!",
+		"Tip: walk into furniture to push it (bigger players push harder). Hold click with a weapon to drag it. Jam a couch into a doorway to build a barricade!",
 		17,
 		UIKit.BOLD,
 		UIKit.LIME

@@ -9,6 +9,9 @@ require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes")) -- cre
 local WorldSetup = require(script.Parent.WorldSetup)
 WorldSetup.run()
 
+local Config = require(ReplicatedStorage.Shared.Config)
+local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+
 local BotService = require(script.Parent.BotService)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
@@ -23,8 +26,9 @@ local RoundManager = require(script.Parent.RoundManager)
 local ShopService = require(script.Parent.ShopService)
 local TopScores = require(script.Parent.TopScores)
 
-MapBuilder.build()
-FurnitureService.build()
+local firstMap = MapLayout.use(Config.MAP_ROTATION[1])
+MapBuilder.build(firstMap)
+FurnitureService.build(firstMap)
 CharacterService.buildTemplate()
 CharacterService.init()
 
@@ -33,7 +37,7 @@ FurnitureService.start(function()
 	for _, p in Participants.all() do
 		local root, humanoid = Participants.body(p)
 		if root and humanoid then
-			table.insert(movers, { root = root, humanoid = humanoid })
+			table.insert(movers, { root = root, humanoid = humanoid, id = p.id, scale = p.scale })
 		end
 	end
 	return movers

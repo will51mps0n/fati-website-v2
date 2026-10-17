@@ -1,79 +1,132 @@
--- Owns every furniture piece: builds them, simulates them on the server (so
--- humans and zombies push by the same rules), and resets them each round.
+-- Owns every furniture piece: builds them, decides who simulates each one,
+-- and resets them each round.
 --
--- Pushing: each frame, anyone walking into a piece adds a push in their move
--- direction, scaled by the piece's weight class. Opposite pushes cancel, so a
--- human holding a couch from inside stops a zombie on the outside. Pieces
--- pressed into walls simply can't move: that is what makes a barricade hold.
--- When nobody pushes, strong drag stops a piece almost at once.
+-- Responsiveness: when you push a piece, your client asks for it ("claim")
+-- and the server hands you its physics, so it moves the instant you push
+-- and stops the instant you stop, with no network lag. If anyone else pushes
+-- the same piece (a zombie on the other side of a barricade, another player,
+-- a bot), the server takes it back and resolves everyone's pushes itself, so
+-- a barricade standoff is fair. Pieces nobody pushes stand perfectly still.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local Participants = require(script.Parent.Participants)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
+local Util = require(ReplicatedStorage.Shared.Util)
 
 local FurnitureService = {}
 
 type Piece = FurnitureBuilder.Built & {
-	push: Vector3,
-	spin: number,
-	pushedThisFrame: boolean,
+	owner: Player?,
+	lastClaim: number,
+	pushers: { [string]: number }, -- participant id -> last time seen pushing
+	contestedUntil: number,
+	burst: Vector3,
+	burstUntil: number,
+	burstLength: number,
 }
 
-export type Mover = { root: BasePart, humanoid: Humanoid }
+export type Mover = { root: BasePart, humanoid: Humanoid, id: string, scale: number }
+
+local OWNER = FurniturePush.OWNER_ATTRIBUTE
+local CONTEST_SECONDS = 0.8
 
 local pieces: { Piece } = {}
 local byBody: { [BasePart]: Piece } = {}
+local byModel: { [Instance]: Piece } = {}
 local folder: Folder
 local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Include
+local external: FurniturePush.Pushes = {}
 
 local getMovers: () -> { Mover } = function()
 	return {}
 end
 
-function FurnitureService.build()
+local function serverOwns(piece: Piece)
+	piece.owner = nil
+	pcall(function()
+		piece.body:SetNetworkOwner(nil)
+	end)
+	piece.model:SetAttribute(OWNER, 0)
+end
+
+local function stop(piece: Piece)
+	local v = piece.body.AssemblyLinearVelocity
+	piece.body.AssemblyLinearVelocity = Vector3.new(0, math.min(v.Y, 0), 0)
+	piece.body.AssemblyAngularVelocity = Vector3.zero
+end
+
+-- Takes a piece back from a client (optionally blocking new claims for a bit).
+local function revoke(piece: Piece, blockSeconds: number)
+	if piece.owner then
+		serverOwns(piece)
+		stop(piece)
+	end
+	piece.contestedUntil = math.max(piece.contestedUntil, os.clock() + blockSeconds)
+end
+
+local function grant(piece: Piece, player: Player)
+	local ok = pcall(function()
+		piece.body:SetNetworkOwner(player)
+	end)
+	if ok then
+		piece.owner = player
+		piece.model:SetAttribute(OWNER, player.UserId)
+	end
+end
+
+function FurnitureService.build(layout: MapLayout.Layout)
 	folder = workspace:WaitForChild("Furniture") :: Folder
 	folder:ClearAllChildren()
 	table.clear(pieces)
 	table.clear(byBody)
-	for _, spot in MapLayout.furniture do
+	table.clear(byModel)
+	for _, spot in layout.furniture do
 		local built = FurnitureBuilder.build(spot, folder)
 		if not built.decor then
 			local piece = built :: Piece
-			piece.push = Vector3.zero
-			piece.spin = 0
-			piece.pushedThisFrame = false
+			piece.owner = nil
+			piece.lastClaim = 0
+			piece.pushers = {}
+			piece.contestedUntil = 0
+			piece.burst = Vector3.zero
+			piece.burstUntil = 0
+			piece.burstLength = 1
 			table.insert(pieces, piece)
 			byBody[built.body] = piece
-			-- Server-owned physics: one source of truth for every pusher.
-			local ok, err = pcall(function()
-				built.body:SetNetworkOwner(nil)
-			end)
-			if not ok then
-				warn("[Furniture] could not set network owner:", err)
-			end
+			byModel[built.model] = piece
+			serverOwns(piece)
 		end
 	end
 	overlap.FilterDescendantsInstances = { folder }
 end
 
--- Adds a push to a piece for this frame. `velocity` is the speed the pusher
--- would like the piece to move at; `at` is where the push lands (for spin).
-function FurnitureService.addPush(body: BasePart, velocity: Vector3, at: Vector3?)
+-- Adds a push on a server-driven piece for the next frame (weapon drags).
+function FurnitureService.addPush(body: BasePart, desired: Vector3, strength: number, at: Vector3?)
+	if byBody[body] then
+		FurniturePush.add(external, body, desired, strength, at)
+	end
+end
+
+-- A sudden shove (shotgun blast, potato hit): the server takes the piece and
+-- moves it at `velocity`, easing to a stop over `seconds`.
+function FurnitureService.shove(body: BasePart, velocity: Vector3, seconds: number)
 	local piece = byBody[body]
 	if not piece then
 		return
 	end
-	piece.push += Vector3.new(velocity.X, 0, velocity.Z)
-	piece.pushedThisFrame = true
-	if at then
-		local r = at - body.Position
-		-- Vertical component of (r x v): off-center pushes turn the piece.
-		piece.spin += (r.Z * velocity.X - r.X * velocity.Z)
-	end
+	revoke(piece, seconds + 0.2)
+	piece.burst = Vector3.new(velocity.X, 0, velocity.Z)
+	piece.burstLength = seconds
+	piece.burstUntil = os.clock() + seconds
 end
 
 function FurnitureService.pieceOf(part: BasePart): FurnitureBuilder.Built?
@@ -85,7 +138,6 @@ function FurnitureService.weightOf(body: BasePart): string?
 	return piece and piece.weight
 end
 
--- Light/medium pieces in a box in front of a point, for the swordfish drag.
 function FurnitureService.findInBox(cframe: CFrame, size: Vector3): { BasePart }
 	local found = {}
 	for _, part in workspace:GetPartBoundsInBox(cframe, size, overlap) do
@@ -98,94 +150,140 @@ end
 
 function FurnitureService.resetAll()
 	for _, piece in pieces do
+		serverOwns(piece)
+		piece.contestedUntil = 0
+		piece.burstUntil = 0
+		table.clear(piece.pushers)
 		piece.model:PivotTo(piece.home)
 		piece.body.AssemblyLinearVelocity = Vector3.zero
 		piece.body.AssemblyAngularVelocity = Vector3.zero
-		piece.push = Vector3.zero
-		piece.spin = 0
 	end
 end
 
-local function collectPushes()
+-- A client asks to drive the pieces it is pushing.
+local function onClaim(player: Player, list: unknown)
+	if typeof(list) ~= "table" then
+		return
+	end
+	local claims = list :: { unknown }
+	if #claims > 16 then
+		return
+	end
+	local p = Participants.fromPlayer(player)
+	local root = p and Participants.body(p)
+	if not p or not root then
+		return
+	end
+	local now = os.clock()
+	for _, model in claims do
+		local piece = if typeof(model) == "Instance" then byModel[model] else nil
+		if not piece or now < piece.contestedUntil or now < piece.burstUntil then
+			continue
+		end
+		if piece.owner and piece.owner ~= player then
+			revoke(piece, CONTEST_SECONDS) -- two players fighting over it: server decides
+			continue
+		end
+		if Util.flatDistance(piece.body.Position, root.Position) > 20 * math.max(1, p.scale) then
+			continue
+		end
+		piece.lastClaim = now
+		if piece.owner ~= player then
+			grant(piece, player)
+		end
+	end
+end
+
+local function collectPushes(now: number): FurniturePush.Pushes
+	local pushes: FurniturePush.Pushes = external
+	external = {}
 	for _, mover in getMovers() do
 		local humanoid, root = mover.humanoid, mover.root
 		local move = humanoid.MoveDirection
 		local flat = Vector3.new(move.X, 0, move.Z)
 		if flat.Magnitude > 0.1 and humanoid.WalkSpeed > 0 then
 			local dir = flat.Unit
-			local radius = root.Size.X / 2
-			local depth = Config.PUSH_PROBE_DEPTH
-			local center = root.Position + dir * (radius + depth / 2 - 0.3)
-			local probe = CFrame.lookAt(center, center + dir)
-			local size = Vector3.new(root.Size.X * 0.9, 2, depth)
-			local seen: { [BasePart]: boolean } = {}
+			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
+			local strength = RoundRules.pushStrength(mover.scale)
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
-				if piece and not seen[part] then
-					seen[part] = true
-					local speed = humanoid.WalkSpeed * Config.FURNITURE_PUSH_FACTOR[piece.weight]
-					FurnitureService.addPush(part, dir * speed, center)
+				if piece then
+					piece.pushers[mover.id] = now
+					FurniturePush.add(pushes, part, dir * humanoid.WalkSpeed, strength, probe.Position)
+				end
+			end
+		end
+	end
+	return pushes
+end
+
+local function step()
+	local now = os.clock()
+	local pushes = collectPushes(now)
+	for _, piece in pieces do
+		local body = piece.body
+		if body.Parent == nil then
+			continue
+		end
+
+		-- Who is pushing this piece right now (seen by the server)?
+		local owner = piece.owner
+		local ownerId = if owner then "P" .. owner.UserId else ""
+		local active, someoneElse = 0, false
+		for id, seen in piece.pushers do
+			if now - seen > 0.3 then
+				piece.pushers[id] = nil
+			else
+				active += 1
+				if owner and id ~= ownerId then
+					someoneElse = true
+				end
+			end
+		end
+		if active >= 2 or someoneElse then
+			-- A tug of war: the server simulates it so both sides count.
+			revoke(piece, CONTEST_SECONDS)
+		elseif owner then
+			local v = body.AssemblyLinearVelocity
+			if owner.Parent ~= Players or now - piece.lastClaim > Config.FURNITURE_RELEASE_SECONDS then
+				revoke(piece, 0)
+			elseif Vector3.new(v.X, 0, v.Z).Magnitude > Config.FURNITURE_MAX_SPEED * 1.5 then
+				revoke(piece, 1) -- faster than any push allows: take it back
+			end
+		end
+
+		if piece.owner == nil then
+			local v = body.AssemblyLinearVelocity
+			if now < piece.burstUntil then
+				local k = (piece.burstUntil - now) / piece.burstLength
+				body.AssemblyLinearVelocity =
+					Vector3.new(piece.burst.X * k, math.min(v.Y, 0), piece.burst.Z * k)
+			else
+				local push = pushes[body]
+				if push then
+					local velocity, spin = FurniturePush.resolve(body, push)
+					body.AssemblyLinearVelocity = Vector3.new(velocity.X, math.min(v.Y, 0), velocity.Z)
+					body.AssemblyAngularVelocity = Vector3.new(0, spin, 0)
+				elseif
+					math.abs(v.X) + math.abs(v.Z) > 0.02 or body.AssemblyAngularVelocity.Magnitude > 0.02
+				then
+					stop(piece) -- no sliding
 				end
 			end
 		end
 	end
 end
 
-local function step(dt: number)
-	collectPushes()
-	local drag = Config.FURNITURE_DRAG ^ (dt * 60)
-	local angularDrag = Config.FURNITURE_ANGULAR_DRAG ^ (dt * 60)
-	local maxSpeed = Config.FURNITURE_MAX_SPEED
-	for _, piece in pieces do
-		local body = piece.body
-		if body.Parent == nil then
-			continue
-		end
-		local v = body.AssemblyLinearVelocity
-		local w = body.AssemblyAngularVelocity
-		local horizontal = Vector3.new(v.X, 0, v.Z)
-		local spinY = w.Y
-		if piece.pushedThisFrame then
-			local target = piece.push
-			if target.Magnitude > maxSpeed then
-				target = target.Unit * maxSpeed
-			end
-			horizontal = horizontal:Lerp(target, math.min(1, dt * 30))
-			local factor = Config.FURNITURE_PUSH_FACTOR[piece.weight]
-			local wantSpin = math.clamp(
-				piece.spin * Config.FURNITURE_SPIN * factor / math.max(1, body.Size.Magnitude / 4),
-				-2,
-				2
-			)
-			spinY = spinY + (wantSpin - spinY) * math.min(1, dt * 10)
-		else
-			horizontal *= drag
-			spinY *= angularDrag
-		end
-		if horizontal.Magnitude > maxSpeed then
-			horizontal = horizontal.Unit * maxSpeed
-		end
-		-- Skip writes on resting pieces so they can sleep.
-		if
-			piece.pushedThisFrame
-			or horizontal.Magnitude > 0.05
-			or math.abs(spinY) > 0.05
-			or math.abs(v.Y) > 0.5
-		then
-			if horizontal.Magnitude <= 0.05 and not piece.pushedThisFrame then
-				horizontal = Vector3.zero
-			end
-			body.AssemblyLinearVelocity = Vector3.new(horizontal.X, math.min(v.Y, 5), horizontal.Z)
-			body.AssemblyAngularVelocity = Vector3.new(w.X * angularDrag, spinY, w.Z * angularDrag)
-		end
-		piece.push = Vector3.zero
-		piece.spin = 0
-		piece.pushedThisFrame = false
-	end
-end
-
 function FurnitureService.start(movers: () -> { Mover })
 	getMovers = movers
+	Remotes.unreliable("PushClaim").OnServerEvent:Connect(onClaim)
+	Players.PlayerRemoving:Connect(function(player)
+		for _, piece in pieces do
+			if piece.owner == player then
+				revoke(piece, 0)
+			end
+		end
+	end)
 	RunService.Heartbeat:Connect(step)
 end
 

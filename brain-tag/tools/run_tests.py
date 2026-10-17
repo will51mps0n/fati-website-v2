@@ -25,6 +25,7 @@ local function test(name, fn)
 		print("FAIL " .. name .. "\\n     " .. tostring(err))
 	end
 end
+local testCase = test
 local function expectEq(actual, expected, label)
 	if actual ~= expected then
 		error(string.format("%s: expected %s, got %s", label or "value", tostring(expected), tostring(actual)), 2)

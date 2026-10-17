@@ -18,6 +18,11 @@ local EVENTS = {
 	"Toast", -- (text, hexColor?)
 }
 
+-- Unreliable: frequent, small, fine to lose one now and then.
+local UNRELIABLE = {
+	"PushClaim", -- client -> server: { Model } of furniture it is pushing
+}
+
 local FUNCTIONS = {
 	"BuyItem", -- (itemId, fromWizard) -> (ok, message)
 	"BuySkin", -- (skinId) -> (status, message)
@@ -37,6 +42,13 @@ if RunService:IsServer() then
 			remote.Parent = folder
 		end
 	end
+	for _, name in UNRELIABLE do
+		if not folder:FindFirstChild(name) then
+			local remote = Instance.new("UnreliableRemoteEvent")
+			remote.Name = name
+			remote.Parent = folder
+		end
+	end
 	for _, name in FUNCTIONS do
 		if not folder:FindFirstChild(name) then
 			local remote = Instance.new("RemoteFunction")
@@ -51,6 +63,10 @@ end
 
 function Remotes.event(name: string): RemoteEvent
 	return folder:WaitForChild(name) :: RemoteEvent
+end
+
+function Remotes.unreliable(name: string): UnreliableRemoteEvent
+	return folder:WaitForChild(name) :: UnreliableRemoteEvent
 end
 
 function Remotes.func(name: string): RemoteFunction
