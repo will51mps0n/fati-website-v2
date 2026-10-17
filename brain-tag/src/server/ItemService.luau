@@ -206,10 +206,17 @@ function ItemService.pickUp(p: Participant)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
+-- Getting eaten loses your item (items should be rare: mostly bought).
 function ItemService.onInfected(p: Participant)
 	if p.heldItem then
-		ItemService.drop(p)
+		ItemService.take(p)
 	end
+end
+
+-- Melee weapons without `hits` only keep zombies away while held; a click
+-- does nothing.
+local function canUse(item: Items.Item): boolean
+	return item.kind ~= "Melee" or item.hits == true
 end
 
 -- Using ----------------------------------------------------------------------------
@@ -348,6 +355,9 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 		setStreaming(p, item.id) -- sprays until "stop" (see streamStep)
 		return
 	end
+	if not canUse(item) then
+		return
+	end
 	local now = os.clock()
 	if now < p.itemReadyAt then
 		return
@@ -357,7 +367,7 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 end
 
 -- Bots use their held item with the same rules and cooldowns as players
--- (they never hook furniture; streams spray for a moment).
+-- (streams spray for a moment).
 function ItemService.botUse(p: Participant, aim: Vector3)
 	local direction = Util.flatUnit(aim)
 	local item = Items.get(p.heldItem)
@@ -372,6 +382,9 @@ function ItemService.botUse(p: Participant, aim: Vector3)
 				setStreaming(p, nil)
 			end
 		end)
+		return
+	end
+	if not canUse(item) then
 		return
 	end
 	local now = os.clock()

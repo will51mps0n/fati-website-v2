@@ -29,6 +29,7 @@ export type Item = {
 	cooldown: number?,
 	straight: boolean?, -- shove along the aim line instead of away from you
 	firmness: number?, -- held melee: how hard the shaft holds things back (1 = normal, low = it gives)
+	hits: boolean?, -- melee: a click swings and knocks zombies back (most only keep them away)
 	guard: number?, -- held melee: studs around the shaft it keeps clear
 	breaksWalls: boolean?,
 	projectileSpeed: number?,
@@ -60,7 +61,7 @@ add({
 	id = "Stick",
 	name = "Stick",
 	kind = "Melee",
-	description = "Cheap and short. Shoves zombies a little and pushes furniture.",
+	description = "Cheap and short. Hold it out to keep zombies back and push furniture.",
 	price = 100,
 	groundWeight = 40,
 	reach = 5,
@@ -103,7 +104,7 @@ add({
 	id = "Spear",
 	name = "Spear",
 	kind = "Melee",
-	description = "Longest reach. Pushes zombies straight away from you.",
+	description = "Longest reach. Hold it out to keep zombies far away.",
 	price = 3500,
 	robuxProduct = "InstantSpear",
 	rare = "AncientSpear",
@@ -119,7 +120,7 @@ add({
 	id = "AncientSpear",
 	name = "Rare Ancient Spear",
 	kind = "Melee",
-	description = "A golden spear. A little longer and a little stronger.",
+	description = "A golden spear: even longer and firmer.",
 	wizardPrice = 7000,
 	isRare = true,
 	reach = 11,
@@ -216,7 +217,7 @@ add({
 	id = "RubberChicken",
 	name = "Rubber Chicken",
 	kind = "Melee",
-	description = "SQUEAK. Barely pushes, but zombies are dazed for ages.",
+	description = "SQUEAK. Soft and floppy: zombies can squeeze past it.",
 	price = 400,
 	groundWeight = 12,
 	reach = 5,
@@ -232,7 +233,7 @@ add({
 	id = "PoolNoodle",
 	name = "Pool Noodle",
 	kind = "Melee",
-	description = "Huge, floppy and fast. Swats everything in front of you.",
+	description = "Long and fat but soft: it slows zombies more than it stops them.",
 	price = 600,
 	groundWeight = 10,
 	reach = 7,
@@ -247,7 +248,7 @@ add({
 	id = "Baguette",
 	name = "Baguette",
 	kind = "Melee",
-	description = "Long, crusty, surprisingly effective. Leaves crumbs.",
+	description = "Long, crusty, surprisingly firm. Keeps zombies at bay.",
 	price = 900,
 	groundWeight = 10,
 	reach = 6.5,
@@ -295,7 +296,7 @@ add({
 	id = "Crowbar",
 	name = "Crowbar",
 	kind = "Melee",
-	description = "Heavy and stiff: shoves furniture and zombies hard.",
+	description = "Heavy and stiff: holds zombies and furniture back hard.",
 	price = 1600,
 	reach = 6,
 	arc = 80,
@@ -324,7 +325,7 @@ add({
 	id = "Lollipop",
 	name = "Giant Lollipop",
 	kind = "Melee",
-	description = "A sweet, wide swing with real weight behind it.",
+	description = "A big, sweet, solid wall of candy.",
 	price = 2000,
 	reach = 7,
 	arc = 120,
@@ -338,7 +339,7 @@ add({
 	id = "Katana",
 	name = "Katana",
 	kind = "Melee",
-	description = "Lightning-fast swings with a long reach.",
+	description = "Thin and long: keeps zombies at a distance.",
 	price = 4000,
 	reach = 8,
 	arc = 70,
@@ -528,6 +529,16 @@ local SOLIDITY: { [string]: { number } } = {
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
 }
+-- Most melee weapons only keep zombies away while you hold them out. These
+-- few can also swing and knock zombies back.
+local HITTERS = { "Bat", "FryingPan", "GoldenPan", "InflatableHammer", "Plunger" }
+for _, id in HITTERS do
+	local item = Items[id]
+	if item then
+		item.hits = true
+	end
+end
+
 for id, values in SOLIDITY do
 	local item = Items[id]
 	if item then

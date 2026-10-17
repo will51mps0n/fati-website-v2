@@ -165,7 +165,8 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 					local verb = if item.kind == "Stream"
 						then "[Hold click] spray"
 						elseif item.kind == "Trap" then "[Click] drop one"
-						elseif item.kind == "Melee" then "[Click] swing  - the weapon pushes what it touches"
+						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
+						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
 					text = verb .. "   [G] drop"
 				end

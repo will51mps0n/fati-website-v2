@@ -44,7 +44,7 @@ Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points 
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
 -- ate you gets them (so zombies grow as they feed).
-Config.INFECT_STEAL_FRACTION = 0.25 -- eat a big player, gain a lot
+Config.INFECT_STEAL_FRACTION = 0.75 -- getting eaten costs most of your points
 
 -- Infection ----------------------------------------------------------------------
 
@@ -115,8 +115,8 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
-Config.GROUND_ITEMS_MIN = 2
-Config.GROUND_ITEMS_MAX = 3
+Config.GROUND_ITEMS_MIN = 1 -- items are rare: mostly you buy them
+Config.GROUND_ITEMS_MAX = 2
 Config.RARE_CHANCE = 0.05
 Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 -- Held melee weapons are solid: zombies touching the shaft are shoved off it
@@ -153,6 +153,7 @@ Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
+Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a weapon
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.

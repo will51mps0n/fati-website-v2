@@ -5,9 +5,9 @@
 --   * zombies spread out over different humans, lead their target, shove
 --     through barricades, remember where a human hid, and press Z sooner
 --     when stuck
---   * humans grab (or start with) weapons, hold them out toward close
---     zombies (weapons are solid) and swing, flee toward open ground away
---     from every zombie, and hide in bushes
+--   * humans grab the odd item (some start with one), hold weapons out
+--     toward close zombies (weapons are solid; a few can swing), flee
+--     toward open ground away from every zombie, and hide in bushes
 -- Movement never aims through walls: straight lines are checked with a
 -- body-wide sweep, everything else uses pathfinding, and a bot that stops
 -- making progress steps sideways and replans.
@@ -43,7 +43,6 @@ type Level = {
 	flee: number, -- human: zombie distance that starts a run
 	directions: number, -- human: escape directions considered
 	hide: number, -- human: chance to be a bush hider
-	buys: boolean, -- human: starts each round with a weapon
 }
 
 local LEVELS: { [number]: Level } = {
@@ -57,7 +56,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 45,
 		directions = 8,
 		hide = 0.35,
-		buys = false,
 	},
 	[4] = {
 		think = 0.18,
@@ -69,7 +67,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 55,
 		directions = 10,
 		hide = 0.45,
-		buys = true,
 	},
 	[5] = {
 		think = 0.14,
@@ -81,7 +78,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 65,
 		directions = 12,
 		hide = 0.5,
-		buys = true,
 	},
 	[6] = {
 		think = 0.11,
@@ -93,7 +89,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 75,
 		directions = 12,
 		hide = 0.55,
-		buys = true,
 	},
 }
 
@@ -452,9 +447,11 @@ local function brain(p: Participant, level: Level, seed: number)
 
 		-- Human ----------------------------------------------------------------------
 		local round = RoundManager.roundNumber()
-		if level.buys and phase == "Prep" and armedRound ~= round and not p.heldItem then
-			armedRound = round
-			ItemService.give(p, STARTER_WEAPONS[random:NextInteger(1, #STARTER_WEAPONS)])
+		if phase == "Prep" and armedRound ~= round then
+			armedRound = round -- one roll per round: only some bots start armed
+			if not p.heldItem and random:NextNumber() < Config.BOT_WEAPON_CHANCE then
+				ItemService.give(p, STARTER_WEAPONS[random:NextInteger(1, #STARTER_WEAPONS)])
+			end
 		end
 		local item = Items.get(p.heldItem)
 

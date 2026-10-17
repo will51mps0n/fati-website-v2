@@ -136,13 +136,13 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 25% of their points. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 75% of their points; the human's item is lost. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
 Score (points) persists, buys items, and sets your speed and size, which
 update the moment your points change (bottom-left shows points, speed boost
-and size). A zombie that eats you takes 25% of your points
+and size). A zombie that eats you takes 75% of your points
 (`INFECT_STEAL_FRACTION`) plus a small flat bonus (`INFECT_REWARD`), so
 eating a big player is worth a lot and zombies grow as they feed. Speed multiplier =
 1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
@@ -156,8 +156,12 @@ settles the tug of war.
 
 ### Items (score prices)
 
-Melee weapons shove and daze zombies when you swing. A held weapon is also
-solid: furniture it touches is pushed out of the way, and zombies that walk
+Most melee weapons can't hit: they only keep zombies away while you hold
+them out. Only the Bat, Frying Pan, Golden Frying Pan, Inflatable Hammer and
+Plunger can also swing to knock zombies back (`HITTERS` in `Items.luau`).
+Items are rare on the ground (1 to 2 a round, and an eaten human's item is
+lost), so you mostly buy them; each bot has a 20% chance to start with one
+(`BOT_WEAPON_CHANCE`). A held weapon is solid: furniture it touches is pushed out of the way, and zombies that walk
 into it are shoved back, so a weapon held across a doorway keeps them out.
 Each weapon has its own firmness and thickness (`SOLIDITY` in `Items.luau`):
 the bat is short but holds zombies firmly, the pool noodle is long and fat but

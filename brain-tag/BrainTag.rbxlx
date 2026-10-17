@@ -918,7 +918,7 @@ Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points 
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
 -- ate you gets them (so zombies grow as they feed).
-Config.INFECT_STEAL_FRACTION = 0.25 -- eat a big player, gain a lot
+Config.INFECT_STEAL_FRACTION = 0.75 -- getting eaten costs most of your points
 
 -- Infection ----------------------------------------------------------------------
 
@@ -989,8 +989,8 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
-Config.GROUND_ITEMS_MIN = 2
-Config.GROUND_ITEMS_MAX = 3
+Config.GROUND_ITEMS_MIN = 1 -- items are rare: mostly you buy them
+Config.GROUND_ITEMS_MAX = 2
 Config.RARE_CHANCE = 0.05
 Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 -- Held melee weapons are solid: zombies touching the shaft are shoved off it
@@ -1027,6 +1027,7 @@ Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
+Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a weapon
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
@@ -1694,6 +1695,7 @@ export type Item = {
 	cooldown: number?,
 	straight: boolean?, -- shove along the aim line instead of away from you
 	firmness: number?, -- held melee: how hard the shaft holds things back (1 = normal, low = it gives)
+	hits: boolean?, -- melee: a click swings and knocks zombies back (most only keep them away)
 	guard: number?, -- held melee: studs around the shaft it keeps clear
 	breaksWalls: boolean?,
 	projectileSpeed: number?,
@@ -1725,7 +1727,7 @@ add({
 	id = "Stick",
 	name = "Stick",
 	kind = "Melee",
-	description = "Cheap and short. Shoves zombies a little and pushes furniture.",
+	description = "Cheap and short. Hold it out to keep zombies back and push furniture.",
 	price = 100,
 	groundWeight = 40,
 	reach = 5,
@@ -1768,7 +1770,7 @@ add({
 	id = "Spear",
 	name = "Spear",
 	kind = "Melee",
-	description = "Longest reach. Pushes zombies straight away from you.",
+	description = "Longest reach. Hold it out to keep zombies far away.",
 	price = 3500,
 	robuxProduct = "InstantSpear",
 	rare = "AncientSpear",
@@ -1784,7 +1786,7 @@ add({
 	id = "AncientSpear",
 	name = "Rare Ancient Spear",
 	kind = "Melee",
-	description = "A golden spear. A little longer and a little stronger.",
+	description = "A golden spear: even longer and firmer.",
 	wizardPrice = 7000,
 	isRare = true,
 	reach = 11,
@@ -1881,7 +1883,7 @@ add({
 	id = "RubberChicken",
 	name = "Rubber Chicken",
 	kind = "Melee",
-	description = "SQUEAK. Barely pushes, but zombies are dazed for ages.",
+	description = "SQUEAK. Soft and floppy: zombies can squeeze past it.",
 	price = 400,
 	groundWeight = 12,
 	reach = 5,
@@ -1897,7 +1899,7 @@ add({
 	id = "PoolNoodle",
 	name = "Pool Noodle",
 	kind = "Melee",
-	description = "Huge, floppy and fast. Swats everything in front of you.",
+	description = "Long and fat but soft: it slows zombies more than it stops them.",
 	price = 600,
 	groundWeight = 10,
 	reach = 7,
@@ -1912,7 +1914,7 @@ add({
 	id = "Baguette",
 	name = "Baguette",
 	kind = "Melee",
-	description = "Long, crusty, surprisingly effective. Leaves crumbs.",
+	description = "Long, crusty, surprisingly firm. Keeps zombies at bay.",
 	price = 900,
 	groundWeight = 10,
 	reach = 6.5,
@@ -1960,7 +1962,7 @@ add({
 	id = "Crowbar",
 	name = "Crowbar",
 	kind = "Melee",
-	description = "Heavy and stiff: shoves furniture and zombies hard.",
+	description = "Heavy and stiff: holds zombies and furniture back hard.",
 	price = 1600,
 	reach = 6,
 	arc = 80,
@@ -1989,7 +1991,7 @@ add({
 	id = "Lollipop",
 	name = "Giant Lollipop",
 	kind = "Melee",
-	description = "A sweet, wide swing with real weight behind it.",
+	description = "A big, sweet, solid wall of candy.",
 	price = 2000,
 	reach = 7,
 	arc = 120,
@@ -2003,7 +2005,7 @@ add({
 	id = "Katana",
 	name = "Katana",
 	kind = "Melee",
-	description = "Lightning-fast swings with a long reach.",
+	description = "Thin and long: keeps zombies at a distance.",
 	price = 4000,
 	reach = 8,
 	arc = 70,
@@ -2193,6 +2195,16 @@ local SOLIDITY: { [string]: { number } } = {
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
 }
+-- Most melee weapons only keep zombies away while you hold them out. These
+-- few can also swing and knock zombies back.
+local HITTERS = { "Bat", "FryingPan", "GoldenPan", "InflatableHammer", "Plunger" }
+for _, id in HITTERS do
+	local item = Items[id]
+	if item then
+		item.hits = true
+	end
+end
+
 for id, values in SOLIDITY do
 	local item = Items[id]
 	if item then
@@ -4301,9 +4313,9 @@ return Announcer
 --   * zombies spread out over different humans, lead their target, shove
 --     through barricades, remember where a human hid, and press Z sooner
 --     when stuck
---   * humans grab (or start with) weapons, hold them out toward close
---     zombies (weapons are solid) and swing, flee toward open ground away
---     from every zombie, and hide in bushes
+--   * humans grab the odd item (some start with one), hold weapons out
+--     toward close zombies (weapons are solid; a few can swing), flee
+--     toward open ground away from every zombie, and hide in bushes
 -- Movement never aims through walls: straight lines are checked with a
 -- body-wide sweep, everything else uses pathfinding, and a bot that stops
 -- making progress steps sideways and replans.
@@ -4339,7 +4351,6 @@ type Level = {
 	flee: number, -- human: zombie distance that starts a run
 	directions: number, -- human: escape directions considered
 	hide: number, -- human: chance to be a bush hider
-	buys: boolean, -- human: starts each round with a weapon
 }
 
 local LEVELS: { [number]: Level } = {
@@ -4353,7 +4364,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 45,
 		directions = 8,
 		hide = 0.35,
-		buys = false,
 	},
 	[4] = {
 		think = 0.18,
@@ -4365,7 +4375,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 55,
 		directions = 10,
 		hide = 0.45,
-		buys = true,
 	},
 	[5] = {
 		think = 0.14,
@@ -4377,7 +4386,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 65,
 		directions = 12,
 		hide = 0.5,
-		buys = true,
 	},
 	[6] = {
 		think = 0.11,
@@ -4389,7 +4397,6 @@ local LEVELS: { [number]: Level } = {
 		flee = 75,
 		directions = 12,
 		hide = 0.55,
-		buys = true,
 	},
 }
 
@@ -4748,9 +4755,11 @@ local function brain(p: Participant, level: Level, seed: number)
 
 		-- Human ----------------------------------------------------------------------
 		local round = RoundManager.roundNumber()
-		if level.buys and phase == "Prep" and armedRound ~= round and not p.heldItem then
-			armedRound = round
-			ItemService.give(p, STARTER_WEAPONS[random:NextInteger(1, #STARTER_WEAPONS)])
+		if phase == "Prep" and armedRound ~= round then
+			armedRound = round -- one roll per round: only some bots start armed
+			if not p.heldItem and random:NextNumber() < Config.BOT_WEAPON_CHANCE then
+				ItemService.give(p, STARTER_WEAPONS[random:NextInteger(1, #STARTER_WEAPONS)])
+			end
 		end
 		local item = Items.get(p.heldItem)
 
@@ -7047,10 +7056,17 @@ function ItemService.pickUp(p: Participant)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
+-- Getting eaten loses your item (items should be rare: mostly bought).
 function ItemService.onInfected(p: Participant)
 	if p.heldItem then
-		ItemService.drop(p)
+		ItemService.take(p)
 	end
+end
+
+-- Melee weapons without `hits` only keep zombies away while held; a click
+-- does nothing.
+local function canUse(item: Items.Item): boolean
+	return item.kind ~= "Melee" or item.hits == true
 end
 
 -- Using ----------------------------------------------------------------------------
@@ -7189,6 +7205,9 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 		setStreaming(p, item.id) -- sprays until "stop" (see streamStep)
 		return
 	end
+	if not canUse(item) then
+		return
+	end
 	local now = os.clock()
 	if now < p.itemReadyAt then
 		return
@@ -7198,7 +7217,7 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 end
 
 -- Bots use their held item with the same rules and cooldowns as players
--- (they never hook furniture; streams spray for a moment).
+-- (streams spray for a moment).
 function ItemService.botUse(p: Participant, aim: Vector3)
 	local direction = Util.flatUnit(aim)
 	local item = Items.get(p.heldItem)
@@ -7213,6 +7232,9 @@ function ItemService.botUse(p: Participant, aim: Vector3)
 				setStreaming(p, nil)
 			end
 		end)
+		return
+	end
+	if not canUse(item) then
 		return
 	end
 	local now = os.clock()
@@ -12409,7 +12431,8 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 					local verb = if item.kind == "Stream"
 						then "[Hold click] spray"
 						elseif item.kind == "Trap" then "[Click] drop one"
-						elseif item.kind == "Melee" then "[Click] swing  - the weapon pushes what it touches"
+						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
+						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
 					text = verb .. "   [G] drop"
 				end
