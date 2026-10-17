@@ -362,6 +362,33 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	use(p, item, direction)
 end
 
+-- Bots use their held item with the same rules and cooldowns as players
+-- (they never hook furniture; streams spray for a moment).
+function ItemService.botUse(p: Participant, aim: Vector3)
+	local direction = Util.flatUnit(aim)
+	local item = Items.get(p.heldItem)
+	if not direction or not item or p.team ~= "Human" then
+		return
+	end
+	p.aim = direction
+	if item.kind == "Stream" then
+		setStreaming(p, item.id)
+		task.delay(0.6, function()
+			if p.heldItem == item.id then
+				setStreaming(p, nil)
+			end
+		end)
+		return
+	end
+	local now = os.clock()
+	if now < p.itemReadyAt then
+		return
+	end
+	p.itemReadyAt = now + (item.cooldown or 0.5)
+	use(p, item, direction)
+	p.dragging = false
+end
+
 -- Holding click with a melee weapon hooks the nearest piece the weapon
 -- touches and pulls it toward you. Your own client does this instantly for
 -- pieces it drives; this server copy covers pieces the server is driving

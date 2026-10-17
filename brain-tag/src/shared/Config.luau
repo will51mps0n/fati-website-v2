@@ -147,8 +147,10 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 
 -- Test bots (Studio only) ---------------------------------------------------------------------
 
-Config.DEBUG_BOTS = true -- only ever active inside Roblox Studio
-Config.DEBUG_BOT_COUNT = 4
+-- Bots join every server, live games included (see BotService for their
+-- names and difficulty levels; Mario Robles is the hardest).
+Config.BOTS = true
+Config.BOT_COUNT = 6
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.

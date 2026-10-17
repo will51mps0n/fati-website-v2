@@ -70,9 +70,13 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 
 ## Testing
 
-- **Alone:** press **Play**. In Studio only, four test bots join (bot humans run
-  from zombies, bot zombies chase with pathfinding), so a full round runs with
-  just you. Turn them off with `Config.DEBUG_BOTS = false`.
+- **Alone:** press **Play**. Six bots join every server (Studio and live games):
+  Mario Robles (level 5, the hardest), Booger Bob (4), Poop Face (3), Stinky
+  Pete (3), Fart Butt (2) and Fat Guy (1). Higher levels think and move faster,
+  see farther, lead their target and remember where you hid as zombies, and
+  grab or start with weapons, swing them and flee smarter as humans. Change the
+  count with `Config.BOT_COUNT` (up to 12 names) or turn them off with
+  `Config.BOTS = false`.
 - **Several players:** Test tab > Clients and Servers > choose 2 or more players > Start.
 - If something breaks, open View > Output and copy the red lines.
 

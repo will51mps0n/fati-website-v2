@@ -453,6 +453,11 @@ local function onZombieReturn(player: Player)
 	CharacterService.place(p, spawnFrame("Zombie", p.scale))
 end
 
+function RoundManager.roundNumber(): number
+	local round = state:GetAttribute("Round")
+	return if typeof(round) == "number" then round else 0
+end
+
 -- Admin controls -------------------------------------------------------------------------------
 
 -- Ends the current phase now (prep -> outbreak, infection -> survivors win).

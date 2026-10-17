@@ -1021,8 +1021,10 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 
 -- Test bots (Studio only) ---------------------------------------------------------------------
 
-Config.DEBUG_BOTS = true -- only ever active inside Roblox Studio
-Config.DEBUG_BOT_COUNT = 4
+-- Bots join every server, live games included (see BotService for their
+-- names and difficulty levels; Mario Robles is the hardest).
+Config.BOTS = true
+Config.BOT_COUNT = 6
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
@@ -4276,20 +4278,25 @@ return Announcer
       <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">BotService</string>
-          <string name="Source"><![CDATA[-- Studio-only test bots so you can play a full round alone. They count as
--- participants for every rule. Bot humans run from the nearest zombie (and
--- wander during prep); bot zombies chase the nearest human they can see
--- with PathfindingService and press "Z" when stuck. Anyone hiding in a bush
--- is invisible to bots until they come close.
+          <string name="Source"><![CDATA[-- Bots that play every round with everyone (Config.BOTS). They count as
+-- participants for every rule. Each has a difficulty level from 1 (dopey)
+-- to 5 (Mario Robles):
+--   * thinks faster, walks faster and sees farther
+--   * as a zombie: leads its target, remembers where a human hid, and
+--     presses "Z" sooner when stuck
+--   * as a human: grabs items during prep (top levels "buy" one), swings at
+--     zombies that get close, flees smarter and hides in bushes more
 
 local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local BushService = require(script.Parent.BushService)
+local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
+local ItemService = require(script.Parent.ItemService)
+local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local RoundManager = require(script.Parent.RoundManager)
@@ -4299,24 +4306,112 @@ type Participant = Participants.Participant
 
 local BotService = {}
 
-local NAMES = { "Mia", "Leo", "Zoe", "Max", "Ivy", "Sam", "Ada", "Kai" }
+type Level = {
+	think: number, -- seconds between decisions
+	speed: number, -- walk speed multiplier
+	sight: number, -- zombie: how far away it notices humans
+	lead: number, -- zombie: seconds of target movement it predicts
+	memory: number, -- zombie: seconds it keeps chasing where a human vanished
+	stuck: number, -- zombie: seconds stuck before pressing Z
+	flee: number, -- human: zombie distance that starts a run
+	directions: number, -- human: escape directions considered
+	hide: number, -- human: chance to be a bush hider
+	swing: number, -- human: chance per decision to swing at a close zombie
+	grab: boolean, -- human: walks to items during prep
+	buys: boolean, -- human: starts each round with a weapon
+}
 
-local function nearest(me: Participant, from: Vector3, team: string): (Vector3?, number)
-	local best: Vector3? = nil
-	local bestDistance = math.huge
-	for _, other in Participants.onTeam(team :: Participants.Team) do
-		if other ~= me then
-			local root = Participants.body(other)
-			if root and BushService.visibleFrom(other, from) then
-				local d = Util.flatDistance(root.Position, from)
-				if d < bestDistance then
-					best, bestDistance = root.Position, d
-				end
-			end
-		end
-	end
-	return best, bestDistance
-end
+local LEVELS: { Level } = {
+	{
+		think = 0.45,
+		speed = 0.82,
+		sight = 35,
+		lead = 0,
+		memory = 0,
+		stuck = 8,
+		flee = 25,
+		directions = 6,
+		hide = 0.15,
+		swing = 0,
+		grab = false,
+		buys = false,
+	},
+	{
+		think = 0.3,
+		speed = 0.9,
+		sight = 55,
+		lead = 0.15,
+		memory = 1,
+		stuck = 7,
+		flee = 35,
+		directions = 8,
+		hide = 0.3,
+		swing = 0.25,
+		grab = false,
+		buys = false,
+	},
+	{
+		think = 0.2,
+		speed = 0.97,
+		sight = 85,
+		lead = 0.35,
+		memory = 2.5,
+		stuck = 6,
+		flee = 45,
+		directions = 12,
+		hide = 0.45,
+		swing = 0.55,
+		grab = true,
+		buys = false,
+	},
+	{
+		think = 0.12,
+		speed = 1.04,
+		sight = 140,
+		lead = 0.5,
+		memory = 4,
+		stuck = 4.5,
+		flee = 55,
+		directions = 16,
+		hide = 0.55,
+		swing = 0.85,
+		grab = true,
+		buys = true,
+	},
+	{
+		think = 0.07,
+		speed = 1.12,
+		sight = 500,
+		lead = 0.7,
+		memory = 7,
+		stuck = 3,
+		flee = 70,
+		directions = 20,
+		hide = 0.65,
+		swing = 1,
+		grab = true,
+		buys = true,
+	},
+}
+
+-- Name and difficulty. The first Config.BOT_COUNT of these join.
+local ROSTER: { { name: string, level: number } } = {
+	{ name = "Mario Robles", level = 5 },
+	{ name = "Fart Butt", level = 2 },
+	{ name = "Poop Face", level = 3 },
+	{ name = "Fat Guy", level = 1 },
+	{ name = "Booger Bob", level = 4 },
+	{ name = "Stinky Pete", level = 3 },
+	{ name = "Captain Wedgie", level = 2 },
+	{ name = "Toilet Ted", level = 1 },
+	{ name = "Sir Toots-a-Lot", level = 4 },
+	{ name = "Sweaty Steve", level = 3 },
+	{ name = "Moldy Cheese", level = 2 },
+	{ name = "Burp Master", level = 4 },
+}
+
+-- Weapons the top bots "buy" at the start of a round.
+local STARTER_WEAPONS = { "Bat", "Spear", "Swordfish", "FryingPan", "Katana", "Lollipop" }
 
 local function randomInside(rng: Random): Vector3
 	local layout = MapLayout.current()
@@ -4342,7 +4437,47 @@ local function nearestBush(from: Vector3, range: number): Vector3?
 	return best
 end
 
-local function brain(p: Participant, rng: Random)
+-- Nearest ground item within `range`.
+local function nearestItem(from: Vector3, range: number): Vector3?
+	local folder = workspace:FindFirstChild("GroundItems")
+	if not folder then
+		return nil
+	end
+	local best: Vector3? = nil
+	local bestDistance = range
+	for _, model in folder:GetChildren() do
+		local x, z = model:GetAttribute("SpotX"), model:GetAttribute("SpotZ")
+		if typeof(x) == "number" and typeof(z) == "number" then
+			local spot = Vector3.new(x, from.Y, z)
+			local d = Util.flatDistance(spot, from)
+			if d < bestDistance then
+				best, bestDistance = spot, d
+			end
+		end
+	end
+	return best
+end
+
+-- The nearest member of `team` this bot can notice: within `sight`, and
+-- not hidden in a bush (unless close). Returns their root too.
+local function nearest(me: Participant, from: Vector3, team: string, sight: number): (BasePart?, number)
+	local best: BasePart? = nil
+	local bestDistance = math.huge
+	for _, other in Participants.onTeam(team :: Participants.Team) do
+		if other ~= me then
+			local root = Participants.body(other)
+			if root and BushService.visibleFrom(other, from) then
+				local d = Util.flatDistance(root.Position, from)
+				if d < bestDistance and d <= sight then
+					best, bestDistance = root, d
+				end
+			end
+		end
+	end
+	return best, bestDistance
+end
+
+local function brain(p: Participant, level: Level, rng: Random)
 	local path = PathfindingService:CreatePath({
 		AgentRadius = 2,
 		AgentHeight = 4,
@@ -4357,11 +4492,15 @@ local function brain(p: Participant, rng: Random)
 	local wanderUntil = 0
 	local lastPosition = Vector3.zero
 	local stuckSince = os.clock()
-	local hider = rng:NextNumber() < 0.5 -- some bot humans run for the bushes
+	local hider = rng:NextNumber() < level.hide
+	local lastSeen: Vector3? = nil -- zombie memory of a target that vanished
+	local lastSeenAt = 0
+	local armedRound = -1
 
 	local function followPath(goal: Vector3, root: BasePart, humanoid: Humanoid)
 		local now = os.clock()
-		if not pathGoal or now - computedAt > 1.2 or (goal - pathGoal).Magnitude > 8 then
+		local refresh = math.max(0.4, level.think * 5)
+		if not pathGoal or now - computedAt > refresh or (goal - pathGoal).Magnitude > 8 then
 			pathGoal, computedAt = goal, now
 			local ok = pcall(function()
 				path:ComputeAsync(root.Position, goal)
@@ -4385,8 +4524,18 @@ local function brain(p: Participant, rng: Random)
 		end
 	end
 
+	-- Walk straight when nothing is in the way (sharper), else pathfind.
+	local function goTo(goal: Vector3, root: BasePart, humanoid: Humanoid)
+		if Util.flatDistance(goal, root.Position) < 30 and Combat.clearPath(root.Position, goal) then
+			humanoid:MoveTo(goal)
+			pathGoal = nil
+		else
+			followPath(goal, root, humanoid)
+		end
+	end
+
 	while Participants.get(p.id) == p do
-		task.wait(0.2)
+		task.wait(level.think * rng:NextNumber(0.8, 1.2))
 		local root, humanoid = Participants.body(p)
 		if not root or not humanoid then
 			continue
@@ -4396,6 +4545,7 @@ local function brain(p: Participant, rng: Random)
 			lastPosition = root.Position
 			stuckSince = now
 		end
+		local phase = RoundManager.phase()
 
 		local function wander()
 			if not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, root.Position) < 3 then
@@ -4406,71 +4556,119 @@ local function brain(p: Participant, rng: Random)
 		end
 
 		if p.team == "Zombie" then
-			local target, distance = nearest(p, root.Position, "Human")
+			local target, distance = nearest(p, root.Position, "Human", level.sight)
 			if target then
-				if distance < 30 and Combat.clearPath(root.Position, target) then
-					humanoid:MoveTo(target)
-					pathGoal = nil
-				else
-					followPath(target, root, humanoid)
-				end
+				-- Aim where the human is going, not where they are.
+				local lead = Util.flat(target.AssemblyLinearVelocity)
+					* level.lead
+					* math.min(1, distance / 20)
+				local goal = target.Position + lead
+				lastSeen, lastSeenAt = goal, now
+				goTo(goal, root, humanoid)
+			elseif lastSeen and now - lastSeenAt < level.memory then
+				goTo(lastSeen, root, humanoid) -- check where they vanished
 			else
-				wander() -- everyone left is hiding (or there's nobody yet)
+				lastSeen = nil
+				wander()
 			end
-			if now - stuckSince > 6 then
+			if now - stuckSince > level.stuck then
 				RoundManager.zombieReturn(p)
 				stuckSince = now
 				lastPosition = root.Position
 			end
-		else
-			local threat, distance = nearest(p, root.Position, "Zombie")
-			local hidden = BushService.hidden(p)
-			local bush = if hider and not hidden then nearestBush(root.Position, 30) else nil
-			if hidden and (not threat or distance > Config.BUSH_REVEAL_DISTANCE) then
-				humanoid:MoveTo(root.Position) -- stay still and hope
-				stuckSince = now
-			elseif threat and distance < 45 and bush then
-				followPath(bush, root, humanoid)
-			elseif threat and distance < 45 then
-				-- Try 12 directions and run toward the one farthest from zombies.
-				local best: Vector3? = nil
-				local bestScore = -math.huge
-				for i = 0, 11 do
-					local angle = i / 12 * math.pi * 2
-					local candidate = root.Position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * 14
-					if inBounds(candidate) and Combat.clearPath(root.Position, candidate) then
-						local _, away = nearest(p, candidate, "Zombie")
-						if away > bestScore then
-							best, bestScore = candidate, away
-						end
+			continue
+		end
+
+		-- Human ----------------------------------------------------------------------
+		local round = RoundManager.roundNumber()
+		if level.buys and phase == "Prep" and armedRound ~= round and not p.heldItem then
+			armedRound = round
+			ItemService.give(p, STARTER_WEAPONS[rng:NextInteger(1, #STARTER_WEAPONS)])
+		end
+		local item = Items.get(p.heldItem)
+		local threat, distance = nearest(p, root.Position, "Zombie", math.huge)
+
+		-- Swing at a zombie in reach.
+		if
+			threat
+			and item
+			and (item.kind == "Melee" or item.kind == "Blast" or item.kind == "Projectile")
+		then
+			local reach = if item.kind == "Projectile"
+				then 40
+				else (item.reach or 5) * math.max(1, p.scale * 0.9) + 2
+			if distance <= reach and rng:NextNumber() < level.swing then
+				local aim = Util.flatUnit(threat.Position - root.Position)
+				if aim then
+					ItemService.botUse(p, aim)
+				end
+			end
+		end
+
+		local hidden = BushService.hidden(p)
+		local bush = if hider and not hidden then nearestBush(root.Position, 35) else nil
+		if hidden and (not threat or distance > Config.BUSH_REVEAL_DISTANCE) then
+			humanoid:MoveTo(root.Position) -- stay still and hope
+		elseif threat and distance < level.flee and bush then
+			followPath(bush, root, humanoid)
+		elseif threat and distance < level.flee then
+			-- Try several directions and run toward the one that keeps the
+			-- most distance from every zombie (better bots look further).
+			local stride = 10 + level.directions * 0.5
+			local best: Vector3? = nil
+			local bestScore = -math.huge
+			for i = 0, level.directions - 1 do
+				local angle = i / level.directions * math.pi * 2
+				local candidate = root.Position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * stride
+				if inBounds(candidate) and Combat.clearPath(root.Position, candidate) then
+					local _, away = nearest(p, candidate, "Zombie", math.huge)
+					if away > bestScore then
+						best, bestScore = candidate, away
 					end
 				end
-				humanoid:MoveTo(best or (root.Position + (root.Position - threat).Unit * 10))
-				pathGoal = nil
+			end
+			humanoid:MoveTo(best or (root.Position + (root.Position - threat.Position).Unit * 10))
+			pathGoal = nil
+		elseif level.grab and phase == "Prep" and not p.heldItem then
+			local spot = nearestItem(root.Position, 80)
+			if spot then
+				if Util.flatDistance(spot, root.Position) < Config.PICKUP_RADIUS then
+					ItemService.pickUp(p)
+				else
+					goTo(spot, root, humanoid)
+				end
 			else
 				wander()
 			end
+		else
+			wander()
+		end
+		-- Hold the weapon out the way you're going (it's solid).
+		local facing = Util.flatUnit(root.CFrame.LookVector)
+		if facing then
+			p.aim = facing
 		end
 	end
 end
 
 function BotService.start()
-	if not (RunService:IsStudio() and Config.DEBUG_BOTS) then
+	if not Config.BOTS then
 		return
 	end
-	warn(
-		string.format(
-			"[Bots] Spawning %d test bots (Studio only). Set Config.DEBUG_BOTS = false to turn them off.",
-			Config.DEBUG_BOT_COUNT
-		)
-	)
-	for i = 1, Config.DEBUG_BOT_COUNT do
+	local count = math.min(Config.BOT_COUNT, #ROSTER)
+	print(string.format("[Bots] %d bots are playing. Set Config.BOTS = false to turn them off.", count))
+	for i = 1, count do
+		local entry = ROSTER[i]
+		local level = LEVELS[math.clamp(entry.level, 1, #LEVELS)]
 		local p = Participants.add({
 			id = "B" .. i,
-			name = "Bot " .. NAMES[(i - 1) % #NAMES + 1],
+			name = entry.name,
 			isBot = true,
 		})
-		task.spawn(brain, p, Random.new(i * 97))
+		p.adminSpeed = level.speed
+		p.state:SetAttribute("BotLevel", entry.level)
+		CharacterService.refreshSpeed(p)
+		task.spawn(brain, p, level, Random.new(i * 97 + os.time()))
 	end
 end
 
@@ -6706,6 +6904,33 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	use(p, item, direction)
 end
 
+-- Bots use their held item with the same rules and cooldowns as players
+-- (they never hook furniture; streams spray for a moment).
+function ItemService.botUse(p: Participant, aim: Vector3)
+	local direction = Util.flatUnit(aim)
+	local item = Items.get(p.heldItem)
+	if not direction or not item or p.team ~= "Human" then
+		return
+	end
+	p.aim = direction
+	if item.kind == "Stream" then
+		setStreaming(p, item.id)
+		task.delay(0.6, function()
+			if p.heldItem == item.id then
+				setStreaming(p, nil)
+			end
+		end)
+		return
+	end
+	local now = os.clock()
+	if now < p.itemReadyAt then
+		return
+	end
+	p.itemReadyAt = now + (item.cooldown or 0.5)
+	use(p, item, direction)
+	p.dragging = false
+end
+
 -- Holding click with a melee weapon hooks the nearest piece the weapon
 -- touches and pulls it toward you. Your own client does this instantly for
 -- pieces it drives; this server copy covers pieces the server is driving
@@ -8754,6 +8979,11 @@ local function onZombieReturn(player: Player)
 	end
 	p.returnReadyAt = now + Config.ZOMBIE_RETURN_COOLDOWN
 	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+end
+
+function RoundManager.roundNumber(): number
+	local round = state:GetAttribute("Round")
+	return if typeof(round) == "number" then round else 0
 end
 
 -- Admin controls -------------------------------------------------------------------------------
