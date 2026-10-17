@@ -1,5 +1,5 @@
 {
- "build": "2026-10-17 17:05 UTC",
+ "build": "2026-10-17 17:06 UTC",
  "scripts": [
   {
    "parent": "ReplicatedStorage",
@@ -568,17 +568,6 @@
    "property": "FogEnd",
    "kind": "plain",
    "value": 100000
-  },
-  {
-   "path": [
-    "TextChatService"
-   ],
-   "property": "ChatVersion",
-   "kind": "Enum",
-   "value": [
-    "ChatVersion",
-    "TextChatService"
-   ]
   }
  ]
 }

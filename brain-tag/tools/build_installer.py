@@ -53,8 +53,15 @@ def property_value(name, value):
     raise SystemExit("build_installer: can't convert %s = %r" % (name, value))
 
 
+# Properties the Command Bar isn't allowed to write. New places already use
+# TextChatService, so skipping ChatVersion only matters for very old places.
+SKIP_PROPERTIES = {"ChatVersion"}
+
+
 def collect_properties(node, path, out):
     for name, value in node.get("$properties", {}).items():
+        if name in SKIP_PROPERTIES:
+            continue
         kind, converted = property_value(name, value)
         out.append({"path": path, "property": name, "kind": kind, "value": converted})
     for key, child in node.items():
