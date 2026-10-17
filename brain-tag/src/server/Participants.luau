@@ -29,7 +29,6 @@ export type Participant = {
 	itemReadyAt: number,
 	returnReadyAt: number,
 	stunUntil: number,
-	dragging: boolean,
 	streaming: boolean, -- holding the button with a water gun / leaf blower
 	nextStreamTick: number,
 	heldCharges: number?, -- uses left (banana peels)
@@ -148,7 +147,6 @@ function Participants.add(info: NewParticipant): Participant
 		itemReadyAt = 0,
 		returnReadyAt = 0,
 		stunUntil = 0,
-		dragging = false,
 		streaming = false,
 		nextStreamTick = 0,
 		heldCharges = nil,

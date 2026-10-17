@@ -1,5 +1,5 @@
 -- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
---   Left click / R2: use item (hold for the swordfish drag)
+--   Left click / R2: use item (hold to keep spraying)
 --   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -83,7 +83,6 @@ end
 
 local function setHeld(p: Participant, itemId: string?, charges: number?)
 	p.heldItem = itemId
-	p.dragging = false
 	local item = Items.get(itemId)
 	p.heldCharges = charges or (item and item.charges)
 	setStreaming(p, nil)
@@ -211,7 +210,6 @@ function ItemService.onInfected(p: Participant)
 	if p.heldItem then
 		ItemService.drop(p)
 	end
-	p.dragging = false
 end
 
 -- Using ----------------------------------------------------------------------------
@@ -280,7 +278,6 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 			end
 		else
 			Announcer.fx("Swing", { character = p.character, item = item.id })
-			p.dragging = true -- held click hooks furniture (see dragStep)
 		end
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
@@ -337,7 +334,6 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	end
 	p.aim = direction
 	if action == "stop" then
-		p.dragging = false
 		setStreaming(p, nil)
 		return
 	end
@@ -348,9 +344,7 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	if not item then
 		return
 	end
-	if item.kind == "Melee" then
-		p.dragging = true -- hooking furniture works even while the swing cools down
-	elseif item.kind == "Stream" then
+	if item.kind == "Stream" then
 		setStreaming(p, item.id) -- sprays until "stop" (see streamStep)
 		return
 	end
@@ -386,13 +380,8 @@ function ItemService.botUse(p: Participant, aim: Vector3)
 	end
 	p.itemReadyAt = now + (item.cooldown or 0.5)
 	use(p, item, direction)
-	p.dragging = false
 end
 
--- Holding click with a melee weapon hooks the nearest piece the weapon
--- touches and pulls it toward you. Your own client does this instantly for
--- pieces it drives; this server copy covers pieces the server is driving
--- (for example during a tug of war at a barricade).
 -- Held melee weapons are solid to zombies too: a zombie touching the shaft
 -- (within the item's `guard`) is shoved off it in short pulses, so a stick
 -- held across a doorway keeps zombies out. Firm weapons (bat, pan) hold
@@ -438,44 +427,6 @@ local function shaftStep()
 					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
 					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
 					Combat.knockback(zombie, away * speed, 0, seconds, true)
-				end
-			end
-		end
-	end
-end
-
-local function dragStep()
-	for _, p in Participants.onTeam("Human") do
-		if p.dragging then
-			local item = Items.get(p.heldItem)
-			local root, humanoid = Participants.body(p)
-			if not item or item.kind ~= "Melee" or not root or not humanoid then
-				p.dragging = false
-				continue
-			end
-			local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
-			local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
-			local center = Vector3.new(hand.X, root.Position.Y, hand.Z) + p.aim * (reach / 2)
-			local box = CFrame.lookAt(center, center + p.aim)
-			local nearest: BasePart? = nil
-			local nearestDistance = math.huge
-			for _, body in FurnitureService.findInBox(box, Vector3.new(1, root.Size.Y + 1, reach)) do
-				local d = Util.flatDistance(body.Position, root.Position)
-				if d < nearestDistance then
-					nearest, nearestDistance = body, d
-				end
-			end
-			if nearest and nearestDistance > root.Size.X / 2 + 2 then
-				local toward = Util.flatUnit(root.Position - nearest.Position)
-				if toward then
-					local hook = if item.dragsFurniture then 1.5 else 1
-					local strength = RoundRules.pushStrength(p.scale) * hook
-					FurnitureService.addPush(
-						nearest,
-						toward * humanoid.WalkSpeed * Config.ITEM_DRAG_FACTOR,
-						strength,
-						nil
-					)
 				end
 			end
 		end
@@ -565,7 +516,6 @@ function ItemService.init()
 		lastAction[player] = nil
 	end)
 
-	RunService.Heartbeat:Connect(dragStep)
 	RunService.Heartbeat:Connect(shaftStep)
 	RunService.Heartbeat:Connect(streamStep)
 end

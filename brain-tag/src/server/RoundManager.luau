@@ -51,6 +51,22 @@ local function spawnFrame(team: string, scale: number): CFrame
 	return CFrame.new(x, y, z)
 end
 
+-- Every human starts the round at the map's start spot, packed into a
+-- little crowd around it (a sunflower spiral, so nobody lands on anyone).
+local crowd = 0
+
+local function startFrame(scale: number): CFrame
+	local spot = MapLayout.current().start
+	crowd += 1
+	local radius = 2.4 * math.sqrt(crowd - 1) * math.max(1, scale)
+	local angle = crowd * 2.39996
+	local y = MapLayout.HEIGHTS.Floor
+		+ Config.CHARACTER.HipHeight
+		+ Config.CHARACTER.RootHeight / 2 * scale
+		+ 0.3
+	return CFrame.new(spot.x + math.cos(angle) * radius, y, spot.z + math.sin(angle) * radius)
+end
+
 local function recount()
 	state:SetAttribute("Survivors", #Participants.onTeam("Human"))
 	state:SetAttribute("Zombies", #Participants.onTeam("Zombie"))
@@ -215,16 +231,16 @@ local function resetWorld()
 	ItemService.clearGround()
 	FurnitureService.resetAll()
 	MapBuilder.restoreWalls()
+	crowd = 0
 	for _, p in Participants.all() do
 		p.team = "Human"
 		p.stunUntil = 0
 		p.boostUntil, p.slowUntil = 0, 0
 		p.alpha = false
-		p.dragging = false
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
 		p.state:SetAttribute("Scale", p.scale)
-		CharacterService.place(p, spawnFrame("Human", p.scale))
+		CharacterService.place(p, startFrame(p.scale))
 		CharacterService.applyLook(p)
 		CharacterService.refreshSpeed(p)
 		grantRoundStartItems(p)
@@ -432,7 +448,8 @@ local function spawnNew(p: Participant)
 		p.team = "Zombie"
 		p.state:SetAttribute("Team", "Zombie")
 	end
-	CharacterService.spawn(p, spawnFrame(p.team, p.scale))
+	-- Humans joining before the outbreak start with everyone else.
+	CharacterService.spawn(p, if p.team == "Human" then startFrame(p.scale) else spawnFrame(p.team, p.scale))
 	if p.team == "Human" then
 		grantRoundStartItems(p)
 	end

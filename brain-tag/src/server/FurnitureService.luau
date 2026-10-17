@@ -45,7 +45,6 @@ export type Mover = {
 	id: string,
 	scale: number,
 	aim: Vector3,
-	dragging: boolean?, -- hooking a piece with held click
 	firmness: number?, -- held weapon's Items.firmness
 	guard: number?, -- held weapon's Items.guard
 	reach: number?,
@@ -60,7 +59,6 @@ local byModel: { [Instance]: Piece } = {}
 local folder: Folder
 local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Include
-local external: FurniturePush.Pushes = {}
 
 local getMovers: () -> { Mover } = function()
 	return {}
@@ -140,13 +138,6 @@ function FurnitureService.build(layout: MapLayout.Layout)
 		end
 	end
 	overlap.FilterDescendantsInstances = { folder }
-end
-
--- Adds a push on a server-driven piece for the next frame (weapon drags).
-function FurnitureService.addPush(body: BasePart, desired: Vector3, strength: number, at: Vector3?)
-	if byBody[body] then
-		FurniturePush.add(external, body, desired, strength, at)
-	end
 end
 
 -- A sudden shove (shotgun blast, potato hit): the server takes the piece and
@@ -235,8 +226,7 @@ local function onClaim(player: Player, list: unknown)
 end
 
 local function collectPushes(now: number): FurniturePush.Pushes
-	local pushes: FurniturePush.Pushes = external
-	external = {}
+	local pushes: FurniturePush.Pushes = {}
 	for _, mover in getMovers() do
 		local humanoid, root = mover.humanoid, mover.root
 		local walk = humanoid.WalkSpeed
@@ -262,8 +252,8 @@ local function collectPushes(now: number): FurniturePush.Pushes
 		end
 		-- A held weapon's shaft is solid, same as on the client: it pushes
 		-- what it touches along your path, or out of its way when you stand
-		-- still or turn. While hooking a piece (held click) the drag does the work.
-		if mover.reach and not mover.dragging then
+		-- still or turn.
+		if mover.reach then
 			local grip = CharacterLook.grip(mover.scale)
 			local hand = (root.CFrame * grip).Position
 			local shaft, shaftSize = FurniturePush.itemProbe(root, grip, mover.aim, mover.reach, mover.guard)

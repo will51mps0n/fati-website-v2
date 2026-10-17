@@ -14,6 +14,8 @@ local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local RoundManager = require(script.Parent.RoundManager)
+local ShopService = require(script.Parent.ShopService)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 type Participant = Participants.Participant
@@ -101,6 +103,21 @@ function ACTIONS.give(admin, data)
 		return false, "Only humans can hold items"
 	end
 	return true, string.format("Gave %s to %s", item.name, names(list))
+end
+
+-- Skins ---------------------------------------------------------------------------------
+
+function ACTIONS.skin(_admin, data)
+	local skin = Skins.get(if typeof(data.skin) == "string" then data.skin else nil)
+	if not skin then
+		return false, "Unknown skin"
+	end
+	local list = targets(data)
+	for _, p in list do
+		ShopService.grantSkin(p, skin.id) -- theirs to keep
+		ShopService.equipSkin(p, skin)
+	end
+	return #list > 0, string.format("%s skin for %s", skin.name, names(list))
 end
 
 -- Players -------------------------------------------------------------------------------

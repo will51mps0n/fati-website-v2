@@ -38,6 +38,19 @@ function Combat.clearPath(from: Vector3, to: Vector3): boolean
 	return workspace:Raycast(a, b - a, solidParams) == nil
 end
 
+-- Like clearPath, but for a body `radius` wide, so bots never try to squeeze
+-- past a wall corner. With `wallsOnly`, furniture doesn't count (a zombie
+-- may shove through a barricade).
+function Combat.clearWide(from: Vector3, to: Vector3, radius: number, wallsOnly: boolean?): boolean
+	local y = MapLayout.HEIGHTS.Floor + 1.4
+	local a = Vector3.new(from.X, y, from.Z)
+	local direction = Vector3.new(to.X, y, to.Z) - a
+	if direction.Magnitude < 0.05 then
+		return true
+	end
+	return workspace:Spherecast(a, radius, direction, if wallsOnly then wallParams else solidParams) == nil
+end
+
 -- True when no (unbroken) wall stands between the two points.
 function Combat.lineOfSight(from: Vector3, to: Vector3): boolean
 	local y = math.max(from.Y, to.Y)

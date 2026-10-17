@@ -70,13 +70,16 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 
 ## Testing
 
-- **Alone:** press **Play**. Six bots join every server (Studio and live games):
-  Mario Robles (level 5, the hardest), Booger Bob (4), Poop Face (3), Stinky
-  Pete (3), Fart Butt (2) and Fat Guy (1). Higher levels think and move faster,
-  see farther, lead their target and remember where you hid as zombies, and
-  grab or start with weapons, swing them and flee smarter as humans. Change the
-  count with `Config.BOT_COUNT` (up to 12 names) or turn them off with
-  `Config.BOTS = false`.
+- **Alone:** press **Play**. Every round fills up with 20 to 30 bots (Studio and
+  live games; fewer as real players join, `Config.BOTS_MIN`, `BOTS_MAX`,
+  `MAX_PARTICIPANTS`). They have funny names (Mario Robles, Fart Butt, Poop
+  Face, Fat Guy, Booger Bob...), random skins, and a level from 3 to 6; most
+  are 5 or 6, and Mario Robles is a 6. Zombie bots spread out over different
+  humans, lead their target, shove through barricades and remember where you
+  hid. Human bots start with weapons, hold them out toward zombies and swing,
+  flee toward open ground and hide in bushes. Bots check their whole body's
+  width before walking straight anywhere and pathfind otherwise, so they don't
+  walk into walls. Turn them off with `Config.BOTS = false`.
 - **Several players:** Test tab > Clients and Servers > choose 2 or more players > Start.
 - If something breaks, open View > Output and copy the red lines.
 
@@ -89,8 +92,7 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 3. Push the couch against the inside of a doorway so it covers the gap. Wait for
    the outbreak and check that a zombie bot can't get through.
 4. Press **E** on an item (yellow ring), click to swing it at a zombie, **G** to drop it.
-   Walk with a stick so its tip touches furniture to push it; hold click to hook
-   a piece and drag it toward you.
+   A held weapon is solid: walk or turn so it touches furniture to push it.
 5. Press **B** to open the shop. When the wizard arrives (chat message), stand
    next to him and press **B** for his rare items.
 6. As a zombie, press **Z** to jump back to the zombie spawn.
@@ -106,6 +108,7 @@ rank 254+ in the owning group) in live servers, and to any UserId listed in
 `Config.ADMIN_USER_IDS`. Pick a target (one player, a bot, or everyone), then:
 
 - **Give item:** any item, into their hand or dropped at your feet.
+- **Give skin:** any skin (even the alpha zombie); they keep it and wear it now.
 - **Speed:** freeze, 0.25x to 3x.
 - **Points:** +1,000 / +10,000 / +100,000 / -1,000, or reset to 0 (size and speed follow).
 - **Player:** make human or zombie, immunity 100, bring to you, go to them, respawn.
@@ -134,7 +137,7 @@ hiccup can't wipe real progress.
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
 | Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 10% of their points. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
-| Reset | Furniture, walls and items reset; everyone respawns as a human. |
+| Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
 Score (points) persists, buys items, and sets your speed and size, which
 update the moment your points change (bottom-left shows points, speed boost
@@ -157,7 +160,7 @@ into it are shoved back, so a weapon held across a doorway keeps them out.
 Each weapon has its own firmness and thickness (`SOLIDITY` in `Items.luau`):
 the bat is short but holds zombies firmly, the pool noodle is long and fat but
 soft, so zombies squeeze past it, spears are thin. A bigger holder holds
-harder. Holding click hooks the nearest piece of furniture and drags it to you.
+harder.
 
 | Item | Price | Effect |
 | --- | --- | --- |
@@ -174,7 +177,7 @@ harder. Holding click hooks the nearest piece of furniture and drags it to you.
 | Frying Pan | 1,200 | CLANG: big knockback, long daze (5% roll: Golden Frying Pan) |
 | Water Gun | 1,200 | Hold to spray zombies back (about 6 s of water) |
 | Potato Gun | 1,500 | Potato projectiles (5% roll: Rare Potato Gun) |
-| Crowbar | 1,600 | Hooks and drags furniture harder than anything |
+| Crowbar | 1,600 | Heavy and stiff: shoves furniture and zombies hard |
 | Plunger | 1,800 | Sticks to a zombie's face and pins them |
 | Giant Lollipop | 2,000 | Wide, heavy swing |
 | Swordfish | 2,500 | Long reach, strong furniture hook |
@@ -260,7 +263,7 @@ Everything lives in `src/shared/Config.luau`:
 
 - **Furniture feel:** `FURNITURE_MASS` (how hard each weight class is to move;
   lower = easier), `PUSH_MAX_FRACTION` (fastest a piece can go, as a share of
-  walk speed), `ITEM_DRAG_FACTOR` (weapon drag speed), `FURNITURE_SPIN` (how
+  walk speed), `FURNITURE_SPIN` (how
   much off-center pushes turn a piece). "Can't move the fridge": lower `Heavy`.
 - **Size:** `SIZE_MULTIPLIER` and `MAX_SCALE`.
 - **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP`.

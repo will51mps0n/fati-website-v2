@@ -62,6 +62,7 @@ export type Layout = {
 	humanSpawns: { Point },
 	zombieSpawns: { Point },
 	wizardSpots: { Point },
+	start: Point, -- where every human starts the round, together
 }
 
 local MapLayout = {}
@@ -498,6 +499,7 @@ local function newLayout(name: string, title: string): Layout
 		humanSpawns = {},
 		zombieSpawns = {},
 		wizardSpots = {},
+		start = { x = 0, z = 0 },
 	}
 end
 
@@ -663,6 +665,7 @@ local function buildNeighborhood(): Layout
 		pt(95, -95),
 	})
 	layout.zombieSpawns = { pt(-140, 0), pt(140, 0) }
+	layout.start = pt(0, -32) -- on the road ring north of the island
 	layout.wizardSpots = mirrorPoints({ pt(-108, -172), pt(136, -100), pt(-136, -150) })
 	return layout
 end
@@ -734,6 +737,7 @@ local function buildMansion(): Layout
 		pt(110, 105),
 	}
 	layout.zombieSpawns = { pt(-165, 162), pt(170, 162) }
+	layout.start = pt(0, 122) -- the front lawn
 	layout.wizardSpots = { pt(-130, -128), pt(160, -20), pt(-160, 128), pt(40, -136) }
 	return layout
 end

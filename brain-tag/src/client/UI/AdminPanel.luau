@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local ClientState = require(script.Parent.Parent.ClientState)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 local UIKit = require(script.Parent.UIKit)
 
 local AdminPanel = {}
@@ -197,6 +198,22 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 			end)
 			b.LayoutOrder = i
 		end
+	end
+
+	-- Skins ---------------------------------------------------------------------------------
+	heading("Give skin (they keep it, and wear it now)")
+	local skinRow = row(30)
+	for i, skin in Skins.list do
+		local label = skin.name .. (if skin.team == "Zombie" then " (Z)" else "")
+		local b = button(
+			skinRow,
+			label,
+			if skin.team == "Zombie" then Color3.fromRGB(70, 120, 60) else nil,
+			function()
+				send("skin", { skin = skin.id })
+			end
+		)
+		b.LayoutOrder = i
 	end
 
 	-- Speed ---------------------------------------------------------------------------------

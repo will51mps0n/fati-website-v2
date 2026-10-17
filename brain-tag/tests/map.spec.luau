@@ -283,6 +283,13 @@ for _, mapName in MapLayout.names do
 			end
 			expect(MapLayout.inRect(layout.bounds, p.x, p.z, -5), "human spawn inside bounds")
 		end
+		do
+			local start = layout.start
+			expect(MapLayout.inRect(layout.bounds, start.x, start.z, -20), "start spot well inside bounds")
+			for _, house in layout.houses do
+				expect(not MapLayout.inRect(house.rect, start.x, start.z, 16), "start crowd clear of houses")
+			end
+		end
 		for _, p in layout.wizardSpots do
 			expect(not insideHouse(p.x, p.z), "wizard spot in a yard")
 		end

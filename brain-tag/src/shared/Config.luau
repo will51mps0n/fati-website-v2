@@ -100,7 +100,6 @@ Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 1
 Config.PUSH_MAX_FRACTION = 0.9
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
-Config.ITEM_DRAG_FACTOR = 0.7 -- hooking furniture with a weapon pulls slower than pushing
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
 Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
@@ -150,7 +149,9 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 -- Bots join every server, live games included (see BotService for their
 -- names and difficulty levels; Mario Robles is the hardest).
 Config.BOTS = true
-Config.BOT_COUNT = 6
+Config.BOTS_MIN = 20 -- each round picks a bot count in this range
+Config.BOTS_MAX = 30
+Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.

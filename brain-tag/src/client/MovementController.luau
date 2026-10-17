@@ -112,7 +112,7 @@ local function step()
 	end
 	root.CFrame = CFrame.lookAt(root.Position, root.Position + aim)
 
-	-- Keep the server's idea of your aim fresh (weapon pushes and drags use it).
+	-- Keep the server's idea of your aim fresh (weapon pushes use it).
 	local now = os.clock()
 	if aimRemote and now - lastAimSent > 0.1 and aim:Dot(lastAimSentValue) < 0.995 then
 		lastAimSent, lastAimSentValue = now, aim

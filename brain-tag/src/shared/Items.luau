@@ -28,7 +28,6 @@ export type Item = {
 	stun: number?,
 	cooldown: number?,
 	straight: boolean?, -- shove along the aim line instead of away from you
-	dragsFurniture: boolean?,
 	firmness: number?, -- held melee: how hard the shaft holds things back (1 = normal, low = it gives)
 	guard: number?, -- held melee: studs around the shaft it keeps clear
 	breaksWalls: boolean?,
@@ -61,7 +60,7 @@ add({
 	id = "Stick",
 	name = "Stick",
 	kind = "Melee",
-	description = "Cheap and short. Shoves zombies a little. Push furniture with it, or hold click to hook and drag.",
+	description = "Cheap and short. Shoves zombies a little and pushes furniture.",
 	price = 100,
 	groundWeight = 40,
 	reach = 5,
@@ -90,7 +89,7 @@ add({
 	id = "Swordfish",
 	name = "Swordfish",
 	kind = "Melee",
-	description = "Long reach. Hooks and drags furniture harder than any other weapon (hold click).",
+	description = "Long reach. A long, solid fish for keeping zombies at a distance.",
 	price = 2500,
 	groundWeight = 4,
 	reach = 8,
@@ -98,7 +97,6 @@ add({
 	knockback = 80,
 	stun = 0.6,
 	cooldown = 0.9,
-	dragsFurniture = true,
 })
 
 add({
@@ -297,14 +295,13 @@ add({
 	id = "Crowbar",
 	name = "Crowbar",
 	kind = "Melee",
-	description = "Pries furniture loose: hooks and drags it harder than anything.",
+	description = "Heavy and stiff: shoves furniture and zombies hard.",
 	price = 1600,
 	reach = 6,
 	arc = 80,
 	knockback = 60,
 	stun = 0.4,
 	cooldown = 0.7,
-	dragsFurniture = true,
 })
 
 add({

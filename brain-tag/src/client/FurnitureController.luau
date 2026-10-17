@@ -2,9 +2,8 @@
 -- instantly and stops the moment you stop. The server hands you a piece when
 -- you claim it and takes it back if someone else pushes it too.
 --
--- You move furniture by walking into it, by walking with a weapon whose
--- shaft touches it, or by holding click with a weapon to hook the nearest
--- piece and drag it toward you.
+-- You move furniture by walking into it, or with a held weapon: its shaft
+-- is solid and pushes whatever it touches.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,7 +13,6 @@ local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local ClientState = require(script.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
-local InputController = require(script.Parent.InputController)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MovementController = require(script.Parent.MovementController)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -88,7 +86,7 @@ local function collect(): FurniturePush.Pushes
 		end
 	end
 
-	-- Weapons: the shaft pushes what it touches; holding click hooks and drags.
+	-- Weapons: the shaft pushes what it touches.
 	local item = Items.get(ClientState.my("HeldItem"))
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
@@ -98,34 +96,8 @@ local function collect(): FurniturePush.Pushes
 		local probe, size = FurniturePush.itemProbe(root, grip, aim, reach, item.guard)
 		local touched = query(probe, size)
 		local firm = strength * (item.firmness or 1) -- a stiff bat shoves harder than a noodle
-		local using = InputController.isUsing()
-		if using and walk > 0 then
-			local nearest: BasePart? = nil
-			local best = math.huge
-			for _, body in touched do
-				local d = Util.flatDistance(body.Position, root.Position)
-				if d < best then
-					nearest, best = body, d
-				end
-			end
-			if nearest then
-				local toward = Util.flatUnit(root.Position - nearest.Position)
-				local gap = FurniturePush.extent(nearest, toward or aim) + root.Size.X / 2 + 0.6
-				if toward and best > gap then
-					local hook = if item.dragsFurniture then 1.5 else 1
-					FurniturePush.add(
-						pushes,
-						nearest,
-						toward * walk * Config.ITEM_DRAG_FACTOR,
-						strength * hook,
-						nil
-					)
-				end
-			end
-		end
-		-- The shaft is solid: what it overlaps moves out of the way (not while
-		-- hooking with held click, where the drag does the work, like the server).
-		if walk > 0 and not using then
+		-- The shaft is solid: what it overlaps moves out of the way.
+		if walk > 0 then
 			for _, body in touched do
 				if not pushes[body] then
 					if moving then
