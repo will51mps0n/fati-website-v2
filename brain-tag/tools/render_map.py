@@ -105,6 +105,12 @@ FURNITURE_COLORS = {
     "Barrel": "8B5A2B",
     "Bench": "A0703F",
     "Lamp": "F2E2A0",
+    "Beanbag": "E74C3C",
+    "TrashCan": "7F8C8D",
+    "Aquarium": "7FC8F8",
+    "Arcade": "6C3483",
+    "VendingMachine": "C0392B",
+    "Treadmill": "2C3E50",
 }
 
 

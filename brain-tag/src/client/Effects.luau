@@ -13,6 +13,31 @@ local Sounds = require(script.Parent.Sounds)
 
 local Effects = {}
 
+local Items = require(ReplicatedStorage.Shared.Items)
+local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
+
+-- Funny sounds made from the few sounds that ship with every Roblox client,
+-- pitched up or down: { sound name in Config.SOUNDS, pitch, volume }.
+local SOUND_STYLES: { [string]: { any } } = {
+	Squeak = { "RoundEnd", 2.4, 0.6 },
+	Clang = { "RoundEnd", 0.55, 0.9 },
+	Boing = { "Lunge", 0.45, 0.9 },
+	Pop = { "RoundEnd", 3.2, 0.6 },
+	Swish = { "Whoosh", 1.5, 0.5 },
+	Twang = { "Lunge", 1.8, 0.6 },
+	Gulp = { "Pickup", 0.7, 0.6 },
+	Slip = { "Whoosh", 0.6, 0.8 },
+}
+
+local function playStyle(style: string?, position: Vector3?): boolean
+	local entry = style and SOUND_STYLES[style]
+	if not entry then
+		return false
+	end
+	Sounds.play(entry[1], position, entry[3], entry[2])
+	return true
+end
+
 local player = Players.LocalPlayer
 local effectsFolder = workspace:WaitForChild("Effects")
 
@@ -79,7 +104,163 @@ local function swing(character: Model?, itemId: string)
 		end
 	end)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	Sounds.play(if thrust then "Lunge" else "Whoosh", root and root.Position)
+	local item = Items.get(itemId)
+	if not playStyle(item and item.sound, root and root.Position) then
+		Sounds.play(if thrust then "Lunge" else "Whoosh", root and root.Position)
+	end
+end
+
+-- Little bits flying out from a point and fading (stars, feathers, crumbs...).
+local BITS: { [string]: { colors: { string }, size: number, count: number, shape: Enum.PartType } } = {
+	Stars = { colors = { "FFE14D", "FFFFFF", "FFC21A" }, size = 0.5, count = 6, shape = Enum.PartType.Block },
+	Feathers = {
+		colors = { "FFFFFF", "FFF3B0", "FFE14D" },
+		size = 0.45,
+		count = 8,
+		shape = Enum.PartType.Block,
+	},
+	Crumbs = { colors = { "D9A15C", "B5783A", "E8C28A" }, size = 0.3, count = 10, shape = Enum.PartType.Ball },
+	Sparkle = {
+		colors = { "FF5FA2", "7FD3FF", "FFFFFF", "FFE14D" },
+		size = 0.35,
+		count = 8,
+		shape = Enum.PartType.Ball,
+	},
+	Confetti = {
+		colors = { "E5484D", "F1C40F", "2ECC71", "3498DB", "9B59B6", "FF5FA2" },
+		size = 0.35,
+		count = 30,
+		shape = Enum.PartType.Block,
+	},
+	Snow = { colors = { "FFFFFF", "E8F6FF" }, size = 0.35, count = 10, shape = Enum.PartType.Ball },
+	Peel = { colors = { "F7DC6F", "FFFFFF", "FFE14D" }, size = 0.4, count = 7, shape = Enum.PartType.Block },
+}
+
+local function bits(kind: string, position: Vector3, direction: Vector3?, spread: number?)
+	local spec = BITS[kind]
+	if not spec then
+		return
+	end
+	local rng = Random.new()
+	for i = 1, spec.count do
+		local part = Parts.make({
+			name = "Bit",
+			shape = spec.shape,
+			size = Vector3.new(spec.size, 0.08, spec.size)
+				* (if spec.shape == Enum.PartType.Ball then 1 else 1),
+			cframe = CFrame.new(position + Vector3.new(0, 2, 0))
+				* CFrame.Angles(0, rng:NextNumber(0, 6.28), 0),
+			color = spec.colors[(i - 1) % #spec.colors + 1],
+			canCollide = false,
+			canQuery = false,
+			parent = effectsFolder,
+		})
+		if spec.shape == Enum.PartType.Ball then
+			part.Size = Vector3.one * spec.size
+		end
+		local dir: Vector3
+		if direction then
+			local cone = spread or 0.6
+			dir = (CFrame.Angles(0, rng:NextNumber(-cone, cone), 0) * direction) * rng:NextNumber(14, 34)
+		else
+			local a = rng:NextNumber(0, math.pi * 2)
+			dir = Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(6, 14)
+		end
+		local finish = position + Vector3.new(dir.X, 0, dir.Z) * 0.35
+		local info = TweenInfo.new(rng:NextNumber(0.4, 0.8), Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(part, info, {
+			CFrame = CFrame.new(finish + Vector3.new(0, 1, 0)) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0),
+			Transparency = 1,
+		})
+		tween:Play()
+		tween.Completed:Once(function()
+			part:Destroy()
+		end)
+	end
+end
+
+-- A temporary visual stuck to a character (plunger, bubble, ice).
+local function stickTo(character: Model?, seconds: number, build: (root: BasePart) -> { BasePart })
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local parts = build(root)
+	for _, part in parts do
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.Massless = true
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
+		part.Parent = character
+	end
+	task.delay(seconds, function()
+		for _, part in parts do
+			part:Destroy()
+		end
+	end)
+end
+
+local function bodyScale(root: BasePart): number
+	return root.Size.X / 2.2
+end
+
+-- Spray particles on everyone currently holding a water gun / leaf blower.
+local SPRAY_COLORS = {
+	WaterGun = ColorSequence.new(Color3.fromHex("8FD3F5"), Color3.fromHex("E8F6FF")),
+	LeafBlower = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromHex("6BBF4E")),
+		ColorSequenceKeypoint.new(0.5, Color3.fromHex("E8913A")),
+		ColorSequenceKeypoint.new(1, Color3.fromHex("C0392B")),
+	}),
+}
+
+local function characters(): { Instance }
+	local list = workspace:GetChildren()
+	local bots = workspace:FindFirstChild("Bots")
+	if bots then
+		for _, bot in bots:GetChildren() do
+			table.insert(list, bot)
+		end
+	end
+	return list
+end
+
+local function updateSprays()
+	for _, character in characters() do
+		if character:IsA("Model") and character:GetAttribute("ParticipantId") then
+			local spraying = character:GetAttribute("Spraying")
+			local held = character:FindFirstChild("HeldItem")
+			local handle = held and held:FindFirstChild("Handle")
+			if handle then
+				local emitter = handle:FindFirstChild("Spray") :: ParticleEmitter?
+				if spraying and not emitter then
+					local attachment = Instance.new("Attachment")
+					attachment.Name = "SprayAt"
+					attachment.CFrame = CFrame.new(0, 0, -4.3)
+					attachment.Parent = handle
+					local created = Instance.new("ParticleEmitter")
+					created.Name = "Spray"
+					created.Color = SPRAY_COLORS[spraying] or SPRAY_COLORS.WaterGun
+					created.EmissionDirection = Enum.NormalId.Front
+					created.Speed = NumberRange.new(28, 40)
+					created.SpreadAngle = Vector2.new(if spraying == "LeafBlower" then 18 else 6, 4)
+					created.Lifetime = NumberRange.new(0.35, 0.5)
+					created.Rate = 70
+					created.Size = NumberSequence.new(if spraying == "LeafBlower" then 0.9 else 0.6, 0.2)
+					created.LightEmission = 0.2
+					created.Parent = attachment
+					emitter = created
+				end
+				if emitter then
+					emitter.Enabled = spraying ~= nil
+				end
+			end
+		end
+	end
 end
 
 local function blast(origin: Vector3, direction: Vector3, reach: number)
@@ -146,10 +327,120 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		Sounds.play("Potato", root and root.Position)
 	end,
 	Splat = function(data)
-		burst(data.position, "C9A66B", 4)
+		local look = data.look
+		if look == "Snowball" then
+			bits("Snow", data.position)
+		elseif look == "Bubble" then
+			burst(data.position, "BFE9FF", 5)
+			playStyle("Pop", data.position)
+		elseif look == "Pebble" then
+			burst(data.position, "8C8C8C", 2.5)
+		else
+			burst(data.position, "C9A66B", 4)
+		end
 	end,
 	Blast = function(data)
-		blast(data.origin, data.direction, data.reach)
+		if data.item == "ConfettiCannon" then
+			bits("Confetti", data.origin, data.direction, 0.6)
+			playStyle("Pop", data.origin)
+			playStyle("Squeak", data.origin)
+		else
+			blast(data.origin, data.direction, data.reach)
+		end
+	end,
+	Hit = function(data)
+		bits(data.fx, data.position)
+	end,
+	Plunged = function(data)
+		stickTo(data.character, data.seconds, function(root)
+			local s = bodyScale(root)
+			local plunger = ItemModels.build("Plunger")
+			-- Cup on the face, stick pointing straight out the front.
+			plunger:PivotTo(
+				root.CFrame
+					* CFrame.new(0, 1.2 * s, -1.0 * s)
+					* CFrame.Angles(0, math.pi, 0)
+					* CFrame.new(0, 0, 3.4)
+			)
+			local parts = {}
+			for _, part in plunger:GetDescendants() do
+				if part:IsA("BasePart") and part.Name ~= "Handle" then
+					for _, weld in part:GetChildren() do
+						if weld:IsA("Weld") then
+							weld:Destroy()
+						end
+					end
+					table.insert(parts, part)
+				end
+			end
+			return parts
+		end)
+	end,
+	Bubbled = function(data)
+		local character = data.character :: Model?
+		stickTo(character, data.seconds, function(root)
+			local s = bodyScale(root)
+			local bubble = Parts.make({
+				name = "Bubble",
+				shape = Enum.PartType.Ball,
+				size = Vector3.one * 5.2 * s,
+				cframe = root.CFrame,
+				color = "BFE9FF",
+				transparency = 0.6,
+			})
+			local shine = Parts.make({
+				name = "Shine",
+				shape = Enum.PartType.Ball,
+				size = Vector3.one * 1.1 * s,
+				cframe = root.CFrame * CFrame.new(-1.2 * s, 1.9 * s, -1.0 * s),
+				color = "FFFFFF",
+				transparency = 0.3,
+			})
+			return { bubble, shine }
+		end)
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			task.delay(data.seconds, function()
+				burst(root.Position, "BFE9FF", 7)
+				playStyle("Pop", root.Position)
+			end)
+		end
+	end,
+	Frozen = function(data)
+		local character = data.character :: Model?
+		if not character then
+			return
+		end
+		local ice = Instance.new("Highlight")
+		ice.FillColor = Color3.fromHex("9FE3FF")
+		ice.FillTransparency = 0.45
+		ice.OutlineColor = Color3.new(1, 1, 1)
+		ice.DepthMode = Enum.HighlightDepthMode.Occluded
+		ice.Parent = character
+		task.delay(data.seconds, function()
+			ice:Destroy()
+		end)
+		local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			bits("Snow", root.Position)
+		end
+	end,
+	Slip = function(data)
+		bits("Peel", data.position)
+		bits("Stars", data.position)
+		playStyle("Slip", data.position)
+	end,
+	Drop = function(data)
+		Sounds.play("Pickup", data.position, 0.4, 0.8)
+	end,
+	Gulp = function(data)
+		bits("Sparkle", data.position)
+		playStyle("Gulp", data.position)
+	end,
+	Boom = function(data)
+		bits("Feathers", data.position)
+		burst(data.position, "FFD93B", 16)
+		playStyle("Squeak", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)
@@ -211,6 +502,18 @@ local function startScrape()
 end
 
 function Effects.start()
+	task.spawn(function()
+		while true do
+			task.wait(0.1)
+			local ok, err = pcall(function()
+				updateSprays()
+				return true
+			end)
+			if not ok then
+				warn("[Fx] spray: " .. tostring(err))
+			end
+		end
+	end)
 	Remotes.event("Knockback").OnClientEvent:Connect(function(velocity: Vector3, seconds: number)
 		local character = player.Character
 		if character and typeof(velocity) == "Vector3" then

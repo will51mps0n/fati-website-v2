@@ -20,6 +20,7 @@ local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local Projectiles = require(script.Parent.Projectiles)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Traps = require(script.Parent.Traps)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Util = require(ReplicatedStorage.Shared.Util)
 local Wizard = require(script.Parent.Wizard)
@@ -44,7 +45,8 @@ local function spawnFrame(team: string, scale: number): CFrame
 	local x = spot.x + rng:NextNumber(-jitter, jitter)
 	local z = spot.z + rng:NextNumber(-jitter, jitter)
 	local y = MapLayout.HEIGHTS.Floor
-		+ (Config.CHARACTER.HipHeight + Config.CHARACTER.RootHeight / 2) * scale
+		+ Config.CHARACTER.HipHeight
+		+ Config.CHARACTER.RootHeight / 2 * scale
 		+ 0.3
 	return CFrame.new(x, y, z)
 end
@@ -180,6 +182,7 @@ end
 local function resetWorld()
 	Wizard.leave()
 	Projectiles.clear()
+	Traps.clear()
 	ItemService.clearGround()
 	FurnitureService.resetAll()
 	MapBuilder.restoreWalls()

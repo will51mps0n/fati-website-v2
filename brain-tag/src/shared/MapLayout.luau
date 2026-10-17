@@ -202,6 +202,7 @@ local LARGE: Plan = {
 		piece("Box", 16, 26),
 		piece("Plant", 44, 4),
 		piece("Picture", 8, 30),
+		piece("Beanbag", 28, 28),
 		-- Bathroom
 		piece("Bathtub", 65, 4.5),
 		piece("Toilet", 52, 14, 90),
@@ -215,6 +216,7 @@ local LARGE: Plan = {
 		piece("Sink", 99, 3.2),
 		piece("Crate", 106, 4),
 		piece("Barrel", 137, 4),
+		piece("TrashCan", 131, 4),
 		piece("Table", 116, 20),
 		piece("Chair", 110, 20, 90),
 		piece("Chair", 122, 20, 270),
@@ -235,6 +237,7 @@ local LARGE: Plan = {
 		piece("Piano", 52, 79.5),
 		piece("TVStand", 52, 50.6),
 		piece("Lamp", 28, 60),
+		piece("Aquarium", 8, 81),
 		piece("Box", 5, 52),
 		piece("Box", 8, 52),
 		piece("Box", 5, 55),
@@ -249,6 +252,7 @@ local LARGE: Plan = {
 		piece("Couch", 122, 78, 180),
 		piece("Armchair", 78, 56),
 		piece("Crate", 88, 56),
+		piece("Arcade", 136, 66),
 		piece("Box", 136, 52),
 		piece("Box", 132.6, 52),
 		piece("Plant", 75, 80),
@@ -371,6 +375,7 @@ local MANSION: Plan = {
 		piece("Armchair", 98, 46),
 		piece("Plant", 136, 52),
 		piece("Box", 96, 30),
+		piece("Aquarium", 98, 36, 90),
 		-- Kitchen
 		piece("Fridge", 148, 4),
 		piece("Fridge", 153, 4),
@@ -383,6 +388,7 @@ local MANSION: Plan = {
 		piece("Chair", 170, 33, 180),
 		piece("Crate", 194, 50),
 		piece("Barrel", 145, 50),
+		piece("TrashCan", 186, 50),
 		piece("Box", 196, 16),
 		piece("Box", 196, 19.2),
 		-- Hallway
@@ -401,6 +407,7 @@ local MANSION: Plan = {
 		piece("Plant", 66, 126),
 		piece("Box", 64, 74),
 		piece("Lamp", 6, 126),
+		piece("Beanbag", 50, 122),
 		-- Laundry
 		piece("Washer", 74, 90),
 		piece("Washer", 74, 94),
@@ -418,6 +425,7 @@ local MANSION: Plan = {
 		piece("Barrel", 113, 124),
 		piece("Bookshelf", 140, 73.5),
 		piece("Lamp", 146, 124),
+		piece("Arcade", 144.5, 116),
 		-- Garage
 		piece("Car", 174, 98),
 		piece("Crate", 155, 75),
@@ -428,6 +436,8 @@ local MANSION: Plan = {
 		piece("Box", 158, 126),
 		piece("Desk", 195, 110, 270),
 		piece("Crate", 196, 126),
+		piece("VendingMachine", 196.5, 90, 270),
+		piece("Treadmill", 158, 105),
 	},
 	items = {
 		pt(30, 40),

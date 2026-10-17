@@ -12,6 +12,9 @@ local player = Players.LocalPlayer
 local aim = Vector3.new(0, 0, -1)
 local usingMouse = not UserInputService.TouchEnabled or UserInputService.MouseEnabled
 local controls: any = nil
+local aimRemote: UnreliableRemoteEvent? = nil
+local lastAimSent = 0
+local lastAimSentValue = Vector3.zero
 
 local KEYS: { [Enum.KeyCode]: Vector3 } = {
 	[Enum.KeyCode.W] = Vector3.new(0, 0, -1),
@@ -108,6 +111,13 @@ local function step()
 		aim = move.Unit
 	end
 	root.CFrame = CFrame.lookAt(root.Position, root.Position + aim)
+
+	-- Keep the server's idea of your aim fresh (weapon pushes and drags use it).
+	local now = os.clock()
+	if aimRemote and now - lastAimSent > 0.1 and aim:Dot(lastAimSentValue) < 0.995 then
+		lastAimSent, lastAimSentValue = now, aim
+		aimRemote:FireServer(aim)
+	end
 end
 
 local function onCharacter(character: Model)
@@ -131,6 +141,10 @@ local function onCharacter(character: Model)
 end
 
 function MovementController.start()
+	task.spawn(function()
+		local Remotes = require(game:GetService("ReplicatedStorage").Shared.Remotes)
+		aimRemote = Remotes.unreliable("Aim")
+	end)
 	task.spawn(function()
 		local ok, module = pcall(function()
 			return require(

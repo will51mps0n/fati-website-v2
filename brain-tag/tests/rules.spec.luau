@@ -139,9 +139,22 @@ test("item data is consistent", function()
 				id .. " gun stats"
 			)
 		elseif item.kind == "Consumable" then
-			expect(item.immunity, id .. " pill stats")
+			expect(item.immunity or (item.speedBoost and item.boostSeconds), id .. " consumable stats")
 		elseif item.kind == "Passive" then
 			expect(item.rewardBonus, id .. " drumstick stats")
+		elseif item.kind == "Stream" then
+			expect(item.reach and item.arc and item.knockback and item.tick, id .. " stream stats")
+		elseif item.kind == "Trap" then
+			expect(item.charges and item.knockback and item.stun, id .. " trap stats")
+		end
+		if item.kind == "Projectile" then
+			expect(item.projectile ~= nil, id .. " has a projectile look")
+		end
+		if item.effect == "Explode" then
+			expect(item.radius, id .. " blast radius")
+		end
+		if item.kind == "Consumable" then
+			expect(item.immunity or item.speedBoost, id .. " does something")
 		end
 		if item.robuxProduct then
 			expect(Config.MONETIZATION.Products[item.robuxProduct] ~= nil, id .. " product key exists")
@@ -160,6 +173,16 @@ test("item data is consistent", function()
 	expectEq(Items.get("Spear").price, 3500, "spear price from the wiki")
 	expectEq(Items.get("Shotgun").price, 10000, "shotgun price from the wiki")
 	expect(#Items.groundTable() >= 4, "enough ground item kinds")
+	local count = 0
+	for _ in Items.all do
+		count += 1
+	end
+	expect(count >= 25, "lots of items: " .. count)
+	local listed = {}
+	for _, id in Items.shopOrder do
+		expect(not listed[id], id .. " listed once")
+		listed[id] = true
+	end
 end)
 
 test("skin data is consistent", function()

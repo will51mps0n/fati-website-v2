@@ -124,9 +124,12 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 			if itemId then
 				preview = UIKit.viewport(slot, ItemModels.build(itemId), { ZIndex = 2 })
 			end
-			local item = Items.get(itemId)
-			itemName.Text = if item then item.name else ""
 		end
+		local item = Items.get(itemId)
+		local charges = ClientState.my("HeldCharges")
+		itemName.Text = if item
+			then item.name .. (if typeof(charges) == "number" and charges > 0 then " x" .. charges else "")
+			else ""
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)
@@ -149,8 +152,13 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						else "Tap SHOP to trade with the wizard"
 				elseif groundItem then
 					text = (if keys then "Press [E] to pick up " else "Tap PICK UP: ") .. groundItem.name
-				elseif itemId and keys then
-					text = "[Click] use   [G] drop"
+				elseif item and keys then
+					local verb = if item.kind == "Stream"
+						then "[Hold click] spray"
+						elseif item.kind == "Trap" then "[Click] drop one"
+						elseif item.kind == "Melee" then "[Click] swing  [Hold] drag furniture"
+						else "[Click] use"
+					text = verb .. "   [G] drop"
 				end
 			end
 		end

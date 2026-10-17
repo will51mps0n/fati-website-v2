@@ -126,7 +126,9 @@ function CharacterService.applyLook(p: Participant)
 		return
 	end
 	root.Size = Vector3.new(C.RootWidth, C.RootHeight, C.RootWidth) * p.scale
-	humanoid.HipHeight = C.HipHeight * p.scale
+	-- Hip height stays fixed while the body grows, so even giant players keep
+	-- their collision box low enough to bump into benches and coffee tables.
+	humanoid.HipHeight = C.HipHeight
 	CharacterLook.apply(character, root, CharacterService.skinFor(p), p.team, p.scale)
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") then
@@ -146,11 +148,33 @@ function CharacterService.refreshSpeed(p: Participant)
 	if not humanoid then
 		return
 	end
-	if os.clock() < p.stunUntil then
+	local now = os.clock()
+	if now < p.stunUntil then
 		humanoid.WalkSpeed = 0
-	else
-		humanoid.WalkSpeed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+		return
 	end
+	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+	if now < p.boostUntil then
+		speed *= p.boostFactor
+	end
+	if now < p.slowUntil then
+		speed *= p.slowFactor
+	end
+	humanoid.WalkSpeed = speed
+end
+
+-- Speeds a participant up (energy drink) or down (snowball) for a while.
+function CharacterService.speedEffect(p: Participant, factor: number, seconds: number)
+	local untilTime = os.clock() + seconds
+	if factor >= 1 then
+		p.boostFactor, p.boostUntil = factor, math.max(p.boostUntil, untilTime)
+	else
+		p.slowFactor, p.slowUntil = factor, math.max(p.slowUntil, untilTime)
+	end
+	CharacterService.refreshSpeed(p)
+	task.delay(seconds + 0.05, function()
+		CharacterService.refreshSpeed(p)
+	end)
 end
 
 local function setup(p: Participant, character: Model)

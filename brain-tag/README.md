@@ -21,8 +21,20 @@ spawns).*
 
 ## Getting it into Roblox Studio
 
-You need [Roblox Studio](https://create.roblox.com/) and the command-line tool
-[Rojo](https://rojo.space), installed through [Rokit](https://github.com/rojo-rbx/rokit).
+The built place is committed as `BrainTag.rbxlx`. One command downloads it and
+opens it in Studio (you only need [Roblox Studio](https://create.roblox.com/)):
+
+- macOS:
+  `curl -L -o ~/Desktop/BrainTag.rbxlx https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/BrainTag.rbxlx && open ~/Desktop/BrainTag.rbxlx`
+- Windows (PowerShell):
+  `iwr https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/BrainTag.rbxlx -OutFile "$HOME\Desktop\BrainTag.rbxlx"; start "$HOME\Desktop\BrainTag.rbxlx"`
+
+Then press **Play**.
+
+### Building it yourself
+
+You need the command-line tool [Rojo](https://rojo.space), installed through
+[Rokit](https://github.com/rojo-rbx/rokit).
 
 1. Install Rokit once.
    - macOS / Linux: `curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash`
@@ -95,22 +107,43 @@ settles the tug of war.
 
 ### Items (score prices)
 
+Melee weapons shove and daze zombies. Every melee weapon also pushes furniture
+with its tip, and holding click hooks the nearest piece and drags it to you.
+
 | Item | Price | Effect |
 | --- | --- | --- |
-| Stick | 100 | Short shove; pushes and drags furniture |
+| Stick | 100 | Short shove |
 | Pill | 300 | +25 immunity (less likely to start as a zombie) |
+| Rubber Chicken | 400 | SQUEAK. Tiny shove, long daze |
+| Energy Drink | 500 | 35% faster for 8 seconds |
+| Pool Noodle | 600 | Huge, floppy, fast, wide swat |
+| Banana Peels | 700 | Drop 3 peels; zombies that step on one slip and spin out |
 | Bat | 750 | Short swing, solid knockback |
+| Slingshot | 800 | Fast little pebbles |
+| Baguette | 900 | Long and crusty, leaves crumbs |
 | Drumstick | 1,000 | Hold it at round end: +40% score (5% roll: Golden, +80%) |
+| Frying Pan | 1,200 | CLANG: big knockback, long daze (5% roll: Golden Frying Pan) |
+| Water Gun | 1,200 | Hold to spray zombies back |
 | Potato Gun | 1,500 | Potato projectiles (5% roll: Rare Potato Gun) |
-| Swordfish | 2,500 | Long reach; hold click to drag light furniture toward you |
+| Crowbar | 1,600 | Hooks and drags furniture harder than anything |
+| Plunger | 1,800 | Sticks to a zombie's face and pins them |
+| Giant Lollipop | 2,000 | Wide, heavy swing |
+| Swordfish | 2,500 | Long reach, strong furniture hook |
+| Snowball Launcher | 3,000 | Frozen zombies crawl for a few seconds |
 | Spear | 3,500 | Longest reach, straight push (5% roll: Rare Ancient Spear) |
+| Katana | 4,000 | Fast swings, long reach |
+| Confetti Cannon | 4,500 | Cone blast in a shower of confetti |
+| Bubble Gun | 5,000 | Traps a zombie in a bubble until it pops |
+| Leaf Blower | 7,000 | Hold to blow zombies and light furniture away |
+| Duck Launcher | 9,000 | Rubber duck that explodes and knocks back every zombie nearby |
 | Shotgun | 10,000 | Cone blast; also blows a hole in the wall in front of you until the round resets |
 
-The wizard sells the rare versions outright: Golden Drumstick 3,000, Rare Potato
-Gun 4,000, Rare Ancient Spear 7,000.
+The wizard sells rare items outright: Golden Drumstick 3,000, Rare Potato Gun
+4,000, Golden Frying Pan 5,000, Inflatable Hammer 6,000 (BOING: sends zombies
+flying), Rare Ancient Spear 7,000.
 
-Stick, Potato Gun, Pill and Drumstick prices and the 3-minute timer were not
-documented for the original; they are placeholders in `Config.luau` / `Items.luau`.
+Only the Bat, Swordfish, Spear and Shotgun prices are known from the original.
+The rest, and the 3-minute timer, are placeholders in `Config.luau` / `Items.luau`.
 
 ## Monetization
 
@@ -125,10 +158,12 @@ you are a zombie), Immunity Shot (+50), and a 2x Score boost for 30 minutes.
 VIP-only skins), Double Score, Starter Kit (a Bat every round), Lucky (rare roll
 chance 5% to 15%).
 
-**3. Skins.** Human: Chef, Ninja, Pumpkin (score), Duck, Astronaut (Robux),
-Royal (VIP). Zombie: Toxic (score), Frost, Mummy (Robux), Golden (VIP). Score
-skins give non-paying players something to grind for; Robux skins are pure
-cosmetics, the safest thing to sell.
+**3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
+Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
+Shark, Hotdog, Duck, Astronaut. Zombie, for score: Toxic, Zombie Dog, Skeleton,
+Zombie Clown. Zombie, for Robux: Ghost, Vampire, Frost, Mummy. VIP: Royal and
+Golden. Score skins give non-paying players something to grind for; Robux
+skins are pure cosmetics, the safest thing to sell.
 
 Suggested starting prices (in Robux):
 
@@ -139,7 +174,7 @@ Suggested starting prices (in Robux):
 | Product | Instant Spear | 35 |
 | Product | 2x Score, 30 min | 49 |
 | Product | Instant Shotgun | 75 |
-| Product | Duck / Astronaut / Frost / Mummy skin | 49 to 99 each |
+| Product | Any Robux skin (Dog, Panda, Robot, Ghost...) | 49 to 99 each |
 | Pass | Starter Kit | 99 |
 | Pass | Lucky | 79 |
 | Pass | Double Score | 149 |

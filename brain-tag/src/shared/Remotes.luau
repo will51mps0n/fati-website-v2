@@ -21,6 +21,7 @@ local EVENTS = {
 -- Unreliable: frequent, small, fine to lose one now and then.
 local UNRELIABLE = {
 	"PushClaim", -- client -> server: { Model } of furniture it is pushing
+	"Aim", -- client -> server: flat aim direction, about 10 times a second
 }
 
 local FUNCTIONS = {

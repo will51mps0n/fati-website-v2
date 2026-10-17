@@ -43,6 +43,12 @@ local Specs: { [string]: Spec } = {
 	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
 	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },
+	Beanbag = { w = 3.4, d = 3.4, h = 2.4, weight = "Light" },
+	TrashCan = { w = 2.2, d = 2.2, h = 3, weight = "Light" },
+	Aquarium = { w = 6, d = 2.6, h = 4, weight = "Heavy" },
+	Arcade = { w = 3.2, d = 3, h = 6.5, weight = "Heavy" },
+	VendingMachine = { w = 4.5, d = 3, h = 7.5, weight = "Massive" },
+	Treadmill = { w = 3, d = 7, h = 2.4, weight = "Heavy" },
 }
 
 local FurnitureSpecs = { specs = Specs }

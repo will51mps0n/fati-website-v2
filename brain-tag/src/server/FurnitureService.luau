@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
 local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
@@ -31,9 +32,19 @@ type Piece = FurnitureBuilder.Built & {
 	burst: Vector3,
 	burstUntil: number,
 	burstLength: number,
+	lastGood: CFrame, -- last position that passed the anti-cheat checks
 }
 
-export type Mover = { root: BasePart, humanoid: Humanoid, id: string, scale: number }
+-- Someone who can push furniture. `reach` is set while they hold a melee
+-- weapon, whose shaft (along `aim`) pushes too.
+export type Mover = {
+	root: BasePart,
+	humanoid: Humanoid,
+	id: string,
+	scale: number,
+	aim: Vector3,
+	reach: number?,
+}
 
 local OWNER = FurniturePush.OWNER_ATTRIBUTE
 local CONTEST_SECONDS = 0.8
@@ -64,13 +75,27 @@ local function stop(piece: Piece)
 	piece.body.AssemblyAngularVelocity = Vector3.zero
 end
 
--- Takes a piece back from a client (optionally blocking new claims for a bit).
-local function revoke(piece: Piece, blockSeconds: number)
+-- Takes a piece back from a client (optionally blocking new claims for a
+-- bit). In a tug of war the piece keeps moving: the server writes the
+-- resolved velocity the same frame, so stopping it would only cause a snap.
+local function revoke(piece: Piece, blockSeconds: number, halt: boolean?)
 	if piece.owner then
 		serverOwns(piece)
-		stop(piece)
+		if halt ~= false then
+			stop(piece)
+		end
 	end
 	piece.contestedUntil = math.max(piece.contestedUntil, os.clock() + blockSeconds)
+end
+
+-- True if anyone other than `id` pushed the piece in the last moment.
+local function othersPushing(piece: Piece, id: string, now: number): boolean
+	for other, seen in piece.pushers do
+		if other ~= id and now - seen <= 0.3 then
+			return true
+		end
+	end
+	return false
 end
 
 local function grant(piece: Piece, player: Player)
@@ -100,6 +125,7 @@ function FurnitureService.build(layout: MapLayout.Layout)
 			piece.burst = Vector3.zero
 			piece.burstUntil = 0
 			piece.burstLength = 1
+			piece.lastGood = built.home
 			table.insert(pieces, piece)
 			byBody[built.body] = piece
 			byModel[built.model] = piece
@@ -155,6 +181,7 @@ function FurnitureService.resetAll()
 		piece.burstUntil = 0
 		table.clear(piece.pushers)
 		piece.model:PivotTo(piece.home)
+		piece.lastGood = piece.home
 		piece.body.AssemblyLinearVelocity = Vector3.zero
 		piece.body.AssemblyAngularVelocity = Vector3.zero
 	end
@@ -181,10 +208,15 @@ local function onClaim(player: Player, list: unknown)
 			continue
 		end
 		if piece.owner and piece.owner ~= player then
-			revoke(piece, CONTEST_SECONDS) -- two players fighting over it: server decides
+			revoke(piece, CONTEST_SECONDS, false) -- two players fighting over it: server decides
 			continue
 		end
-		if Util.flatDistance(piece.body.Position, root.Position) > 20 * math.max(1, p.scale) then
+		if othersPushing(piece, p.id, now) then
+			continue -- someone else is on it too: the server settles that
+		end
+		-- Only pieces you could actually be touching (body or longest weapon).
+		local range = piece.body.Size.Magnitude / 2 + root.Size.X / 2 + 12 * math.max(1, p.scale) + 3
+		if Util.flatDistance(piece.body.Position, root.Position) > range then
 			continue
 		end
 		piece.lastClaim = now
@@ -205,11 +237,31 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			local dir = flat.Unit
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
 			local strength = RoundRules.pushStrength(mover.scale)
+			local touched: { [BasePart]: boolean } = {}
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
+					touched[part] = true
 					piece.pushers[mover.id] = now
 					FurniturePush.add(pushes, part, dir * humanoid.WalkSpeed, strength, probe.Position)
+				end
+			end
+			-- A held weapon's shaft pushes what it touches, same as the client does.
+			if mover.reach then
+				local shaft, shaftSize =
+					FurniturePush.itemProbe(root, CharacterLook.grip(mover.scale), mover.aim, mover.reach)
+				for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
+					local piece = byBody[part]
+					if piece and not touched[part] then
+						piece.pushers[mover.id] = now
+						FurniturePush.add(
+							pushes,
+							part,
+							dir * humanoid.WalkSpeed,
+							strength,
+							part.Position + mover.aim * 0.5
+						)
+					end
 				end
 			end
 		end
@@ -217,7 +269,31 @@ local function collectPushes(now: number): FurniturePush.Pushes
 	return pushes
 end
 
-local function step()
+-- Is a client-driven piece somewhere a legitimate push could have put it?
+local function plausible(piece: Piece, dt: number): boolean
+	local body = piece.body
+	local owner = piece.owner
+	local p = owner and Participants.fromPlayer(owner)
+	local root = p and Participants.body(p)
+	if not p or not root then
+		return false
+	end
+	local v = body.AssemblyLinearVelocity
+	if Vector3.new(v.X, 0, v.Z).Magnitude > Config.FURNITURE_MAX_SPEED * 1.5 or v.Y > 8 then
+		return false
+	end
+	if body.AssemblyAngularVelocity.Magnitude > 3 then
+		return false
+	end
+	local moved = Util.flatDistance(body.Position, piece.lastGood.Position)
+	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * dt + 1 then
+		return false -- teleported
+	end
+	local range = body.Size.Magnitude / 2 + root.Size.X / 2 + 14 * math.max(1, p.scale) + 6
+	return Util.flatDistance(body.Position, root.Position) <= range
+end
+
+local function step(dt: number)
 	local now = os.clock()
 	local pushes = collectPushes(now)
 	for _, piece in pieces do
@@ -242,17 +318,25 @@ local function step()
 		end
 		if active >= 2 or someoneElse then
 			-- A tug of war: the server simulates it so both sides count.
-			revoke(piece, CONTEST_SECONDS)
+			revoke(piece, CONTEST_SECONDS, false)
+		elseif not owner and now < piece.contestedUntil and active >= 1 then
+			-- Keep the server in charge until the tug of war is really over.
+			piece.contestedUntil = now + CONTEST_SECONDS
 		elseif owner then
-			local v = body.AssemblyLinearVelocity
 			if owner.Parent ~= Players or now - piece.lastClaim > Config.FURNITURE_RELEASE_SECONDS then
 				revoke(piece, 0)
-			elseif Vector3.new(v.X, 0, v.Z).Magnitude > Config.FURNITURE_MAX_SPEED * 1.5 then
-				revoke(piece, 1) -- faster than any push allows: take it back
+			elseif not plausible(piece, dt) then
+				-- Moved in a way no push could: put it back and take it away.
+				revoke(piece, 1.5)
+				piece.model:PivotTo(piece.lastGood)
 			end
+		end
+		if piece.owner then
+			piece.lastGood = body.CFrame
 		end
 
 		if piece.owner == nil then
+			piece.lastGood = body.CFrame
 			local v = body.AssemblyLinearVelocity
 			if now < piece.burstUntil then
 				local k = (piece.burstUntil - now) / piece.burstLength

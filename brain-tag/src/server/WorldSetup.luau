@@ -51,7 +51,7 @@ function WorldSetup.run()
 		Config.PLAYERS_COLLIDE
 	)
 
-	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Effects", "Bots" } do
+	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Traps", "Effects", "Bots" } do
 		folder(name, workspace)
 	end
 

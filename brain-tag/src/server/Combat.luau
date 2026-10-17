@@ -68,6 +68,29 @@ function Combat.knockback(target: Participant, velocity: Vector3, stun: number)
 	end
 end
 
+-- Area blast (duck launcher): shoves every zombie within `radius` away from
+-- the center, with a classic (harmless) Roblox explosion for show.
+function Combat.explode(at: Vector3, radius: number, knockback: number, stun: number)
+	local boom = Instance.new("Explosion")
+	boom.Position = at
+	boom.BlastRadius = radius
+	boom.BlastPressure = 0
+	boom.DestroyJointRadiusPercent = 0
+	boom.ExplosionType = Enum.ExplosionType.NoCraters
+	boom.Parent = workspace
+	for _, zombie in Participants.onTeam("Zombie") do
+		local root = Participants.body(zombie)
+		if root then
+			local offset = Util.flat(root.Position - at)
+			if offset.Magnitude <= radius and Combat.lineOfSight(at, root.Position) then
+				local away = if offset.Magnitude > 0.1 then offset.Unit else Vector3.xAxis
+				local falloff = 1 - offset.Magnitude / radius * 0.5
+				Combat.knockback(zombie, away * knockback * falloff, stun)
+			end
+		end
+	end
+end
+
 export type Hit = { target: Participant, direction: Vector3, distance: number }
 
 -- Zombies inside a cone in front of `attacker`, not behind walls.

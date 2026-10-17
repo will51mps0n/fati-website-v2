@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -20,6 +21,7 @@ local Parts = require(ReplicatedStorage.Shared.Parts)
 local Participants = require(script.Parent.Participants)
 local Projectiles = require(script.Parent.Projectiles)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Traps = require(script.Parent.Traps)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -72,16 +74,27 @@ function ItemService.refreshHand(p: Participant)
 	attachHeld(p)
 end
 
-local function setHeld(p: Participant, itemId: string?)
+local function setStreaming(p: Participant, itemId: string?)
+	p.streaming = itemId ~= nil
+	if p.character then
+		p.character:SetAttribute("Spraying", itemId) -- clients draw the spray
+	end
+end
+
+local function setHeld(p: Participant, itemId: string?, charges: number?)
 	p.heldItem = itemId
 	p.dragging = false
+	local item = Items.get(itemId)
+	p.heldCharges = charges or (item and item.charges)
+	setStreaming(p, nil)
 	p.state:SetAttribute("HeldItem", itemId or "")
+	p.state:SetAttribute("HeldCharges", p.heldCharges or 0)
 	attachHeld(p)
 end
 
 -- Ground items -----------------------------------------------------------------------
 
-function ItemService.spawnGround(itemId: string, position: Vector3): Model
+function ItemService.spawnGround(itemId: string, position: Vector3, charges: number?): Model
 	local model = ItemModels.build(itemId)
 	model.Name = itemId
 	-- Built at the origin, so the bounding box center is the offset to undo.
@@ -101,6 +114,7 @@ function ItemService.spawnGround(itemId: string, position: Vector3): Model
 	ring.CanCollide = false
 	ring.CanQuery = false
 	model:SetAttribute("ItemId", itemId)
+	model:SetAttribute("Charges", charges)
 	model:SetAttribute("SpotX", position.X)
 	model:SetAttribute("SpotZ", position.Z)
 	model.Parent = groundFolder
@@ -141,11 +155,11 @@ end
 -- Holding ----------------------------------------------------------------------------
 
 -- Puts an item in the participant's hand, dropping what they held before.
-function ItemService.give(p: Participant, itemId: string)
+function ItemService.give(p: Participant, itemId: string, charges: number?)
 	if p.heldItem then
 		ItemService.drop(p)
 	end
-	setHeld(p, itemId)
+	setHeld(p, itemId, charges)
 end
 
 function ItemService.drop(p: Participant)
@@ -156,7 +170,7 @@ function ItemService.drop(p: Participant)
 	local root = Participants.body(p)
 	if root then
 		local spot = root.Position + p.aim * (root.Size.X / 2 + 2)
-		ItemService.spawnGround(itemId, spot)
+		ItemService.spawnGround(itemId, spot, p.heldCharges)
 	end
 	setHeld(p, nil)
 end
@@ -187,8 +201,9 @@ function ItemService.pickUp(p: Participant)
 		return
 	end
 	local itemId = best:GetAttribute("ItemId") :: string
+	local charges = best:GetAttribute("Charges")
 	best:Destroy()
-	ItemService.give(p, itemId)
+	ItemService.give(p, itemId, if typeof(charges) == "number" then charges else nil)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
@@ -234,9 +249,19 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		for _, hit in Combat.zombiesInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
+			local zRoot = Participants.body(hit.target)
+			if zRoot and item.fx then
+				Announcer.fx("Hit", { position = zRoot.Position, fx = item.fx })
+			end
+			if item.effect == "Plunge" then
+				Announcer.fx(
+					"Plunged",
+					{ character = hit.target.character, seconds = item.effectSeconds or 1.5 }
+				)
+			end
 		end
 		if kind == "Blast" then
-			Announcer.fx("Blast", { origin = root.Position, direction = aim, reach = reach })
+			Announcer.fx("Blast", { origin = root.Position, direction = aim, reach = reach, item = item.id })
 			if item.breaksWalls then
 				breakWallAhead(p, aim, reach)
 			end
@@ -260,6 +285,25 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
+	elseif kind == "Trap" then
+		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item)
+		Announcer.fx("Drop", { position = root.Position })
+		p.heldCharges = (p.heldCharges or 1) - 1
+		p.state:SetAttribute("HeldCharges", p.heldCharges)
+		if p.heldCharges <= 0 then
+			ItemService.take(p)
+		end
+	elseif kind == "Consumable" and item.speedBoost then
+		CharacterService.speedEffect(p, item.speedBoost, item.boostSeconds or 8)
+		ItemService.take(p)
+		Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		if p.player then
+			Announcer.toast(
+				p.player,
+				"Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds",
+				Config.COLORS.Good
+			)
+		end
 	elseif kind == "Consumable" then
 		local before = p.immunity
 		Participants.setImmunity(p, p.immunity + (item.immunity or 0))
@@ -294,6 +338,7 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	p.aim = direction
 	if action == "stop" then
 		p.dragging = false
+		setStreaming(p, nil)
 		return
 	end
 	if action ~= "start" or p.team ~= "Human" then
@@ -301,6 +346,12 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	end
 	local item = Items.get(p.heldItem)
 	if not item then
+		return
+	end
+	if item.kind == "Melee" then
+		p.dragging = true -- hooking furniture works even while the swing cools down
+	elseif item.kind == "Stream" then
+		setStreaming(p, item.id) -- sprays until "stop" (see streamStep)
 		return
 	end
 	local now = os.clock()
@@ -353,10 +404,53 @@ local function dragStep()
 	end
 end
 
+-- Water gun and leaf blower: while held, push every zombie in the cone a
+-- little, many times a second. The leaf blower also blows light furniture.
+local function streamStep()
+	local now = os.clock()
+	for _, p in Participants.onTeam("Human") do
+		if not p.streaming then
+			continue
+		end
+		local item = Items.get(p.heldItem)
+		local root = Participants.body(p)
+		if not item or item.kind ~= "Stream" or not root then
+			setStreaming(p, nil)
+			continue
+		end
+		if now < p.nextStreamTick then
+			continue
+		end
+		p.nextStreamTick = now + (item.tick or 0.12)
+		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
+		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
+			local falloff = 1 - hit.distance / (reach * 1.5)
+			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)
+		end
+		if item.fx == "Leaves" then
+			local center = root.Position + p.aim * (reach / 2)
+			local box = CFrame.lookAt(center, center + p.aim)
+			for _, body in FurnitureService.findInBox(box, Vector3.new(reach * 0.6, 4, reach)) do
+				local weight = FurnitureService.weightOf(body)
+				if weight == "Light" or weight == "Medium" then
+					FurnitureService.shove(body, p.aim * (if weight == "Light" then 12 else 6), 0.18)
+				end
+			end
+		end
+	end
+end
+
 function ItemService.init()
 	groundFolder = workspace:WaitForChild("GroundItems") :: Folder
 
 	Remotes.event("UseItem").OnServerEvent:Connect(onUse)
+	Remotes.unreliable("Aim").OnServerEvent:Connect(function(player, aim)
+		local p = Participants.fromPlayer(player)
+		local direction = if p and typeof(aim) == "Vector3" then Util.flatUnit(aim) else nil
+		if p and direction then
+			p.aim = direction
+		end
+	end)
 
 	local lastAction: { [Player]: number } = {}
 	local function throttled(player: Player): boolean
@@ -386,6 +480,7 @@ function ItemService.init()
 	end)
 
 	RunService.Heartbeat:Connect(dragStep)
+	RunService.Heartbeat:Connect(streamStep)
 end
 
 return ItemService

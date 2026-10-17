@@ -213,6 +213,214 @@ local HATS: { [string]: HatBuilder } = {
 	end,
 }
 
+-- Costume pieces for the animal and character skins, drawn in real studs at
+-- scale `s`. Reference points: head center (0, 0), head radius 1.15 * s,
+-- head top at y = 0.97 * s, face front at z = -1.05 * s; body 3.6 x 2.1 * s
+-- centered at z = +0.1 * s with its top at y = 0.5 * s.
+type Kit = {
+	dot: (x: number, z: number, d: number, top: number, color: string | Color3) -> Part,
+	bar: (
+		x: number,
+		z: number,
+		w: number,
+		d: number,
+		top: number,
+		color: string | Color3,
+		yaw: number?
+	) -> Part,
+	pill: (x: number, z: number, w: number, d: number, top: number, color: string | Color3) -> (),
+	ball: (x: number, y: number, z: number, d: number, color: string | Color3) -> Part,
+}
+
+local function kit(model: Model, root: BasePart, s: number): Kit
+	local k = {} :: Kit
+	function k.dot(x, z, d, top, color)
+		local part = disc("Costume", d * s, 0.05 * s, color)
+		attach(root, part, CFrame.new(x * s, (top - 0.025) * s, z * s) * UP, model)
+		return part
+	end
+	function k.bar(x, z, w, d, top, color, yaw)
+		local part = block("Costume", Vector3.new(w, 0.05, d) * s, color)
+		attach(root, part, CFrame.new(x * s, (top - 0.025) * s, z * s) * CFrame.Angles(0, yaw or 0, 0), model)
+		return part
+	end
+	function k.pill(x, z, w, d, top, color)
+		local r = math.min(w, d) / 2
+		roundedRect(
+			model,
+			root,
+			"Costume",
+			x * s,
+			z * s,
+			w * s,
+			d * s,
+			r * s * 0.999,
+			top * s,
+			0.05 * s,
+			color
+		)
+	end
+	function k.ball(x, y, z, d, color)
+		local part = ball("Costume", d * s, if typeof(color) == "string" then color else "FFFFFF")
+		if typeof(color) == "Color3" then
+			part.Color = color
+		end
+		attach(root, part, CFrame.new(x * s, y * s, z * s), model)
+		return part
+	end
+	return k
+end
+
+-- Ears stick out from under the head; snouts and noses sit on top of it.
+type Style = (k: Kit, skin: Skins.Skin) -> ()
+
+local function snout(k: Kit, color: string, nose: string)
+	k.dot(0, -0.85, 0.95, 1.0, color)
+	k.dot(0, -1.15, 0.42, 1.04, nose)
+end
+
+local STYLES: { [string]: Style } = {
+	Dog = function(k, skin)
+		local ear = skin.accent or "6B4226"
+		for side = -1, 1, 2 do
+			k.pill(side * 1.05, 0.15, 0.7, 1.3, 0.92, ear) -- floppy ears
+		end
+		snout(k, skin.skin, "1C1C1C")
+		k.pill(0, 1.7, 0.5, 1.2, 0.55, skin.shirt) -- tail
+		k.dot(0, 2.25, 0.5, 0.55, skin.shirt)
+	end,
+	Cat = function(k, skin)
+		local ear = skin.accent or "6E6E73"
+		for side = -1, 1, 2 do
+			k.bar(side * 0.72, -0.45, 0.75, 0.75, 0.85, ear, math.rad(45)) -- pointy ears
+			for _, angle in { -0.15, 0.15 } do
+				k.bar(side * 0.55, -1.15 + angle, 0.9, 0.05, 1.06, "1C1C1C", side * angle) -- whiskers
+			end
+		end
+		k.dot(0, -1.1, 0.3, 1.05, "FF8FAB")
+		k.bar(0.4, 1.7, 0.3, 1.4, 0.55, skin.shirt, 0.5) -- tail
+	end,
+	Bunny = function(k, skin)
+		for side = -1, 1, 2 do
+			k.pill(side * 0.42, 1.05, 0.55, 1.9, 1.05, skin.hair) -- long ears
+			k.pill(side * 0.42, 1.05, 0.28, 1.4, 1.07, skin.accent or "FFB3C7")
+		end
+		k.dot(0, -1.12, 0.32, 1.05, "FF8FAB")
+		k.dot(0, 1.4, 0.75, 0.56, "FFFFFF") -- fluffy tail
+	end,
+	Bear = function(k, skin)
+		for side = -1, 1, 2 do
+			k.dot(side * 0.9, 0.2, 0.75, 0.86, skin.accent or "5A3518")
+		end
+		snout(k, skin.skin, "1C1C1C")
+	end,
+	Panda = function(k, skin)
+		for side = -1, 1, 2 do
+			k.dot(side * 0.9, 0.15, 0.75, 0.86, "1C1C1C") -- ears
+			k.pill(side * 0.38, -0.55, 0.38, 0.55, 1.0, "1C1C1C") -- eye patches
+		end
+		k.dot(0, -1.12, 0.3, 1.04, "1C1C1C")
+	end,
+	Frog = function(k, skin)
+		for side = -1, 1, 2 do
+			k.dot(side * 0.5, -0.55, 0.8, 1.1, "FFFFFF") -- big eyes
+			k.dot(side * 0.5, -0.65, 0.35, 1.14, "1C1C1C")
+		end
+		k.bar(0, -0.95, 0.9, 0.08, 1.03, skin.accent or "2E7D32") -- smile
+	end,
+	Penguin = function(k, skin)
+		k.pill(0, -0.4, 2.0, 1.0, 0.53, "F4F4F4") -- white belly on the chest
+		k.bar(0, -1.25, 0.5, 0.45, 1.03, skin.accent or "F39C12", math.rad(45)) -- beak
+		for side = -1, 1, 2 do
+			k.dot(side * 0.35, -0.6, 0.25, 1.02, "1C1C1C")
+		end
+	end,
+	Robot = function(k, skin)
+		k.bar(0, -0.6, 1.5, 0.35, 1.02, skin.accent or "00E5FF") -- visor
+		for side = -1, 1, 2 do
+			k.dot(side * 1.1, 0, 0.35, 0.95, "7F8C8D") -- bolts
+		end
+		k.bar(0, 0.2, 0.08, 0.8, 1.05, "7F8C8D") -- antenna stalk (seen from above)
+		k.ball(0, 1.2, 0.55, 0.38, "E5484D")
+	end,
+	Pirate = function(k, skin)
+		k.dot(0, 0.1, 2.0, 1.15, "1C1C1C") -- tricorn hat
+		k.bar(0, -0.75, 1.5, 0.3, 1.16, "1C1C1C")
+		k.dot(0, 0.1, 0.35, 1.18, "F4F4F4") -- skull badge
+		k.dot(0.35, -0.85, 0.32, 1.05, "1C1C1C") -- eye patch
+		k.bar(-0.1, -0.7, 1.4, 0.06, 1.04, "1C1C1C", -0.5)
+	end,
+	Cowboy = function(k, skin)
+		k.dot(0, 0.05, 2.9, 1.1, skin.accent or "8B5A2B") -- wide brim
+		k.pill(0, 0.05, 1.4, 1.05, 1.3, "6B4226") -- crown
+		k.bar(0, 0.05, 1.42, 0.18, 1.31, "1C1C1C")
+	end,
+	Alien = function(k, skin)
+		for side = -1, 1, 2 do
+			k.pill(side * 0.45, -0.55, 0.5, 0.75, 1.02, skin.accent or "1C1C1C") -- big eyes
+			k.bar(side * 0.4, 0.35, 0.08, 0.9, 1.05, skin.hair, side * 0.4) -- antennae
+			k.ball(side * 0.6, 1.2, 0.75, 0.32, "C6FF00")
+		end
+	end,
+	Knight = function(k, skin)
+		k.dot(0, 0, 2.45, 1.05, "BDC3C7") -- helmet
+		k.bar(0, -0.75, 1.4, 0.14, 1.07, "2B2B30") -- visor slit
+		k.pill(0, 0.5, 0.45, 1.4, 1.12, skin.accent or "C0392B") -- plume
+	end,
+	Shark = function(k, skin)
+		local fin = skin.accent or "4A6378"
+		k.bar(0, 0.2, 0.55, 0.55, 1.12, fin, math.rad(45)) -- dorsal fin
+		for side = -1, 1, 2 do
+			k.bar(side * 2.0, 0.1, 0.8, 0.8, 0.45, fin, math.rad(45)) -- side fins
+			k.bar(side * 0.45, 1.75, 0.7, 0.7, 0.45, fin, math.rad(45)) -- tail fin
+		end
+		k.bar(0, -0.95, 1.2, 0.1, 1.03, "F4F4F4") -- teeth
+	end,
+	Hotdog = function(k, skin)
+		for i = -2, 2 do
+			k.bar(
+				i * 0.32,
+				-0.1 + (i % 2) * 0.25,
+				0.32,
+				0.12,
+				1.03,
+				skin.accent or "F7DC6F",
+				(i % 2) * 0.8 - 0.4
+			) -- mustard
+		end
+	end,
+	Skeleton = function(k, skin)
+		for i = -1, 2 do
+			k.bar(0, i * 0.35 + 0.1, 2.4, 0.13, 0.53, "F4F4F4") -- ribs
+		end
+		k.bar(0, 0.1, 0.18, 1.6, 0.54, "F4F4F4") -- spine
+		for side = -1, 1, 2 do
+			k.dot(side * 0.4, -0.5, 0.45, 1.02, "1C1C1C") -- eye sockets
+		end
+	end,
+	Ghost = function(k, skin)
+		for side = -1, 1, 2 do
+			k.pill(side * 0.38, -0.55, 0.35, 0.55, 1.02, "1C1C1C")
+		end
+		k.dot(0, -0.95, 0.4, 1.03, "1C1C1C") -- "oooo" mouth
+		k.pill(0, 1.6, 1.6, 1.0, 0.45, skin.shirt) -- wispy tail
+	end,
+	Vampire = function(k, skin)
+		k.pill(0, 0.55, 4.1, 1.8, 0.48, skin.accent or "8E1B1B") -- cape lining
+		k.bar(0, -0.75, 0.9, 0.5, 1.0, skin.hair, 0) -- widow's peak
+		for side = -1, 1, 2 do
+			k.bar(side * 0.15, -1.12, 0.1, 0.18, 1.06, "FFFFFF") -- fangs
+		end
+	end,
+	Clown = function(k, skin)
+		for i, color in { "E5484D", "F1C40F", "3498DB" } do
+			k.ball(-1.0, 0.95, (i - 2) * 0.45, 0.6, color)
+			k.ball(1.0, 0.95, (i - 2) * 0.45, 0.6, color)
+		end
+		k.ball(0, 1.05, -1.1, 0.4, skin.accent or "E5484D") -- red nose
+	end,
+}
+
 -- Where the right hand holds an item, relative to the root (front is -Z).
 function CharacterLook.grip(scale: number): CFrame
 	return CFrame.new(1.2 * scale, 0.6 * scale, -0.95 * scale)
@@ -233,7 +441,8 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 	-- Soft shadow on the floor under the character.
 	local shadow = disc("Shadow", 3.1 * s, 0.05, Color3.new(0, 0, 0))
 	shadow.Transparency = 0.72
-	attach(root, shadow, CFrame.new(0, -(C.RootHeight / 2 + C.HipHeight) * s + 0.08, 0) * UP, model)
+	-- Floor level is HipHeight below the root's bottom (hip height doesn't scale).
+	attach(root, shadow, CFrame.new(0, -(C.RootHeight / 2 * s + C.HipHeight) + 0.14, 0) * UP, model)
 
 	-- Body: outline first (bigger, lower), then the shirt on top.
 	local w, d, r, o = C.BodyWidth * s, C.BodyDepth * s, 0.7 * s, 0.14 * s
@@ -301,9 +510,22 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
+	-- A little nose poking out past the front of the head, like the original.
+	local nose = 0.3 * hd
+	attach(
+		root,
+		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+		model
+	)
+	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 
+	local style = skin.hat and STYLES[skin.hat]
+	if style then
+		style(kit(model, root, s), skin)
+	end
 	local hat = skin.hat and HATS[skin.hat]
 	if hat then
 		hat(model, root, s * C.HeadDiameter / 1.9) -- hats were sized for a 1.9-stud head
@@ -511,6 +733,14 @@ Config.MONETIZATION = {
 		SkinAstronaut = 0,
 		SkinFrost = 0,
 		SkinMummy = 0,
+		SkinDog = 0,
+		SkinPanda = 0,
+		SkinRobot = 0,
+		SkinAlien = 0,
+		SkinShark = 0,
+		SkinHotdog = 0,
+		SkinGhost = 0,
+		SkinVampire = 0,
 	},
 	VIP_SCORE_BONUS = 0.2,
 	DOUBLE_SCORE_BONUS = 1,
@@ -664,6 +894,12 @@ local Specs: { [string]: Spec } = {
 	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
 	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },
+	Beanbag = { w = 3.4, d = 3.4, h = 2.4, weight = "Light" },
+	TrashCan = { w = 2.2, d = 2.2, h = 3, weight = "Light" },
+	Aquarium = { w = 6, d = 2.6, h = 4, weight = "Heavy" },
+	Arcade = { w = 3.2, d = 3, h = 6.5, weight = "Heavy" },
+	VendingMachine = { w = 4.5, d = 3, h = 7.5, weight = "Massive" },
+	Treadmill = { w = 3, d = 7, h = 2.4, weight = "Heavy" },
 }
 
 local FurnitureSpecs = { specs = Specs }
@@ -704,6 +940,7 @@ type PieceSpec = {
 	color: string,
 	shape: Enum.PartType?,
 	material: Enum.Material?,
+	transparency: number?,
 }
 
 local Z = Parts.ALONG_Z
@@ -747,6 +984,42 @@ local function ballAt(
 end
 
 local DIAMOND = CFrame.Angles(0, math.rad(45), 0)
+
+-- Flat disc lying face-up (reads as a circle from the top-down camera).
+local function discAt(
+	diameter: number,
+	height: number,
+	x: number,
+	y: number,
+	z: number,
+	color: string
+): PieceSpec
+	return {
+		size = Vector3.new(height, diameter, diameter),
+		at = CFrame.new(x, y, z) * Parts.UPRIGHT,
+		color = color,
+		shape = Enum.PartType.Cylinder,
+	}
+end
+
+-- Cylinder lying along X (sideways across the item).
+local function crossRod(length: number, diameter: number, x: number, z: number, color: string): PieceSpec
+	return {
+		size = Vector3.new(length, diameter, diameter),
+		at = CFrame.new(x, 0, z),
+		color = color,
+		shape = Enum.PartType.Cylinder,
+	}
+end
+
+local function see(spec: PieceSpec, transparency: number): PieceSpec
+	spec.transparency = transparency
+	return spec
+end
+
+local function yaw(radians: number): CFrame
+	return CFrame.Angles(0, radians, 0)
+end
 
 local DESIGNS: { [string]: { PieceSpec } } = {
 	Stick = {
@@ -822,6 +1095,147 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		ballAt(0.45, -0.12, 0, 0.25, "F4EFE1"),
 		ballAt(1.35, 0, 0, -1.35, "F5C542", Enum.Material.Neon),
 	},
+	RubberChicken = {
+		rod(0.8, 0.25, -0.2, "F28C1C"), -- feet (the handle)
+		ballAt(1.25, 0, 0, -2.5, "FFE14D"), -- body
+		blockAt(Vector3.new(0.22, 0.16, 0.7), 0.6, 0.05, -2.5, "F7D23A", yaw(0.4)), -- wings
+		blockAt(Vector3.new(0.22, 0.16, 0.7), -0.6, 0.05, -2.5, "F7D23A", yaw(-0.4)),
+		rod(1.4, 0.35, -1.25, "FFE14D"), -- neck
+		ballAt(0.65, 0, 0.05, -3.35, "FFE14D"), -- head
+		blockAt(Vector3.new(0.26, 0.2, 0.45), 0, 0.05, -3.75, "F28C1C"), -- beak
+		ballAt(0.32, 0, 0.35, -3.3, "E5484D"), -- comb
+		ballAt(0.13, 0.22, 0.2, -3.45, "111111"), -- eyes
+		ballAt(0.13, -0.22, 0.2, -3.45, "111111"),
+	},
+	PoolNoodle = {
+		rod(6, 0.65, -3, "FF4FA3"),
+		rod(0.06, 0.32, -6.02, "B8326F"), -- the hole in the end
+	},
+	Baguette = {
+		rod(4.4, 0.75, -2.3, "D9A15C"),
+		ballAt(0.75, 0, 0, -0.1, "D9A15C"),
+		ballAt(0.75, 0, 0, -4.5, "D9A15C"),
+		blockAt(Vector3.new(0.6, 0.08, 0.12), 0, 0.36, -1.1, "B5783A", yaw(0.6)),
+		blockAt(Vector3.new(0.6, 0.08, 0.12), 0, 0.36, -2.0, "B5783A", yaw(0.6)),
+		blockAt(Vector3.new(0.6, 0.08, 0.12), 0, 0.36, -2.9, "B5783A", yaw(0.6)),
+		blockAt(Vector3.new(0.6, 0.08, 0.12), 0, 0.36, -3.8, "B5783A", yaw(0.6)),
+	},
+	FryingPan = {
+		rod(1.6, 0.25, -0.8, "2B2B2B"),
+		discAt(2.2, 0.2, 0, 0, -2.6, "333333"),
+		discAt(1.9, 0.22, 0, 0.01, -2.6, "4A4A4A"),
+		discAt(1.1, 0.24, 0.15, 0.02, -2.5, "FFFFFF"), -- a fried egg
+		ballAt(0.45, 0.15, 0.12, -2.5, "FFC21A"),
+	},
+	GoldenPan = {
+		rod(1.6, 0.25, -0.8, "B8860B"),
+		discAt(2.3, 0.2, 0, 0, -2.65, "E0B235"),
+		discAt(2.0, 0.22, 0, 0.01, -2.65, "F5C542"),
+		discAt(1.1, 0.24, 0.15, 0.02, -2.55, "FFFFFF"),
+		ballAt(0.45, 0.15, 0.12, -2.55, "F5C542", Enum.Material.Neon),
+	},
+	Crowbar = {
+		rod(4, 0.3, -2, "C0392B"),
+		blockAt(Vector3.new(0.3, 0.3, 0.9), 0.3, 0, -4.2, "C0392B", yaw(0.9)),
+		blockAt(Vector3.new(0.32, 0.22, 0.3), 0.62, 0, -4.4, "3A3A3A"),
+		rod(0.5, 0.32, -0.25, "3A3A3A"),
+	},
+	Plunger = {
+		rod(3, 0.3, -1.5, "B88A55"),
+		ballAt(1.4, 0, 0, -3.4, "C0392B"),
+		{
+			size = Vector3.new(0.12, 1.5, 1.5),
+			at = CFrame.new(0, 0, -3.95) * Z,
+			color = "8E2A20",
+			shape = Enum.PartType.Cylinder,
+		},
+	},
+	Lollipop = {
+		rod(3, 0.22, -1.5, "F4F4F4"),
+		discAt(2.4, 0.25, 0, 0, -3.9, "FF5FA2"),
+		discAt(1.8, 0.27, 0, 0.01, -3.9, "FFFFFF"),
+		discAt(1.2, 0.29, 0, 0.02, -3.9, "7FD3FF"),
+		discAt(0.6, 0.31, 0, 0.03, -3.9, "FFE14D"),
+	},
+	Katana = {
+		rod(1.3, 0.3, -0.3, "1C1C20"),
+		discAt(0.7, 0.15, 0, 0, -1.0, "C9A227"),
+		blockAt(Vector3.new(0.18, 0.12, 4.2), 0, 0, -3.15, "D9DEE4"),
+		blockAt(Vector3.new(0.06, 0.13, 4.0), 0.07, 0, -3.15, "FFFFFF"),
+	},
+	InflatableHammer = {
+		rod(3, 0.35, -1.5, "FFD93B"),
+		crossRod(3, 1.8, 0, -3.6, "E5484D"),
+		crossRod(0.4, 1.85, 1.3, -3.6, "FFD93B"),
+		crossRod(0.4, 1.85, -1.3, -3.6, "FFD93B"),
+	},
+	Slingshot = {
+		rod(1.2, 0.3, -0.6, "8B5A2B"),
+		blockAt(Vector3.new(0.25, 0.25, 1.2), 0.35, 0, -1.6, "8B5A2B", yaw(0.4)),
+		blockAt(Vector3.new(0.25, 0.25, 1.2), -0.35, 0, -1.6, "8B5A2B", yaw(-0.4)),
+		blockAt(Vector3.new(1.0, 0.08, 0.08), 0, 0, -2.15, "E5484D"),
+		ballAt(0.32, 0, 0.05, -2.0, "8C8C8C"),
+	},
+	WaterGun = {
+		blockAt(Vector3.new(0.8, 0.7, 1.8), 0, 0, -0.9, "2ECC71"),
+		see(ballAt(0.95, 0, 0.55, -0.6, "5DADE2"), 0.25),
+		rod(1.2, 0.3, -2.4, "F39C12"),
+		blockAt(Vector3.new(0.25, 0.4, 0.3), 0, -0.4, -0.2, "F39C12"),
+	},
+	SnowballLauncher = {
+		rod(2.6, 0.8, -1.6, "AED6F1"),
+		ballAt(0.8, 0, 0.5, -0.5, "FFFFFF"),
+		{
+			size = Vector3.new(0.1, 0.9, 0.9),
+			at = CFrame.new(0, 0, -2.92) * Z,
+			color = "FFFFFF",
+			shape = Enum.PartType.Cylinder,
+		},
+	},
+	BubbleGun = {
+		blockAt(Vector3.new(0.7, 0.6, 1.4), 0, 0, -0.7, "9B59B6"),
+		discAt(1.3, 0.15, 0, 0, -2.0, "E056FD"),
+		see(discAt(0.95, 0.17, 0, 0.01, -2.0, "D6EAF8"), 0.4),
+		see(ballAt(0.55, 0.45, 0.35, -2.8, "D6EAF8"), 0.5),
+		see(ballAt(0.35, -0.3, 0.25, -3.3, "D6EAF8"), 0.5),
+	},
+	ConfettiCannon = {
+		rod(2.6, 0.9, -1.6, "8E44AD"),
+		rod(0.3, 0.95, -0.8, "F1C40F"),
+		rod(0.3, 0.95, -1.6, "1ABC9C"),
+		rod(0.3, 0.95, -2.4, "FF5FA2"),
+		blockAt(Vector3.new(0.15, 0.05, 0.15), 0.3, 0.3, -3.1, "F1C40F", yaw(0.5)),
+		blockAt(Vector3.new(0.15, 0.05, 0.15), -0.2, 0.35, -3.2, "1ABC9C", yaw(1.1)),
+		blockAt(Vector3.new(0.15, 0.05, 0.15), 0.05, 0.4, -3.35, "FF5FA2", yaw(0.2)),
+	},
+	LeafBlower = {
+		blockAt(Vector3.new(1.2, 1.0, 1.2), 0, 0, -0.2, "E67E22"),
+		rod(3.2, 0.55, -2.4, "2B2B2B"),
+		rod(0.5, 0.75, -4.1, "2B2B2B"),
+		blockAt(Vector3.new(0.45, 0.05, 0.28), 0.25, 0.4, -4.6, "27AE60", yaw(0.7)),
+	},
+	DuckLauncher = {
+		rod(3, 0.9, -1.8, "27AE60"),
+		rod(0.3, 0.95, -0.6, "1E8449"),
+		ballAt(0.7, 0, 0.3, -3.4, "FFD93B"),
+		blockAt(Vector3.new(0.3, 0.15, 0.3), 0, 0.3, -3.85, "F28C1C"),
+	},
+	BananaPeel = {
+		ballAt(0.45, 0, 0, -1.0, "8B5A2B"),
+		blockAt(Vector3.new(0.45, 0.12, 1.0), 0, 0, -1.4, "F7DC6F"),
+		blockAt(Vector3.new(0.45, 0.12, 1.0), 0.35, 0, -0.8, "F7DC6F", yaw(math.rad(120))),
+		blockAt(Vector3.new(0.45, 0.12, 1.0), -0.35, 0, -0.8, "F7DC6F", yaw(math.rad(-120))),
+	},
+	EnergyDrink = {
+		rod(1.2, 0.7, -0.8, "2ECC71"),
+		rod(0.4, 0.72, -0.8, "1C1C20"),
+		{
+			size = Vector3.new(0.06, 0.66, 0.66),
+			at = CFrame.new(0, 0, -1.43) * Z,
+			color = "C0C6CC",
+			shape = Enum.PartType.Cylinder,
+		},
+	},
 }
 
 -- Returns a Model whose PrimaryPart "Handle" (an invisible grip at the
@@ -849,6 +1263,7 @@ function ItemModels.build(itemId: string): Model
 			color = spec.color,
 			shape = spec.shape,
 			material = spec.material,
+			transparency = spec.transparency,
 			canCollide = false,
 			canQuery = false,
 			parent = model,
@@ -875,7 +1290,14 @@ return ItemModels
 -- Item definitions. Prices are in score. Weapons never kill: they shove
 -- (knockback, studs per second at the start of the shove) and briefly stun.
 
-export type ItemKind = "Melee" | "Projectile" | "Blast" | "Consumable" | "Passive"
+export type ItemKind =
+	"Melee" -- click to swing
+	| "Projectile" -- click to fire one shot
+	| "Blast" -- click for a cone blast
+	| "Stream" -- hold to spray (water gun, leaf blower)
+	| "Trap" -- click to drop a trap at your feet
+	| "Consumable" -- click to use up
+	| "Passive" -- just hold it
 
 export type Item = {
 	id: string,
@@ -901,6 +1323,18 @@ export type Item = {
 	projectileRadius: number?,
 	immunity: number?,
 	rewardBonus: number?,
+	-- Fun extras (see ItemService and the client's Effects):
+	sound: string?, -- sound style played on use
+	fx: string?, -- little visual on hit or use
+	effect: string?, -- "Freeze" | "Bubble" | "Explode" | "Plunge" | "Slip"
+	projectile: string?, -- projectile look: "Potato" | "Pebble" | "Snowball" | "Bubble" | "Duck"
+	slowFactor: number?, -- Freeze: speed multiplier while frozen
+	effectSeconds: number?, -- how long Freeze/Bubble/Plunge lasts
+	radius: number?, -- Explode: blast radius
+	tick: number?, -- Stream: seconds between pushes while held
+	charges: number?, -- Trap: how many you can drop
+	speedBoost: number?, -- Consumable: speed multiplier
+	boostSeconds: number?,
 }
 
 local Items: { [string]: Item } = {}
@@ -998,6 +1432,7 @@ add({
 	projectileSpeed = 90,
 	projectileRange = 110,
 	projectileRadius = 0.6,
+	projectile = "Potato",
 })
 
 add({
@@ -1013,6 +1448,7 @@ add({
 	projectileSpeed = 100,
 	projectileRange = 120,
 	projectileRadius = 0.9,
+	projectile = "Potato",
 })
 
 add({
@@ -1062,9 +1498,330 @@ add({
 	rewardBonus = 0.8,
 })
 
+-- Funny weapons ----------------------------------------------------------------------
+
+add({
+	id = "RubberChicken",
+	name = "Rubber Chicken",
+	kind = "Melee",
+	description = "SQUEAK. Barely pushes, but zombies are dazed for ages.",
+	price = 400,
+	groundWeight = 12,
+	reach = 5,
+	arc = 120,
+	knockback = 30,
+	stun = 0.9,
+	cooldown = 0.5,
+	sound = "Squeak",
+	fx = "Feathers",
+})
+
+add({
+	id = "PoolNoodle",
+	name = "Pool Noodle",
+	kind = "Melee",
+	description = "Huge, floppy and fast. Swats everything in front of you.",
+	price = 600,
+	groundWeight = 10,
+	reach = 7,
+	arc = 160,
+	knockback = 35,
+	stun = 0.2,
+	cooldown = 0.35,
+	sound = "Swish",
+})
+
+add({
+	id = "Baguette",
+	name = "Baguette",
+	kind = "Melee",
+	description = "Long, crusty, surprisingly effective. Leaves crumbs.",
+	price = 900,
+	groundWeight = 10,
+	reach = 6.5,
+	arc = 90,
+	knockback = 55,
+	stun = 0.35,
+	cooldown = 0.7,
+	fx = "Crumbs",
+})
+
+add({
+	id = "FryingPan",
+	name = "Frying Pan",
+	kind = "Melee",
+	description = "CLANG! Big knockback and a good long daze. Egg included.",
+	price = 1200,
+	rare = "GoldenPan",
+	groundWeight = 6,
+	reach = 5,
+	arc = 110,
+	knockback = 75,
+	stun = 0.7,
+	cooldown = 0.9,
+	sound = "Clang",
+	fx = "Stars",
+})
+
+add({
+	id = "GoldenPan",
+	name = "Golden Frying Pan",
+	kind = "Melee",
+	description = "The legendary pan. CLANG, but louder.",
+	wizardPrice = 5000,
+	isRare = true,
+	reach = 5.5,
+	arc = 120,
+	knockback = 115,
+	stun = 0.9,
+	cooldown = 0.8,
+	sound = "Clang",
+	fx = "Stars",
+})
+
+add({
+	id = "Crowbar",
+	name = "Crowbar",
+	kind = "Melee",
+	description = "Pries furniture loose: hooks and drags it harder than anything.",
+	price = 1600,
+	reach = 6,
+	arc = 80,
+	knockback = 60,
+	stun = 0.4,
+	cooldown = 0.7,
+	dragsFurniture = true,
+})
+
+add({
+	id = "Plunger",
+	name = "Plunger",
+	kind = "Melee",
+	description = "Thwop! Sticks to a zombie's face and freezes them in place.",
+	price = 1800,
+	reach = 7,
+	arc = 45,
+	knockback = 15,
+	stun = 1.5,
+	cooldown = 1.3,
+	effect = "Plunge",
+	effectSeconds = 1.5,
+	sound = "Pop",
+})
+
+add({
+	id = "Lollipop",
+	name = "Giant Lollipop",
+	kind = "Melee",
+	description = "A sweet, wide swing with real weight behind it.",
+	price = 2000,
+	reach = 7,
+	arc = 120,
+	knockback = 70,
+	stun = 0.4,
+	cooldown = 0.8,
+	fx = "Sparkle",
+})
+
+add({
+	id = "Katana",
+	name = "Katana",
+	kind = "Melee",
+	description = "Lightning-fast swings with a long reach.",
+	price = 4000,
+	reach = 8,
+	arc = 70,
+	knockback = 70,
+	stun = 0.3,
+	cooldown = 0.4,
+})
+
+add({
+	id = "InflatableHammer",
+	name = "Inflatable Hammer",
+	kind = "Melee",
+	description = "BOING! Sends zombies flying across the room.",
+	wizardPrice = 6000,
+	isRare = true,
+	reach = 7,
+	arc = 120,
+	knockback = 160,
+	stun = 0.6,
+	cooldown = 1.4,
+	sound = "Boing",
+	fx = "Stars",
+})
+
+add({
+	id = "Slingshot",
+	name = "Slingshot",
+	kind = "Projectile",
+	description = "Fast little pebbles. Quick to reload.",
+	price = 800,
+	groundWeight = 6,
+	knockback = 40,
+	stun = 0.25,
+	cooldown = 0.6,
+	projectile = "Pebble",
+	projectileSpeed = 140,
+	projectileRange = 100,
+	projectileRadius = 0.4,
+	sound = "Twang",
+})
+
+add({
+	id = "WaterGun",
+	name = "Water Gun",
+	kind = "Stream",
+	description = "Hold to spray. Keeps zombies pushed back while you have water.",
+	price = 1200,
+	groundWeight = 5,
+	reach = 16,
+	arc = 24,
+	knockback = 16,
+	stun = 0.1,
+	tick = 0.12,
+	fx = "Water",
+})
+
+add({
+	id = "SnowballLauncher",
+	name = "Snowball Launcher",
+	kind = "Projectile",
+	description = "Snowballs freeze zombies: they slow to a crawl for a few seconds.",
+	price = 3000,
+	knockback = 20,
+	stun = 0.2,
+	cooldown = 1.1,
+	projectile = "Snowball",
+	projectileSpeed = 85,
+	projectileRange = 110,
+	projectileRadius = 0.8,
+	effect = "Freeze",
+	slowFactor = 0.4,
+	effectSeconds = 2.5,
+})
+
+add({
+	id = "BubbleGun",
+	name = "Bubble Gun",
+	kind = "Projectile",
+	description = "Traps a zombie in a giant bubble. They can't move until it pops.",
+	price = 5000,
+	knockback = 0,
+	stun = 2,
+	cooldown = 2.2,
+	projectile = "Bubble",
+	projectileSpeed = 45,
+	projectileRange = 70,
+	projectileRadius = 1.2,
+	effect = "Bubble",
+	effectSeconds = 2,
+	sound = "Pop",
+})
+
+add({
+	id = "ConfettiCannon",
+	name = "Confetti Cannon",
+	kind = "Blast",
+	description = "A party in a tube. Blasts zombies back in a shower of confetti.",
+	price = 4500,
+	reach = 12,
+	arc = 70,
+	knockback = 95,
+	stun = 0.5,
+	cooldown = 2.2,
+	fx = "Confetti",
+	sound = "Pop",
+})
+
+add({
+	id = "LeafBlower",
+	name = "Leaf Blower",
+	kind = "Stream",
+	description = "Hold to blow zombies (and light furniture) away in a wide cone.",
+	price = 7000,
+	reach = 14,
+	arc = 40,
+	knockback = 24,
+	stun = 0.1,
+	tick = 0.1,
+	fx = "Leaves",
+})
+
+add({
+	id = "DuckLauncher",
+	name = "Duck Launcher",
+	kind = "Projectile",
+	description = "Fires a rubber duck that explodes and knocks back every zombie nearby.",
+	price = 9000,
+	knockback = 110,
+	stun = 0.6,
+	cooldown = 3.5,
+	projectile = "Duck",
+	projectileSpeed = 70,
+	projectileRange = 90,
+	projectileRadius = 0.9,
+	effect = "Explode",
+	radius = 10,
+	sound = "Squeak",
+})
+
+add({
+	id = "BananaPeel",
+	name = "Banana Peels",
+	kind = "Trap",
+	description = "Click to drop a peel. Zombies that step on it slip and spin out. 3 peels.",
+	price = 700,
+	groundWeight = 6,
+	cooldown = 0.6,
+	charges = 3,
+	knockback = 45,
+	stun = 1.2,
+	effect = "Slip",
+})
+
+add({
+	id = "EnergyDrink",
+	name = "Energy Drink",
+	kind = "Consumable",
+	description = "Click to chug: 35% faster for 8 seconds.",
+	price = 500,
+	groundWeight = 8,
+	cooldown = 0.5,
+	speedBoost = 1.35,
+	boostSeconds = 8,
+})
+
 -- Display order in the shops.
-local SHOP_ORDER = { "Stick", "Pill", "Bat", "Drumstick", "PotatoGun", "Swordfish", "Spear", "Shotgun" }
-local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "AncientSpear" }
+local SHOP_ORDER = {
+	"Stick",
+	"Pill",
+	"RubberChicken",
+	"EnergyDrink",
+	"PoolNoodle",
+	"BananaPeel",
+	"Bat",
+	"Slingshot",
+	"Baguette",
+	"Drumstick",
+	"FryingPan",
+	"WaterGun",
+	"PotatoGun",
+	"Crowbar",
+	"Plunger",
+	"Lollipop",
+	"Swordfish",
+	"SnowballLauncher",
+	"Spear",
+	"Katana",
+	"ConfettiCannon",
+	"BubbleGun",
+	"LeafBlower",
+	"DuckLauncher",
+	"Shotgun",
+}
+local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "AncientSpear", "InflatableHammer" }
 
 local module = {
 	all = Items,
@@ -1368,6 +2125,7 @@ local LARGE: Plan = {
 		piece("Box", 16, 26),
 		piece("Plant", 44, 4),
 		piece("Picture", 8, 30),
+		piece("Beanbag", 28, 28),
 		-- Bathroom
 		piece("Bathtub", 65, 4.5),
 		piece("Toilet", 52, 14, 90),
@@ -1381,6 +2139,7 @@ local LARGE: Plan = {
 		piece("Sink", 99, 3.2),
 		piece("Crate", 106, 4),
 		piece("Barrel", 137, 4),
+		piece("TrashCan", 131, 4),
 		piece("Table", 116, 20),
 		piece("Chair", 110, 20, 90),
 		piece("Chair", 122, 20, 270),
@@ -1401,6 +2160,7 @@ local LARGE: Plan = {
 		piece("Piano", 52, 79.5),
 		piece("TVStand", 52, 50.6),
 		piece("Lamp", 28, 60),
+		piece("Aquarium", 8, 81),
 		piece("Box", 5, 52),
 		piece("Box", 8, 52),
 		piece("Box", 5, 55),
@@ -1415,6 +2175,7 @@ local LARGE: Plan = {
 		piece("Couch", 122, 78, 180),
 		piece("Armchair", 78, 56),
 		piece("Crate", 88, 56),
+		piece("Arcade", 136, 66),
 		piece("Box", 136, 52),
 		piece("Box", 132.6, 52),
 		piece("Plant", 75, 80),
@@ -1537,6 +2298,7 @@ local MANSION: Plan = {
 		piece("Armchair", 98, 46),
 		piece("Plant", 136, 52),
 		piece("Box", 96, 30),
+		piece("Aquarium", 98, 36, 90),
 		-- Kitchen
 		piece("Fridge", 148, 4),
 		piece("Fridge", 153, 4),
@@ -1549,6 +2311,7 @@ local MANSION: Plan = {
 		piece("Chair", 170, 33, 180),
 		piece("Crate", 194, 50),
 		piece("Barrel", 145, 50),
+		piece("TrashCan", 186, 50),
 		piece("Box", 196, 16),
 		piece("Box", 196, 19.2),
 		-- Hallway
@@ -1567,6 +2330,7 @@ local MANSION: Plan = {
 		piece("Plant", 66, 126),
 		piece("Box", 64, 74),
 		piece("Lamp", 6, 126),
+		piece("Beanbag", 50, 122),
 		-- Laundry
 		piece("Washer", 74, 90),
 		piece("Washer", 74, 94),
@@ -1584,6 +2348,7 @@ local MANSION: Plan = {
 		piece("Barrel", 113, 124),
 		piece("Bookshelf", 140, 73.5),
 		piece("Lamp", 146, 124),
+		piece("Arcade", 144.5, 116),
 		-- Garage
 		piece("Car", 174, 98),
 		piece("Crate", 155, 75),
@@ -1594,6 +2359,8 @@ local MANSION: Plan = {
 		piece("Box", 158, 126),
 		piece("Desk", 195, 110, 270),
 		piece("Crate", 196, 126),
+		piece("VendingMachine", 196.5, 90, 270),
+		piece("Treadmill", 158, 105),
 	},
 	items = {
 		pt(30, 40),
@@ -2207,6 +2974,7 @@ local EVENTS = {
 -- Unreliable: frequent, small, fine to lose one now and then.
 local UNRELIABLE = {
 	"PushClaim", -- client -> server: { Model } of furniture it is pushing
+	"Aim", -- client -> server: flat aim direction, about 10 times a second
 }
 
 local FUNCTIONS = {
@@ -2417,14 +3185,22 @@ export type Skin = {
 	shirt: string, -- body (hex color)
 	hair: string, -- top of the head
 	skin: string, -- the face crescent (and zombie arms)
-	hat: string?,
+	hat: string?, -- costume extras (CharacterLook STYLES or HATS)
+	accent: string?, -- extra color some costumes use (ears, beak, plume...)
 	scorePrice: number?,
 	product: string?,
 	pass: string?,
 	default: boolean?,
 }
 
-type Extra = { hat: string?, scorePrice: number?, product: string?, pass: string?, default: boolean? }
+type Extra = {
+	hat: string?,
+	accent: string?,
+	scorePrice: number?,
+	product: string?,
+	pass: string?,
+	default: boolean?,
+}
 
 local function skin(
 	id: string,
@@ -2444,6 +3220,7 @@ local function skin(
 		hair = hair,
 		skin = face,
 		hat = e.hat,
+		accent = e.accent,
 		scorePrice = e.scorePrice,
 		product = e.product,
 		pass = e.pass,
@@ -2468,6 +3245,116 @@ local list: { Skin } = {
 		{ hat = "Visor", product = "SkinAstronaut" }
 	),
 	skin("Royal", "Royal", "Human", "7B2CBF", "A8743F", "F6C79A", { hat = "Crown", pass = "VIP" }),
+	skin(
+		"Dog",
+		"Dog",
+		"Human",
+		"C8955A",
+		"B07A45",
+		"E8C9A0",
+		{ hat = "Dog", accent = "6B4226", product = "SkinDog" }
+	),
+	skin(
+		"Cat",
+		"Cat",
+		"Human",
+		"8E8E93",
+		"A5A5AA",
+		"F2F2F2",
+		{ hat = "Cat", accent = "6E6E73", scorePrice = 8000 }
+	),
+	skin(
+		"Bunny",
+		"Bunny",
+		"Human",
+		"F4F4F4",
+		"FFFFFF",
+		"FFD6E0",
+		{ hat = "Bunny", accent = "FFB3C7", scorePrice = 10000 }
+	),
+	skin(
+		"Bear",
+		"Bear",
+		"Human",
+		"8B5A2B",
+		"7A4A22",
+		"C8955A",
+		{ hat = "Bear", accent = "5A3518", scorePrice = 7000 }
+	),
+	skin("Panda", "Panda", "Human", "1C1C1C", "F4F4F4", "F4F4F4", { hat = "Panda", product = "SkinPanda" }),
+	skin(
+		"Frog",
+		"Frog",
+		"Human",
+		"4CAF50",
+		"5BBF5E",
+		"A5D6A7",
+		{ hat = "Frog", accent = "2E7D32", scorePrice = 9000 }
+	),
+	skin(
+		"Penguin",
+		"Penguin",
+		"Human",
+		"1C1C24",
+		"1C1C24",
+		"F4F4F4",
+		{ hat = "Penguin", accent = "F39C12", scorePrice = 11000 }
+	),
+	skin(
+		"Robot",
+		"Robot",
+		"Human",
+		"95A5A6",
+		"B0BEC5",
+		"CFD8DC",
+		{ hat = "Robot", accent = "00E5FF", product = "SkinRobot" }
+	),
+	skin("Pirate", "Pirate", "Human", "C0392B", "5A3A22", "F6C79A", { hat = "Pirate", scorePrice = 15000 }),
+	skin(
+		"Cowboy",
+		"Cowboy",
+		"Human",
+		"D35400",
+		"6B4226",
+		"F6C79A",
+		{ hat = "Cowboy", accent = "8B5A2B", scorePrice = 14000 }
+	),
+	skin(
+		"Alien",
+		"Alien",
+		"Human",
+		"7F8C8D",
+		"8BC34A",
+		"AED581",
+		{ hat = "Alien", accent = "1C1C1C", product = "SkinAlien" }
+	),
+	skin(
+		"Knight",
+		"Knight",
+		"Human",
+		"7F8C8D",
+		"BDC3C7",
+		"F6C79A",
+		{ hat = "Knight", accent = "C0392B", scorePrice = 20000 }
+	),
+	skin(
+		"Shark",
+		"Shark",
+		"Human",
+		"5D7B93",
+		"6E8CA5",
+		"F4F4F4",
+		{ hat = "Shark", accent = "4A6378", product = "SkinShark" }
+	),
+	skin(
+		"Hotdog",
+		"Hot Dog",
+		"Human",
+		"E0A458",
+		"C0532B",
+		"F6C79A",
+		{ hat = "Hotdog", accent = "F7DC6F", product = "SkinHotdog" }
+	),
 
 	-- Zombies
 	skin("ClassicZombie", "Classic", "Zombie", "6B8F5A", "4C6B33", "9CCB5A", { default = true }),
@@ -2483,6 +3370,43 @@ local list: { Skin } = {
 		{ hat = "Bandage", product = "SkinMummy" }
 	),
 	skin("GoldenZombie", "Golden", "Zombie", "8A7A20", "C9A227", "C9D94A", { hat = "Crown", pass = "VIP" }),
+	skin(
+		"ZombieDog",
+		"Zombie Dog",
+		"Zombie",
+		"6B7D52",
+		"5A6B3E",
+		"9CCB5A",
+		{ hat = "Dog", accent = "3E4A2A", scorePrice = 8000 }
+	),
+	skin(
+		"Skeleton",
+		"Skeleton",
+		"Zombie",
+		"2B2B2B",
+		"F4F4F4",
+		"F4F4F4",
+		{ hat = "Skeleton", scorePrice = 12000 }
+	),
+	skin("Ghost", "Ghost", "Zombie", "EEF2FF", "FFFFFF", "FFFFFF", { hat = "Ghost", product = "SkinGhost" }),
+	skin(
+		"Vampire",
+		"Vampire",
+		"Zombie",
+		"1C1C1C",
+		"111111",
+		"E8E8F0",
+		{ hat = "Vampire", accent = "8E1B1B", product = "SkinVampire" }
+	),
+	skin(
+		"ZombieClown",
+		"Clown",
+		"Zombie",
+		"8E44AD",
+		"F4F4F4",
+		"F4F4F4",
+		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
+	),
 }
 
 local byId: { [string]: Skin } = {}
@@ -2942,7 +3866,9 @@ function CharacterService.applyLook(p: Participant)
 		return
 	end
 	root.Size = Vector3.new(C.RootWidth, C.RootHeight, C.RootWidth) * p.scale
-	humanoid.HipHeight = C.HipHeight * p.scale
+	-- Hip height stays fixed while the body grows, so even giant players keep
+	-- their collision box low enough to bump into benches and coffee tables.
+	humanoid.HipHeight = C.HipHeight
 	CharacterLook.apply(character, root, CharacterService.skinFor(p), p.team, p.scale)
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") then
@@ -2962,11 +3888,33 @@ function CharacterService.refreshSpeed(p: Participant)
 	if not humanoid then
 		return
 	end
-	if os.clock() < p.stunUntil then
+	local now = os.clock()
+	if now < p.stunUntil then
 		humanoid.WalkSpeed = 0
-	else
-		humanoid.WalkSpeed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+		return
 	end
+	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+	if now < p.boostUntil then
+		speed *= p.boostFactor
+	end
+	if now < p.slowUntil then
+		speed *= p.slowFactor
+	end
+	humanoid.WalkSpeed = speed
+end
+
+-- Speeds a participant up (energy drink) or down (snowball) for a while.
+function CharacterService.speedEffect(p: Participant, factor: number, seconds: number)
+	local untilTime = os.clock() + seconds
+	if factor >= 1 then
+		p.boostFactor, p.boostUntil = factor, math.max(p.boostUntil, untilTime)
+	else
+		p.slowFactor, p.slowUntil = factor, math.max(p.slowUntil, untilTime)
+	end
+	CharacterService.refreshSpeed(p)
+	task.delay(seconds + 0.05, function()
+		CharacterService.refreshSpeed(p)
+	end)
 end
 
 local function setup(p: Participant, character: Model)
@@ -3135,6 +4083,29 @@ function Combat.knockback(target: Participant, velocity: Vector3, stun: number)
 		knockbackRemote:FireClient(target.player, velocity, Config.KNOCKBACK_SECONDS)
 	else
 		Knockback.apply(character, velocity, Config.KNOCKBACK_SECONDS)
+	end
+end
+
+-- Area blast (duck launcher): shoves every zombie within `radius` away from
+-- the center, with a classic (harmless) Roblox explosion for show.
+function Combat.explode(at: Vector3, radius: number, knockback: number, stun: number)
+	local boom = Instance.new("Explosion")
+	boom.Position = at
+	boom.BlastRadius = radius
+	boom.BlastPressure = 0
+	boom.DestroyJointRadiusPercent = 0
+	boom.ExplosionType = Enum.ExplosionType.NoCraters
+	boom.Parent = workspace
+	for _, zombie in Participants.onTeam("Zombie") do
+		local root = Participants.body(zombie)
+		if root then
+			local offset = Util.flat(root.Position - at)
+			if offset.Magnitude <= radius and Combat.lineOfSight(at, root.Position) then
+				local away = if offset.Magnitude > 0.1 then offset.Unit else Vector3.xAxis
+				local falloff = 1 - offset.Magnitude / radius * 0.5
+				Combat.knockback(zombie, away * knockback * falloff, stun)
+			end
+		end
 	end
 end
 
@@ -3563,7 +4534,9 @@ local DESIGNS: { [string]: Design } = {
 			for side = -1, 1, 2 do
 				c:top(side * (c.w / 2 - 0.45), 0.2, 0.9, c.d - 0.4, 0.5, 0.6, "2F7099") -- arms
 				c:top(side * (c.w / 4 - 0.2), 0.45, c.w / 2 - 1.3, c.d - 1.3, 0.15, 0.2, "5BA7D6") -- cushions
+				c:top(side * (c.w / 4 - 0.2), 0.45, c.w / 2 - 1.8, 0.12, 0.17, 0.2, "4A93C2") -- cushion seam
 			end
+			c:top(c.w / 2 - 1.6, -0.2, 1.2, 1.0, 0.35, 0.3, "F1C40F", 0.3) -- throw pillow
 		end,
 	},
 	Armchair = {
@@ -3582,12 +4555,20 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -0.3, c.w - 0.4, 0.12, 0.03, 0.06, "B9C0C8") -- door split
 			c:top(c.w / 2 - 0.7, c.d / 2 - 0.25, 0.25, 0.5, 0.06, 0.1, "8A939C") -- handle
 			c:top(0, 0, c.w - 0.3, c.d - 0.3, 0.01, 0.02, "F7F9FA")
+			c:disc(-0.9, 0.6, 0.4, 0.05, 0.06, "E5484D") -- fridge magnets
+			c:disc(-0.3, 0.9, 0.35, 0.05, 0.06, "3498DB")
+			c:top(0.6, 0.7, 0.6, 0.45, 0.05, 0.06, "FFE14D", 0.2) -- a note
 		end,
 	},
 	Stove = {
 		body = "E6E6E6",
 		draw = function(c)
 			c:top(0, -c.d / 2 + 0.3, c.w, 0.6, 0.35, 0.4, "BDBDBD") -- control strip
+			for i = -1, 1 do
+				c:disc(i * 1.1, -c.d / 2 + 0.3, 0.3, 0.42, 0.08, "333333") -- knobs
+			end
+			c:disc(0.9, 0.95, 0.95, 0.5, 0.5, "7F8C8D") -- a pot on the front burner
+			c:disc(0.9, 0.95, 0.75, 0.52, 0.5, "C0392B")
 			for _, x in { -0.9, 0.9 } do
 				for _, z in { -0.35, 0.95 } do
 					c:disc(x, z, 1.1, 0.06, 0.08, "3A3A3A")
@@ -3609,6 +4590,7 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -c.d / 2 + 0.5, c.w, 1.0, 0.5, 0.6, "E1E6EB") -- tank
 			c:disc(0, 0.45, 2.1, 0.04, 0.08, "DCE3E9") -- seat
 			c:disc(0, 0.45, 1.3, 0.06, 0.08, "A8D4EE") -- water
+			c:disc(c.w / 2 + 0.2, -c.d / 2 + 0.6, 0.7, -0.4, 0.5, "FFFFFF") -- paper roll
 		end,
 	},
 	Bathtub = {
@@ -3616,6 +4598,12 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:top(0, 0, c.w - 1.0, c.d - 1.0, 0.03, 0.06, "A9D6F0")
 			c:top(c.w / 2 - 0.4, 0, 0.4, 0.5, 0.3, 0.3, "8A939C") -- tap
+			c:ball(-1.5, c.h / 2 + 0.15, 0.3, 0.6, "FFD93B") -- rubber duck
+			c:ball(-1.25, c.h / 2 + 0.35, 0.3, 0.35, "FFD93B")
+			c:top(-1.0, 0.3, 0.2, 0.15, 0.4, 0.1, "F28C1C")
+			for i = 1, 4 do
+				c:disc(1.6 - i * 0.5, -0.6 + (i % 2) * 0.4, 0.35, 0.08, 0.06, "FFFFFF") -- bubbles
+			end
 		end,
 	},
 	Bed = {
@@ -3628,12 +4616,25 @@ local DESIGNS: { [string]: Design } = {
 			for side = -1, 1, 2 do
 				c:top(side * 1.55, -c.d / 2 + 1.3, 2.6, 1.4, 0.45, 0.4, "FFFFFF") -- pillows
 			end
+			for row = 0, 2 do
+				for col = -1, 1, 2 do
+					c:top(col * 1.5, c.d * 0.02 + row * 1.6, 2.4, 0.06, 0.32, 0.36, "27924A") -- quilt lines
+				end
+			end
+			c:ball(1.6, c.h / 2 + 0.55, -c.d / 2 + 2.6, 0.9, "A0582A") -- teddy bear
+			c:ball(1.6, c.h / 2 + 0.75, -c.d / 2 + 2.05, 0.6, "A0582A")
 		end,
 	},
 	Table = {
 		body = "B07A45",
 		draw = function(c)
 			c:top(0, 0, c.w - 0.6, c.d - 0.6, 0.02, 0.04, "C08A55")
+			for _, x in { -2.3, 0, 2.3 } do
+				c:disc(x, 0, 1.3, 0.06, 0.06, "F4F4F4") -- plates
+				c:disc(x, 0, 0.7, 0.08, 0.06, "E8E8E8")
+			end
+			c:disc(-1.2, 1.4, 0.45, 0.1, 0.1, "3498DB") -- cups
+			c:disc(1.2, -1.4, 0.45, 0.1, 0.1, "E5484D")
 		end,
 	},
 	CoffeeTable = {
@@ -3646,6 +4647,7 @@ local DESIGNS: { [string]: Design } = {
 		body = "C08A55",
 		draw = function(c)
 			c:top(0, -c.d / 2 + 0.2, c.w, 0.4, 0.8, 0.9, "8B5A2B")
+			c:top(0, 0.2, c.w - 0.6, c.d - 0.9, 0.05, 0.06, "C0392B") -- seat cushion
 		end,
 	},
 	Bookshelf = {
@@ -3655,12 +4657,14 @@ local DESIGNS: { [string]: Design } = {
 			local span = c.w - 0.6
 			for i = 1, count do
 				local x = -span / 2 + (i - 0.5) * span / count
+				local depth = c.d - 0.7 - (i % 3) * 0.2 -- books of different sizes
+				local raise = 0.04 + (i % 2) * 0.03
 				c:top(
 					x,
 					0.15,
 					span / count - 0.12,
-					c.d - 0.7,
-					0.04,
+					depth,
+					raise,
 					0.08,
 					BOOK_COLORS[(i - 1) % #BOOK_COLORS + 1]
 				)
@@ -3672,6 +4676,7 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:top(0, 0, 0.55, c.d, 0.02, 0.04, "E6CFA1") -- tape
 			c:top(0, 0, c.w, 0.08, 0.02, 0.04, "A88350") -- flap seam
+			c:top(0.75, 0.75, 0.7, 0.45, 0.03, 0.04, "F4F4F4") -- shipping label
 		end,
 	},
 	-- Wooden crate with a diagonal brace, like the original's.
@@ -3791,16 +4796,13 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:disc(0, 0, 2.0, -0.6, c.h - 0.6, "B5653A") -- pot
 			c:disc(0, 0, 1.6, -0.55, 0.1, "5A3A22") -- soil
-			for i = 0, 3 do
-				local a = i / 4 * math.pi * 2 + 0.4
-				c:ball(
-					math.cos(a) * 0.55,
-					c.h / 2 + 0.1,
-					math.sin(a) * 0.55,
-					1.2,
-					if i % 2 == 0 then "3E9B3A" else "4FB848"
-				)
+			for i = 0, 5 do
+				local a = i / 6 * math.pi * 2 + 0.4
+				local leaf = if i % 2 == 0 then "3E9B3A" else "4FB848"
+				c:ball(math.cos(a) * 0.6, c.h / 2 + 0.1, math.sin(a) * 0.6, 1.0, leaf)
 			end
+			c:ball(0, c.h / 2 + 0.45, 0, 0.5, "F48FB1") -- a flower
+			c:ball(0, c.h / 2 + 0.6, 0, 0.22, "FFE066")
 		end,
 	},
 	Picture = {
@@ -3809,6 +4811,90 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, 0, c.w - 0.7, c.d - 0.7, 0.03, 0.06, "7FB8E0") -- sky
 			c:top(0, 0.55, c.w - 0.7, 0.6, 0.05, 0.06, "5BAA4A") -- hill
 			c:disc(0.9, -0.35, 0.6, 0.07, 0.06, "FFD54A") -- sun
+		end,
+	},
+	Beanbag = {
+		body = "E74C3C",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w + 0.3, -0.25, c.h - 0.3, "A93226") -- outline
+			c:disc(0, 0, c.w, -0.2, c.h - 0.3, "E74C3C")
+			c:disc(0.3, 0.3, c.w * 0.55, -0.15, 0.1, "C0392B") -- the dent you sit in
+		end,
+	},
+	TrashCan = {
+		body = "7F8C8D",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w + 0.25, -0.1, c.h - 0.2, "4D5656")
+			c:disc(0, 0, c.w, -0.05, c.h - 0.2, "95A5A6")
+			c:disc(0, 0, c.w * 0.8, 0, 0.06, "7F8C8D") -- lid
+			c:top(0, 0, c.w * 0.5, 0.25, 0.08, 0.1, "4D5656") -- handle
+			c:top(0.5, 0.45, 0.6, 0.18, 0.12, 0.08, "F7DC6F", 0.6) -- a banana peel on top
+		end,
+	},
+	Aquarium = {
+		body = "7FC8F8",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.4, c.d - 0.4, 0.02, 0.04, "4FA3D9") -- water
+			c:top(0, c.d / 2 - 0.45, c.w - 0.5, 0.4, 0.03, 0.04, "E8D3A2") -- sand
+			local fishes: { { x: number, z: number, color: string } } = {
+				{ x = -1.6, z = -0.2, color = "F39C12" },
+				{ x = 0.4, z = 0.3, color = "E74C3C" },
+				{ x = 1.7, z = -0.4, color = "F1C40F" },
+			}
+			for i, fish in fishes do
+				local x, z, color = fish.x, fish.z, fish.color
+				c:top(x, z, 0.7, 0.35, 0.05 + i * 0.01, 0.04, color) -- fish
+				c:top(x + 0.45, z, 0.25, 0.3, 0.05 + i * 0.01, 0.04, color, math.rad(45)) -- tails
+			end
+			c:top(-2.3, 0.6, 0.15, 0.8, 0.04, 0.05, "27AE60") -- seaweed
+			c:disc(2.4, 0.5, 0.25, 0.07, 0.04, "FFFFFF") -- bubbles
+			c:disc(2.2, 0.1, 0.18, 0.07, 0.04, "FFFFFF")
+		end,
+	},
+	Arcade = {
+		body = "6C3483",
+		draw = function(c)
+			c:top(0, -0.35, c.w - 0.6, 1.4, 0.04, 0.06, "111111") -- screen
+			for i, color in { "E74C3C", "F1C40F", "2ECC71", "3498DB" } do
+				c:top(-0.9 + i * 0.36, -0.35 + (i % 2) * 0.3, 0.25, 0.25, 0.06, 0.04, color) -- pixels
+			end
+			c:disc(-0.6, 0.85, 0.45, 0.2, 0.25, "E74C3C") -- joystick
+			c:disc(0.4, 0.85, 0.3, 0.08, 0.08, "F1C40F") -- buttons
+			c:disc(0.9, 0.85, 0.3, 0.08, 0.08, "3498DB")
+		end,
+	},
+	VendingMachine = {
+		body = "C0392B",
+		draw = function(c)
+			c:top(-0.4, 0, c.w - 1.6, c.d - 0.6, 0.03, 0.05, "B3E5FC") -- glass
+			local colors = { "E74C3C", "3498DB", "2ECC71", "F1C40F", "9B59B6", "E67E22" }
+			for row = 0, 2 do
+				for col = 0, 2 do
+					c:disc(
+						-1.5 + col * 0.8,
+						-0.8 + row * 0.8,
+						0.45,
+						0.06,
+						0.04,
+						colors[(row * 3 + col) % #colors + 1]
+					) -- cans
+				end
+			end
+			c:top(c.w / 2 - 0.55, -0.4, 0.5, 0.9, 0.05, 0.06, "2B2B30") -- coin slot panel
+			c:top(c.w / 2 - 0.55, 0.6, 0.5, 0.25, 0.06, 0.06, "F1C40F")
+		end,
+	},
+	Treadmill = {
+		body = "3A3A3A",
+		draw = function(c)
+			c:top(0, 0.4, c.w - 0.8, c.d - 1.6, 0.02, 0.04, "222222") -- belt
+			for i = -2, 2 do
+				c:top(0, 0.4 + i * 1.1, c.w - 0.9, 0.06, 0.04, 0.03, "4A4A4A") -- belt slats
+			end
+			c:top(0, -c.d / 2 + 0.4, c.w, 0.8, 0.5, 0.5, "5D6D7E") -- console
+			c:top(0, -c.d / 2 + 0.4, 1.0, 0.4, 0.52, 0.5, "2ECC71") -- display
 		end,
 	},
 	-- Green rug with a pale border and a fringe on the short ends, like the original.
@@ -3861,6 +4947,19 @@ function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance)
 	model.PrimaryPart = body
 
 	design.draw(newCtx(model, body, spec.w, spec.d, spec.h))
+
+	if not design.transparentBody and not decor then
+		-- A darker, slightly bigger copy just under the top: from above it
+		-- draws the thick outline the original's furniture has.
+		local base = Color3.fromHex(design.body)
+		Parts.make({
+			name = "Outline",
+			size = Vector3.new(spec.w + 0.4, spec.h - 0.04, spec.d + 0.4),
+			cframe = home * CFrame.new(0, -0.02, 0),
+			color = Color3.new(base.R * 0.55, base.G * 0.55, base.B * 0.55),
+			parent = model,
+		})
+	end
 
 	if decor then
 		for _, part in model:GetDescendants() do
@@ -3937,6 +5036,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
 local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
@@ -3956,9 +5056,19 @@ type Piece = FurnitureBuilder.Built & {
 	burst: Vector3,
 	burstUntil: number,
 	burstLength: number,
+	lastGood: CFrame, -- last position that passed the anti-cheat checks
 }
 
-export type Mover = { root: BasePart, humanoid: Humanoid, id: string, scale: number }
+-- Someone who can push furniture. `reach` is set while they hold a melee
+-- weapon, whose shaft (along `aim`) pushes too.
+export type Mover = {
+	root: BasePart,
+	humanoid: Humanoid,
+	id: string,
+	scale: number,
+	aim: Vector3,
+	reach: number?,
+}
 
 local OWNER = FurniturePush.OWNER_ATTRIBUTE
 local CONTEST_SECONDS = 0.8
@@ -3989,13 +5099,27 @@ local function stop(piece: Piece)
 	piece.body.AssemblyAngularVelocity = Vector3.zero
 end
 
--- Takes a piece back from a client (optionally blocking new claims for a bit).
-local function revoke(piece: Piece, blockSeconds: number)
+-- Takes a piece back from a client (optionally blocking new claims for a
+-- bit). In a tug of war the piece keeps moving: the server writes the
+-- resolved velocity the same frame, so stopping it would only cause a snap.
+local function revoke(piece: Piece, blockSeconds: number, halt: boolean?)
 	if piece.owner then
 		serverOwns(piece)
-		stop(piece)
+		if halt ~= false then
+			stop(piece)
+		end
 	end
 	piece.contestedUntil = math.max(piece.contestedUntil, os.clock() + blockSeconds)
+end
+
+-- True if anyone other than `id` pushed the piece in the last moment.
+local function othersPushing(piece: Piece, id: string, now: number): boolean
+	for other, seen in piece.pushers do
+		if other ~= id and now - seen <= 0.3 then
+			return true
+		end
+	end
+	return false
 end
 
 local function grant(piece: Piece, player: Player)
@@ -4025,6 +5149,7 @@ function FurnitureService.build(layout: MapLayout.Layout)
 			piece.burst = Vector3.zero
 			piece.burstUntil = 0
 			piece.burstLength = 1
+			piece.lastGood = built.home
 			table.insert(pieces, piece)
 			byBody[built.body] = piece
 			byModel[built.model] = piece
@@ -4080,6 +5205,7 @@ function FurnitureService.resetAll()
 		piece.burstUntil = 0
 		table.clear(piece.pushers)
 		piece.model:PivotTo(piece.home)
+		piece.lastGood = piece.home
 		piece.body.AssemblyLinearVelocity = Vector3.zero
 		piece.body.AssemblyAngularVelocity = Vector3.zero
 	end
@@ -4106,10 +5232,15 @@ local function onClaim(player: Player, list: unknown)
 			continue
 		end
 		if piece.owner and piece.owner ~= player then
-			revoke(piece, CONTEST_SECONDS) -- two players fighting over it: server decides
+			revoke(piece, CONTEST_SECONDS, false) -- two players fighting over it: server decides
 			continue
 		end
-		if Util.flatDistance(piece.body.Position, root.Position) > 20 * math.max(1, p.scale) then
+		if othersPushing(piece, p.id, now) then
+			continue -- someone else is on it too: the server settles that
+		end
+		-- Only pieces you could actually be touching (body or longest weapon).
+		local range = piece.body.Size.Magnitude / 2 + root.Size.X / 2 + 12 * math.max(1, p.scale) + 3
+		if Util.flatDistance(piece.body.Position, root.Position) > range then
 			continue
 		end
 		piece.lastClaim = now
@@ -4130,11 +5261,31 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			local dir = flat.Unit
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
 			local strength = RoundRules.pushStrength(mover.scale)
+			local touched: { [BasePart]: boolean } = {}
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
+					touched[part] = true
 					piece.pushers[mover.id] = now
 					FurniturePush.add(pushes, part, dir * humanoid.WalkSpeed, strength, probe.Position)
+				end
+			end
+			-- A held weapon's shaft pushes what it touches, same as the client does.
+			if mover.reach then
+				local shaft, shaftSize =
+					FurniturePush.itemProbe(root, CharacterLook.grip(mover.scale), mover.aim, mover.reach)
+				for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
+					local piece = byBody[part]
+					if piece and not touched[part] then
+						piece.pushers[mover.id] = now
+						FurniturePush.add(
+							pushes,
+							part,
+							dir * humanoid.WalkSpeed,
+							strength,
+							part.Position + mover.aim * 0.5
+						)
+					end
 				end
 			end
 		end
@@ -4142,7 +5293,31 @@ local function collectPushes(now: number): FurniturePush.Pushes
 	return pushes
 end
 
-local function step()
+-- Is a client-driven piece somewhere a legitimate push could have put it?
+local function plausible(piece: Piece, dt: number): boolean
+	local body = piece.body
+	local owner = piece.owner
+	local p = owner and Participants.fromPlayer(owner)
+	local root = p and Participants.body(p)
+	if not p or not root then
+		return false
+	end
+	local v = body.AssemblyLinearVelocity
+	if Vector3.new(v.X, 0, v.Z).Magnitude > Config.FURNITURE_MAX_SPEED * 1.5 or v.Y > 8 then
+		return false
+	end
+	if body.AssemblyAngularVelocity.Magnitude > 3 then
+		return false
+	end
+	local moved = Util.flatDistance(body.Position, piece.lastGood.Position)
+	if moved > Config.FURNITURE_MAX_SPEED * 1.6 * dt + 1 then
+		return false -- teleported
+	end
+	local range = body.Size.Magnitude / 2 + root.Size.X / 2 + 14 * math.max(1, p.scale) + 6
+	return Util.flatDistance(body.Position, root.Position) <= range
+end
+
+local function step(dt: number)
 	local now = os.clock()
 	local pushes = collectPushes(now)
 	for _, piece in pieces do
@@ -4167,17 +5342,25 @@ local function step()
 		end
 		if active >= 2 or someoneElse then
 			-- A tug of war: the server simulates it so both sides count.
-			revoke(piece, CONTEST_SECONDS)
+			revoke(piece, CONTEST_SECONDS, false)
+		elseif not owner and now < piece.contestedUntil and active >= 1 then
+			-- Keep the server in charge until the tug of war is really over.
+			piece.contestedUntil = now + CONTEST_SECONDS
 		elseif owner then
-			local v = body.AssemblyLinearVelocity
 			if owner.Parent ~= Players or now - piece.lastClaim > Config.FURNITURE_RELEASE_SECONDS then
 				revoke(piece, 0)
-			elseif Vector3.new(v.X, 0, v.Z).Magnitude > Config.FURNITURE_MAX_SPEED * 1.5 then
-				revoke(piece, 1) -- faster than any push allows: take it back
+			elseif not plausible(piece, dt) then
+				-- Moved in a way no push could: put it back and take it away.
+				revoke(piece, 1.5)
+				piece.model:PivotTo(piece.lastGood)
 			end
+		end
+		if piece.owner then
+			piece.lastGood = body.CFrame
 		end
 
 		if piece.owner == nil then
+			piece.lastGood = body.CFrame
 			local v = body.AssemblyLinearVelocity
 			if now < piece.burstUntil then
 				local k = (piece.burstUntil - now) / piece.burstLength
@@ -4229,6 +5412,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -4241,6 +5425,7 @@ local Parts = require(ReplicatedStorage.Shared.Parts)
 local Participants = require(script.Parent.Participants)
 local Projectiles = require(script.Parent.Projectiles)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Traps = require(script.Parent.Traps)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -4293,16 +5478,27 @@ function ItemService.refreshHand(p: Participant)
 	attachHeld(p)
 end
 
-local function setHeld(p: Participant, itemId: string?)
+local function setStreaming(p: Participant, itemId: string?)
+	p.streaming = itemId ~= nil
+	if p.character then
+		p.character:SetAttribute("Spraying", itemId) -- clients draw the spray
+	end
+end
+
+local function setHeld(p: Participant, itemId: string?, charges: number?)
 	p.heldItem = itemId
 	p.dragging = false
+	local item = Items.get(itemId)
+	p.heldCharges = charges or (item and item.charges)
+	setStreaming(p, nil)
 	p.state:SetAttribute("HeldItem", itemId or "")
+	p.state:SetAttribute("HeldCharges", p.heldCharges or 0)
 	attachHeld(p)
 end
 
 -- Ground items -----------------------------------------------------------------------
 
-function ItemService.spawnGround(itemId: string, position: Vector3): Model
+function ItemService.spawnGround(itemId: string, position: Vector3, charges: number?): Model
 	local model = ItemModels.build(itemId)
 	model.Name = itemId
 	-- Built at the origin, so the bounding box center is the offset to undo.
@@ -4322,6 +5518,7 @@ function ItemService.spawnGround(itemId: string, position: Vector3): Model
 	ring.CanCollide = false
 	ring.CanQuery = false
 	model:SetAttribute("ItemId", itemId)
+	model:SetAttribute("Charges", charges)
 	model:SetAttribute("SpotX", position.X)
 	model:SetAttribute("SpotZ", position.Z)
 	model.Parent = groundFolder
@@ -4362,11 +5559,11 @@ end
 -- Holding ----------------------------------------------------------------------------
 
 -- Puts an item in the participant's hand, dropping what they held before.
-function ItemService.give(p: Participant, itemId: string)
+function ItemService.give(p: Participant, itemId: string, charges: number?)
 	if p.heldItem then
 		ItemService.drop(p)
 	end
-	setHeld(p, itemId)
+	setHeld(p, itemId, charges)
 end
 
 function ItemService.drop(p: Participant)
@@ -4377,7 +5574,7 @@ function ItemService.drop(p: Participant)
 	local root = Participants.body(p)
 	if root then
 		local spot = root.Position + p.aim * (root.Size.X / 2 + 2)
-		ItemService.spawnGround(itemId, spot)
+		ItemService.spawnGround(itemId, spot, p.heldCharges)
 	end
 	setHeld(p, nil)
 end
@@ -4408,8 +5605,9 @@ function ItemService.pickUp(p: Participant)
 		return
 	end
 	local itemId = best:GetAttribute("ItemId") :: string
+	local charges = best:GetAttribute("Charges")
 	best:Destroy()
-	ItemService.give(p, itemId)
+	ItemService.give(p, itemId, if typeof(charges) == "number" then charges else nil)
 	Announcer.fx("Pickup", { position = root.Position })
 end
 
@@ -4455,9 +5653,19 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		for _, hit in Combat.zombiesInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
+			local zRoot = Participants.body(hit.target)
+			if zRoot and item.fx then
+				Announcer.fx("Hit", { position = zRoot.Position, fx = item.fx })
+			end
+			if item.effect == "Plunge" then
+				Announcer.fx(
+					"Plunged",
+					{ character = hit.target.character, seconds = item.effectSeconds or 1.5 }
+				)
+			end
 		end
 		if kind == "Blast" then
-			Announcer.fx("Blast", { origin = root.Position, direction = aim, reach = reach })
+			Announcer.fx("Blast", { origin = root.Position, direction = aim, reach = reach, item = item.id })
 			if item.breaksWalls then
 				breakWallAhead(p, aim, reach)
 			end
@@ -4481,6 +5689,25 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
+	elseif kind == "Trap" then
+		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item)
+		Announcer.fx("Drop", { position = root.Position })
+		p.heldCharges = (p.heldCharges or 1) - 1
+		p.state:SetAttribute("HeldCharges", p.heldCharges)
+		if p.heldCharges <= 0 then
+			ItemService.take(p)
+		end
+	elseif kind == "Consumable" and item.speedBoost then
+		CharacterService.speedEffect(p, item.speedBoost, item.boostSeconds or 8)
+		ItemService.take(p)
+		Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		if p.player then
+			Announcer.toast(
+				p.player,
+				"Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds",
+				Config.COLORS.Good
+			)
+		end
 	elseif kind == "Consumable" then
 		local before = p.immunity
 		Participants.setImmunity(p, p.immunity + (item.immunity or 0))
@@ -4515,6 +5742,7 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	p.aim = direction
 	if action == "stop" then
 		p.dragging = false
+		setStreaming(p, nil)
 		return
 	end
 	if action ~= "start" or p.team ~= "Human" then
@@ -4522,6 +5750,12 @@ local function onUse(player: Player, action: unknown, aim: unknown)
 	end
 	local item = Items.get(p.heldItem)
 	if not item then
+		return
+	end
+	if item.kind == "Melee" then
+		p.dragging = true -- hooking furniture works even while the swing cools down
+	elseif item.kind == "Stream" then
+		setStreaming(p, item.id) -- sprays until "stop" (see streamStep)
 		return
 	end
 	local now = os.clock()
@@ -4574,10 +5808,53 @@ local function dragStep()
 	end
 end
 
+-- Water gun and leaf blower: while held, push every zombie in the cone a
+-- little, many times a second. The leaf blower also blows light furniture.
+local function streamStep()
+	local now = os.clock()
+	for _, p in Participants.onTeam("Human") do
+		if not p.streaming then
+			continue
+		end
+		local item = Items.get(p.heldItem)
+		local root = Participants.body(p)
+		if not item or item.kind ~= "Stream" or not root then
+			setStreaming(p, nil)
+			continue
+		end
+		if now < p.nextStreamTick then
+			continue
+		end
+		p.nextStreamTick = now + (item.tick or 0.12)
+		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
+		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
+			local falloff = 1 - hit.distance / (reach * 1.5)
+			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)
+		end
+		if item.fx == "Leaves" then
+			local center = root.Position + p.aim * (reach / 2)
+			local box = CFrame.lookAt(center, center + p.aim)
+			for _, body in FurnitureService.findInBox(box, Vector3.new(reach * 0.6, 4, reach)) do
+				local weight = FurnitureService.weightOf(body)
+				if weight == "Light" or weight == "Medium" then
+					FurnitureService.shove(body, p.aim * (if weight == "Light" then 12 else 6), 0.18)
+				end
+			end
+		end
+	end
+end
+
 function ItemService.init()
 	groundFolder = workspace:WaitForChild("GroundItems") :: Folder
 
 	Remotes.event("UseItem").OnServerEvent:Connect(onUse)
+	Remotes.unreliable("Aim").OnServerEvent:Connect(function(player, aim)
+		local p = Participants.fromPlayer(player)
+		local direction = if p and typeof(aim) == "Vector3" then Util.flatUnit(aim) else nil
+		if p and direction then
+			p.aim = direction
+		end
+	end)
 
 	local lastAction: { [Player]: number } = {}
 	local function throttled(player: Player): boolean
@@ -4607,6 +5884,7 @@ function ItemService.init()
 	end)
 
 	RunService.Heartbeat:Connect(dragStep)
+	RunService.Heartbeat:Connect(streamStep)
 end
 
 return ItemService
@@ -4629,6 +5907,7 @@ local WorldSetup = require(script.Parent.WorldSetup)
 WorldSetup.run()
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 
 local BotService = require(script.Parent.BotService)
@@ -4644,6 +5923,7 @@ local Projectiles = require(script.Parent.Projectiles)
 local RoundManager = require(script.Parent.RoundManager)
 local ShopService = require(script.Parent.ShopService)
 local TopScores = require(script.Parent.TopScores)
+local Traps = require(script.Parent.Traps)
 
 local firstMap = MapLayout.use(Config.MAP_ROTATION[1])
 MapBuilder.build(firstMap)
@@ -4656,7 +5936,16 @@ FurnitureService.start(function()
 	for _, p in Participants.all() do
 		local root, humanoid = Participants.body(p)
 		if root and humanoid then
-			table.insert(movers, { root = root, humanoid = humanoid, id = p.id, scale = p.scale })
+			local item = Items.get(p.heldItem)
+			local melee = p.team == "Human" and item and item.kind == "Melee"
+			table.insert(movers, {
+				root = root,
+				humanoid = humanoid,
+				id = p.id,
+				scale = p.scale,
+				aim = p.aim,
+				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
+			})
 		end
 	end
 	return movers
@@ -4664,6 +5953,7 @@ end)
 
 Combat.init()
 Projectiles.init()
+Traps.init()
 ItemService.init()
 ShopService.init()
 DataService.init()
@@ -5470,6 +6760,13 @@ export type Participant = {
 	returnReadyAt: number,
 	stunUntil: number,
 	dragging: boolean,
+	streaming: boolean, -- holding the button with a water gun / leaf blower
+	nextStreamTick: number,
+	heldCharges: number?, -- uses left (banana peels)
+	boostUntil: number, -- energy drink
+	boostFactor: number,
+	slowUntil: number, -- snowball freeze
+	slowFactor: number,
 	spawning: boolean,
 	aim: Vector3,
 	profile: any?, -- saved data table for players (DataService)
@@ -5522,6 +6819,7 @@ function Participants.publish(p: Participant)
 	s:SetAttribute("Immunity", p.immunity)
 	s:SetAttribute("Scale", p.scale)
 	s:SetAttribute("HeldItem", p.heldItem or "")
+	s:SetAttribute("HeldCharges", p.heldCharges or 0)
 	s:SetAttribute("HumanSkin", p.humanSkin)
 	s:SetAttribute("ZombieSkin", p.zombieSkin)
 	s:SetAttribute("OwnedSkins", csv(p.ownedSkins))
@@ -5578,6 +6876,13 @@ function Participants.add(info: NewParticipant): Participant
 		returnReadyAt = 0,
 		stunUntil = 0,
 		dragging = false,
+		streaming = false,
+		nextStreamTick = 0,
+		heldCharges = nil,
+		boostUntil = 0,
+		boostFactor = 1,
+		slowUntil = 0,
+		slowFactor = 1,
 		spawning = false,
 		aim = Vector3.new(0, 0, -1),
 		profile = profile,
@@ -5700,26 +7005,30 @@ return Participants
       <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">Projectiles</string>
-          <string name="Source"><![CDATA[-- Potato gun shots, simulated on the server with sphere casts so hits are
--- decided in one place. Potatoes pass through humans and stop at the first
--- zombie, wall, bush or piece of furniture.
+          <string name="Source"><![CDATA[-- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
+-- ducks. Simulated on the server with sphere casts so hits are decided in
+-- one place. Shots pass through humans and stop at the first zombie, wall,
+-- bush or piece of furniture, then apply their effect (shove, freeze,
+-- bubble trap or explosion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local FurnitureService = require(script.Parent.FurnitureService)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 local Participants = require(script.Parent.Participants)
+local Util = require(ReplicatedStorage.Shared.Util)
 
 type Participant = Participants.Participant
 
 local Projectiles = {}
 
 type Shot = {
-	part: Part,
+	model: Model,
 	position: Vector3,
 	direction: Vector3,
 	traveled: number,
@@ -5731,14 +7040,99 @@ type Shot = {
 local shots: { Shot } = {}
 local folder: Folder
 
-local function finish(shot: Shot, at: Vector3?)
-	shot.part:Destroy()
+local function ball(model: Model, diameter: number, offset: Vector3, color: string, transparency: number?)
+	local part = Parts.make({
+		name = "Ball",
+		shape = Enum.PartType.Ball,
+		size = Vector3.one * diameter,
+		cframe = CFrame.new(offset),
+		color = color,
+		transparency = transparency,
+		canCollide = false,
+		canQuery = false,
+		parent = model,
+	})
+	if not model.PrimaryPart then
+		model.PrimaryPart = part
+	end
+end
+
+-- The flying object, built at the origin facing -Z.
+local function buildLook(item: Items.Item): Model
+	local model = Instance.new("Model")
+	model.Name = item.projectile or "Potato"
+	local d = (item.projectileRadius or 0.6) * 2
+	local look = item.projectile
+	if look == "Pebble" then
+		ball(model, d, Vector3.zero, "8C8C8C")
+	elseif look == "Snowball" then
+		ball(model, d, Vector3.zero, "FFFFFF")
+		ball(model, d * 0.5, Vector3.new(0.2, 0.25, -0.1), "E8F6FF")
+	elseif look == "Bubble" then
+		ball(model, d, Vector3.zero, "BFE9FF", 0.55)
+		ball(model, d * 0.25, Vector3.new(-d * 0.2, d * 0.3, -d * 0.15), "FFFFFF", 0.2) -- shine
+	elseif look == "Duck" then
+		ball(model, d, Vector3.zero, "FFD93B")
+		ball(model, d * 0.6, Vector3.new(0, d * 0.35, -d * 0.35), "FFD93B")
+		Parts.make({
+			name = "Beak",
+			size = Vector3.new(0.35, 0.15, 0.4) * d,
+			cframe = CFrame.new(0, d * 0.32, -d * 0.7),
+			color = "F28C1C",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	else
+		ball(model, d, Vector3.zero, if item.isRare then "B98A4E" else "C9A66B")
+		ball(model, d * 0.25, Vector3.new(d * 0.2, d * 0.3, 0), "8B6A43")
+	end
+	return model
+end
+
+local function impact(shot: Shot, at: Vector3, target: Participant?, hitPart: Instance)
+	local item = shot.item
+	local dir = shot.direction
+	if item.effect == "Explode" then
+		Combat.explode(at, item.radius or 10, item.knockback or 100, item.stun or 0.5)
+		for _, body in
+			FurnitureService.findInBox(
+				CFrame.new(at),
+				Vector3.new(1, 0, 1) * (item.radius or 10) * 1.6 + Vector3.yAxis * 6
+			)
+		do
+			local away = Util.flatUnit(body.Position - at) or dir
+			FurnitureService.shove(body, away * 18, 0.35)
+		end
+		Announcer.fx("Boom", { position = at })
+		return
+	end
+	if target and target.team == "Zombie" then
+		if item.knockback and item.knockback > 0 then
+			Combat.knockback(target, dir * item.knockback, item.stun or 0.3)
+		else
+			Combat.knockback(target, Vector3.zero, item.stun or 0.3)
+		end
+		if item.effect == "Freeze" then
+			CharacterService.speedEffect(target, item.slowFactor or 0.4, item.effectSeconds or 2.5)
+			Announcer.fx("Frozen", { character = target.character, seconds = item.effectSeconds or 2.5 })
+		elseif item.effect == "Bubble" then
+			Announcer.fx("Bubbled", { character = target.character, seconds = item.effectSeconds or 2 })
+		end
+	elseif hitPart:IsA("BasePart") then
+		local weight = FurnitureService.weightOf(hitPart)
+		if weight == "Light" or (weight == "Medium" and (item.knockback or 0) >= 80) then
+			FurnitureService.shove(hitPart, dir * 12, 0.25)
+		end
+	end
+	Announcer.fx("Splat", { position = at, look = item.projectile })
+end
+
+local function finish(shot: Shot)
+	shot.model:Destroy()
 	local index = table.find(shots, shot)
 	if index then
 		table.remove(shots, index)
-	end
-	if at then
-		Announcer.fx("Splat", { position = at })
 	end
 end
 
@@ -5750,7 +7144,7 @@ local function step(dt: number)
 		local radius = item.projectileRadius or 0.6
 		local done = false
 		-- A Spherecast ignores parts already overlapping its starting sphere,
-		-- so each cast starts a little behind the potato. Otherwise a zombie
+		-- so each cast starts a little behind the shot. Otherwise a zombie
 		-- walking into it between frames would be missed.
 		local back = radius + 1
 		local origin = shot.position - shot.direction * back
@@ -5767,14 +7161,8 @@ local function step(dt: number)
 				shot.params.FilterDescendantsInstances = shot.ignored
 				continue
 			end
-			if target and target.team == "Zombie" then
-				Combat.knockback(target, shot.direction * (item.knockback or 50), item.stun or 0.3)
-			elseif
-				result.Instance:IsA("BasePart") and FurnitureService.weightOf(result.Instance) == "Light"
-			then
-				FurnitureService.shove(result.Instance, shot.direction * 12, 0.25)
-			end
-			finish(shot, result.Position)
+			impact(shot, result.Position, target, result.Instance)
+			finish(shot)
 			done = true
 			break
 		end
@@ -5782,9 +7170,14 @@ local function step(dt: number)
 			shot.position += shot.direction * distance
 			shot.traveled += distance
 			if shot.traveled >= (item.projectileRange or 100) then
-				finish(shot, nil)
+				if item.effect == "Explode" then
+					impact(shot, shot.position, nil, workspace) -- ducks go off at the end of their flight
+				end
+				finish(shot)
 			else
-				shot.part.CFrame = CFrame.new(shot.position)
+				-- Ducks and potatoes tumble a little as they fly.
+				local spin = CFrame.Angles(0, shot.traveled * 0.15, 0)
+				shot.model:PivotTo(CFrame.lookAt(shot.position, shot.position + shot.direction) * spin)
 			end
 		end
 	end
@@ -5797,20 +7190,14 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 	end
 	local radius = item.projectileRadius or 0.6
 	local origin = root.Position + aim * (root.Size.X / 2 + radius + 0.4)
-	local part = Parts.make({
-		name = "Potato",
-		shape = Enum.PartType.Ball,
-		size = Vector3.one * radius * 2,
-		cframe = CFrame.new(origin),
-		color = if item.isRare then "B98A4E" else "C9A66B",
-		canCollide = false,
-		canQuery = false,
-		parent = folder,
-	})
+	local model = buildLook(item)
+	model:PivotTo(CFrame.lookAt(origin, origin + aim))
+	model.Parent = folder
 	local ignored: { Instance } = {
 		shooter.character,
 		folder,
 		workspace:WaitForChild("GroundItems"),
+		workspace:WaitForChild("Traps"),
 		workspace:WaitForChild("Effects"),
 	}
 	local map = workspace:WaitForChild("Map")
@@ -5824,7 +7211,7 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = ignored
 	table.insert(shots, {
-		part = part,
+		model = model,
 		position = origin,
 		direction = aim,
 		traveled = 0,
@@ -5836,7 +7223,7 @@ end
 
 function Projectiles.clear()
 	for i = #shots, 1, -1 do
-		finish(shots[i], nil)
+		finish(shots[i])
 	end
 end
 
@@ -5874,6 +7261,7 @@ local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local Projectiles = require(script.Parent.Projectiles)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Traps = require(script.Parent.Traps)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Util = require(ReplicatedStorage.Shared.Util)
 local Wizard = require(script.Parent.Wizard)
@@ -5898,7 +7286,8 @@ local function spawnFrame(team: string, scale: number): CFrame
 	local x = spot.x + rng:NextNumber(-jitter, jitter)
 	local z = spot.z + rng:NextNumber(-jitter, jitter)
 	local y = MapLayout.HEIGHTS.Floor
-		+ (Config.CHARACTER.HipHeight + Config.CHARACTER.RootHeight / 2) * scale
+		+ Config.CHARACTER.HipHeight
+		+ Config.CHARACTER.RootHeight / 2 * scale
 		+ 0.3
 	return CFrame.new(x, y, z)
 end
@@ -6034,6 +7423,7 @@ end
 local function resetWorld()
 	Wizard.leave()
 	Projectiles.clear()
+	Traps.clear()
 	ItemService.clearGround()
 	FurnitureService.resetAll()
 	MapBuilder.restoreWalls()
@@ -6530,6 +7920,113 @@ return TopScores
       </Item>
       <Item class="ModuleScript" referent="35">
         <Properties>
+          <string name="Name">Traps</string>
+          <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for zombies. A zombie that steps
+-- on one slips: a shove in the way they were walking and a long daze.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Announcer = require(script.Parent.Announcer)
+local Combat = require(script.Parent.Combat)
+local Items = require(ReplicatedStorage.Shared.Items)
+local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local Parts = require(ReplicatedStorage.Shared.Parts)
+local Participants = require(script.Parent.Participants)
+local Util = require(ReplicatedStorage.Shared.Util)
+
+local Traps = {}
+
+type Trap = { model: Model, position: Vector3, item: Items.Item }
+
+local traps: { Trap } = {}
+local folder: Folder
+local MAX_TRAPS = 30
+
+local function buildPeel(at: Vector3, spin: number): Model
+	local model = Instance.new("Model")
+	model.Name = "BananaPeel"
+	local y = MapLayout.HEIGHTS.Floor + 0.12
+	local center = CFrame.new(at.X, y, at.Z) * CFrame.Angles(0, spin, 0)
+	for i = 0, 2 do
+		local arm = center * CFrame.Angles(0, i * math.pi * 2 / 3, 0) * CFrame.new(0, 0, -0.6)
+		Parts.make({
+			name = "Peel",
+			size = Vector3.new(0.55, 0.12, 1.3),
+			cframe = arm,
+			color = "F7DC6F",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		Parts.make({
+			name = "PeelInside",
+			size = Vector3.new(0.35, 0.13, 1.0),
+			cframe = arm * CFrame.new(0, 0.005, 0.05),
+			color = "FFF6C7",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	end
+	Parts.disc("Stem", center.Position + Vector3.new(0, 0.05, 0), 0.5, 0.2, "8B5A2B", model).CanCollide =
+		false
+	return model
+end
+
+function Traps.place(position: Vector3, item: Items.Item)
+	if #traps >= MAX_TRAPS then
+		local oldest = table.remove(traps, 1)
+		if oldest then
+			oldest.model:Destroy()
+		end
+	end
+	local model = buildPeel(position, math.random() * math.pi * 2)
+	model.Parent = folder
+	table.insert(traps, { model = model, position = Vector3.new(position.X, 0, position.Z), item = item })
+end
+
+function Traps.clear()
+	for _, trap in traps do
+		trap.model:Destroy()
+	end
+	table.clear(traps)
+end
+
+local function step()
+	if #traps == 0 then
+		return
+	end
+	for _, zombie in Participants.onTeam("Zombie") do
+		local root, humanoid = Participants.body(zombie)
+		if root and humanoid then
+			for i = #traps, 1, -1 do
+				local trap = traps[i]
+				if Util.flatDistance(root.Position, trap.position) <= 1.4 + root.Size.X / 2 then
+					local move = Util.flatUnit(humanoid.MoveDirection)
+						or Util.flatUnit(root.CFrame.LookVector)
+						or Vector3.xAxis
+					Combat.knockback(zombie, move * (trap.item.knockback or 45), trap.item.stun or 1.2)
+					Announcer.fx("Slip", { position = trap.position, character = zombie.character })
+					trap.model:Destroy()
+					table.remove(traps, i)
+				end
+			end
+		end
+	end
+end
+
+function Traps.init()
+	folder = workspace:WaitForChild("Traps") :: Folder
+	RunService.Heartbeat:Connect(step)
+end
+
+return Traps
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="36">
+        <Properties>
           <string name="Name">Wizard</string>
           <string name="Source"><![CDATA[-- The wizard: shows up at a random moment during the prep phase in one of the
 -- yards, sells rare items to humans standing within reach (press B near
@@ -6664,7 +8161,7 @@ return Wizard
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">WorldSetup</string>
           <string name="Source"><![CDATA[-- One-time world settings: flat lighting, collision groups, the folders other
@@ -6720,7 +8217,7 @@ function WorldSetup.run()
 		Config.PLAYERS_COLLIDE
 	)
 
-	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Effects", "Bots" } do
+	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Traps", "Effects", "Bots" } do
 		folder(name, workspace)
 	end
 
@@ -6747,7 +8244,7 @@ return WorldSetup
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="37">
+  <Item class="StarterPlayer" referent="38">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="AutoJumpEnabled">false</bool>
@@ -6756,11 +8253,11 @@ return WorldSetup
       <float name="CharacterWalkSpeed">16</float>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="38">
+    <Item class="StarterCharacterScripts" referent="39">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="39">
+      <Item class="LocalScript" referent="40">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[-- Intentionally empty. Brain Tag characters are flat top-down blobs with no
@@ -6769,15 +8266,15 @@ return WorldSetup
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="40">
+    <Item class="StarterPlayerScripts" referent="41">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="41">
+      <Item class="Folder" referent="42">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">CameraController</string>
             <string name="Source"><![CDATA[-- Straight-down camera that follows your character. A narrow field of view
@@ -6840,7 +8337,7 @@ return CameraController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">ChatSetup</string>
             <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-left with channel tabs,
@@ -6927,7 +8424,7 @@ return ChatSetup
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">ClientState</string>
             <string name="Source"><![CDATA[-- Read-only view of the replicated game state for client code: the round
@@ -7039,7 +8536,7 @@ return ClientState
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- Plays what the server announces: your own knockback, item swings, potato
@@ -7056,6 +8553,31 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Sounds = require(script.Parent.Sounds)
 
 local Effects = {}
+
+local Items = require(ReplicatedStorage.Shared.Items)
+local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
+
+-- Funny sounds made from the few sounds that ship with every Roblox client,
+-- pitched up or down: { sound name in Config.SOUNDS, pitch, volume }.
+local SOUND_STYLES: { [string]: { any } } = {
+	Squeak = { "RoundEnd", 2.4, 0.6 },
+	Clang = { "RoundEnd", 0.55, 0.9 },
+	Boing = { "Lunge", 0.45, 0.9 },
+	Pop = { "RoundEnd", 3.2, 0.6 },
+	Swish = { "Whoosh", 1.5, 0.5 },
+	Twang = { "Lunge", 1.8, 0.6 },
+	Gulp = { "Pickup", 0.7, 0.6 },
+	Slip = { "Whoosh", 0.6, 0.8 },
+}
+
+local function playStyle(style: string?, position: Vector3?): boolean
+	local entry = style and SOUND_STYLES[style]
+	if not entry then
+		return false
+	end
+	Sounds.play(entry[1], position, entry[3], entry[2])
+	return true
+end
 
 local player = Players.LocalPlayer
 local effectsFolder = workspace:WaitForChild("Effects")
@@ -7123,7 +8645,163 @@ local function swing(character: Model?, itemId: string)
 		end
 	end)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	Sounds.play(if thrust then "Lunge" else "Whoosh", root and root.Position)
+	local item = Items.get(itemId)
+	if not playStyle(item and item.sound, root and root.Position) then
+		Sounds.play(if thrust then "Lunge" else "Whoosh", root and root.Position)
+	end
+end
+
+-- Little bits flying out from a point and fading (stars, feathers, crumbs...).
+local BITS: { [string]: { colors: { string }, size: number, count: number, shape: Enum.PartType } } = {
+	Stars = { colors = { "FFE14D", "FFFFFF", "FFC21A" }, size = 0.5, count = 6, shape = Enum.PartType.Block },
+	Feathers = {
+		colors = { "FFFFFF", "FFF3B0", "FFE14D" },
+		size = 0.45,
+		count = 8,
+		shape = Enum.PartType.Block,
+	},
+	Crumbs = { colors = { "D9A15C", "B5783A", "E8C28A" }, size = 0.3, count = 10, shape = Enum.PartType.Ball },
+	Sparkle = {
+		colors = { "FF5FA2", "7FD3FF", "FFFFFF", "FFE14D" },
+		size = 0.35,
+		count = 8,
+		shape = Enum.PartType.Ball,
+	},
+	Confetti = {
+		colors = { "E5484D", "F1C40F", "2ECC71", "3498DB", "9B59B6", "FF5FA2" },
+		size = 0.35,
+		count = 30,
+		shape = Enum.PartType.Block,
+	},
+	Snow = { colors = { "FFFFFF", "E8F6FF" }, size = 0.35, count = 10, shape = Enum.PartType.Ball },
+	Peel = { colors = { "F7DC6F", "FFFFFF", "FFE14D" }, size = 0.4, count = 7, shape = Enum.PartType.Block },
+}
+
+local function bits(kind: string, position: Vector3, direction: Vector3?, spread: number?)
+	local spec = BITS[kind]
+	if not spec then
+		return
+	end
+	local rng = Random.new()
+	for i = 1, spec.count do
+		local part = Parts.make({
+			name = "Bit",
+			shape = spec.shape,
+			size = Vector3.new(spec.size, 0.08, spec.size)
+				* (if spec.shape == Enum.PartType.Ball then 1 else 1),
+			cframe = CFrame.new(position + Vector3.new(0, 2, 0))
+				* CFrame.Angles(0, rng:NextNumber(0, 6.28), 0),
+			color = spec.colors[(i - 1) % #spec.colors + 1],
+			canCollide = false,
+			canQuery = false,
+			parent = effectsFolder,
+		})
+		if spec.shape == Enum.PartType.Ball then
+			part.Size = Vector3.one * spec.size
+		end
+		local dir: Vector3
+		if direction then
+			local cone = spread or 0.6
+			dir = (CFrame.Angles(0, rng:NextNumber(-cone, cone), 0) * direction) * rng:NextNumber(14, 34)
+		else
+			local a = rng:NextNumber(0, math.pi * 2)
+			dir = Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(6, 14)
+		end
+		local finish = position + Vector3.new(dir.X, 0, dir.Z) * 0.35
+		local info = TweenInfo.new(rng:NextNumber(0.4, 0.8), Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(part, info, {
+			CFrame = CFrame.new(finish + Vector3.new(0, 1, 0)) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0),
+			Transparency = 1,
+		})
+		tween:Play()
+		tween.Completed:Once(function()
+			part:Destroy()
+		end)
+	end
+end
+
+-- A temporary visual stuck to a character (plunger, bubble, ice).
+local function stickTo(character: Model?, seconds: number, build: (root: BasePart) -> { BasePart })
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local parts = build(root)
+	for _, part in parts do
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.Massless = true
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
+		part.Parent = character
+	end
+	task.delay(seconds, function()
+		for _, part in parts do
+			part:Destroy()
+		end
+	end)
+end
+
+local function bodyScale(root: BasePart): number
+	return root.Size.X / 2.2
+end
+
+-- Spray particles on everyone currently holding a water gun / leaf blower.
+local SPRAY_COLORS = {
+	WaterGun = ColorSequence.new(Color3.fromHex("8FD3F5"), Color3.fromHex("E8F6FF")),
+	LeafBlower = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromHex("6BBF4E")),
+		ColorSequenceKeypoint.new(0.5, Color3.fromHex("E8913A")),
+		ColorSequenceKeypoint.new(1, Color3.fromHex("C0392B")),
+	}),
+}
+
+local function characters(): { Instance }
+	local list = workspace:GetChildren()
+	local bots = workspace:FindFirstChild("Bots")
+	if bots then
+		for _, bot in bots:GetChildren() do
+			table.insert(list, bot)
+		end
+	end
+	return list
+end
+
+local function updateSprays()
+	for _, character in characters() do
+		if character:IsA("Model") and character:GetAttribute("ParticipantId") then
+			local spraying = character:GetAttribute("Spraying")
+			local held = character:FindFirstChild("HeldItem")
+			local handle = held and held:FindFirstChild("Handle")
+			if handle then
+				local emitter = handle:FindFirstChild("Spray") :: ParticleEmitter?
+				if spraying and not emitter then
+					local attachment = Instance.new("Attachment")
+					attachment.Name = "SprayAt"
+					attachment.CFrame = CFrame.new(0, 0, -4.3)
+					attachment.Parent = handle
+					local created = Instance.new("ParticleEmitter")
+					created.Name = "Spray"
+					created.Color = SPRAY_COLORS[spraying] or SPRAY_COLORS.WaterGun
+					created.EmissionDirection = Enum.NormalId.Front
+					created.Speed = NumberRange.new(28, 40)
+					created.SpreadAngle = Vector2.new(if spraying == "LeafBlower" then 18 else 6, 4)
+					created.Lifetime = NumberRange.new(0.35, 0.5)
+					created.Rate = 70
+					created.Size = NumberSequence.new(if spraying == "LeafBlower" then 0.9 else 0.6, 0.2)
+					created.LightEmission = 0.2
+					created.Parent = attachment
+					emitter = created
+				end
+				if emitter then
+					emitter.Enabled = spraying ~= nil
+				end
+			end
+		end
+	end
 end
 
 local function blast(origin: Vector3, direction: Vector3, reach: number)
@@ -7190,10 +8868,120 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		Sounds.play("Potato", root and root.Position)
 	end,
 	Splat = function(data)
-		burst(data.position, "C9A66B", 4)
+		local look = data.look
+		if look == "Snowball" then
+			bits("Snow", data.position)
+		elseif look == "Bubble" then
+			burst(data.position, "BFE9FF", 5)
+			playStyle("Pop", data.position)
+		elseif look == "Pebble" then
+			burst(data.position, "8C8C8C", 2.5)
+		else
+			burst(data.position, "C9A66B", 4)
+		end
 	end,
 	Blast = function(data)
-		blast(data.origin, data.direction, data.reach)
+		if data.item == "ConfettiCannon" then
+			bits("Confetti", data.origin, data.direction, 0.6)
+			playStyle("Pop", data.origin)
+			playStyle("Squeak", data.origin)
+		else
+			blast(data.origin, data.direction, data.reach)
+		end
+	end,
+	Hit = function(data)
+		bits(data.fx, data.position)
+	end,
+	Plunged = function(data)
+		stickTo(data.character, data.seconds, function(root)
+			local s = bodyScale(root)
+			local plunger = ItemModels.build("Plunger")
+			-- Cup on the face, stick pointing straight out the front.
+			plunger:PivotTo(
+				root.CFrame
+					* CFrame.new(0, 1.2 * s, -1.0 * s)
+					* CFrame.Angles(0, math.pi, 0)
+					* CFrame.new(0, 0, 3.4)
+			)
+			local parts = {}
+			for _, part in plunger:GetDescendants() do
+				if part:IsA("BasePart") and part.Name ~= "Handle" then
+					for _, weld in part:GetChildren() do
+						if weld:IsA("Weld") then
+							weld:Destroy()
+						end
+					end
+					table.insert(parts, part)
+				end
+			end
+			return parts
+		end)
+	end,
+	Bubbled = function(data)
+		local character = data.character :: Model?
+		stickTo(character, data.seconds, function(root)
+			local s = bodyScale(root)
+			local bubble = Parts.make({
+				name = "Bubble",
+				shape = Enum.PartType.Ball,
+				size = Vector3.one * 5.2 * s,
+				cframe = root.CFrame,
+				color = "BFE9FF",
+				transparency = 0.6,
+			})
+			local shine = Parts.make({
+				name = "Shine",
+				shape = Enum.PartType.Ball,
+				size = Vector3.one * 1.1 * s,
+				cframe = root.CFrame * CFrame.new(-1.2 * s, 1.9 * s, -1.0 * s),
+				color = "FFFFFF",
+				transparency = 0.3,
+			})
+			return { bubble, shine }
+		end)
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			task.delay(data.seconds, function()
+				burst(root.Position, "BFE9FF", 7)
+				playStyle("Pop", root.Position)
+			end)
+		end
+	end,
+	Frozen = function(data)
+		local character = data.character :: Model?
+		if not character then
+			return
+		end
+		local ice = Instance.new("Highlight")
+		ice.FillColor = Color3.fromHex("9FE3FF")
+		ice.FillTransparency = 0.45
+		ice.OutlineColor = Color3.new(1, 1, 1)
+		ice.DepthMode = Enum.HighlightDepthMode.Occluded
+		ice.Parent = character
+		task.delay(data.seconds, function()
+			ice:Destroy()
+		end)
+		local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			bits("Snow", root.Position)
+		end
+	end,
+	Slip = function(data)
+		bits("Peel", data.position)
+		bits("Stars", data.position)
+		playStyle("Slip", data.position)
+	end,
+	Drop = function(data)
+		Sounds.play("Pickup", data.position, 0.4, 0.8)
+	end,
+	Gulp = function(data)
+		bits("Sparkle", data.position)
+		playStyle("Gulp", data.position)
+	end,
+	Boom = function(data)
+		bits("Feathers", data.position)
+		burst(data.position, "FFD93B", 16)
+		playStyle("Squeak", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)
@@ -7255,6 +9043,18 @@ local function startScrape()
 end
 
 function Effects.start()
+	task.spawn(function()
+		while true do
+			task.wait(0.1)
+			local ok, err = pcall(function()
+				updateSprays()
+				return true
+			end)
+			if not ok then
+				warn("[Fx] spray: " .. tostring(err))
+			end
+		end
+	end)
 	Remotes.event("Knockback").OnClientEvent:Connect(function(velocity: Vector3, seconds: number)
 		local character = player.Character
 		if character and typeof(velocity) == "Vector3" then
@@ -7280,7 +9080,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">FurnitureController</string>
             <string name="Source"><![CDATA[-- Drives the furniture YOU are pushing, on your own machine, so it responds
@@ -7496,7 +9296,7 @@ return FurnitureController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">InputController</string>
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
@@ -7599,7 +9399,7 @@ return InputController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="48">
+        <Item class="LocalScript" referent="49">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Client entry point.
@@ -7616,7 +9416,7 @@ require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">MovementController</string>
             <string name="Source"><![CDATA[-- Moves the character in SCREEN directions (W = up the screen = world -Z)
@@ -7633,6 +9433,9 @@ local player = Players.LocalPlayer
 local aim = Vector3.new(0, 0, -1)
 local usingMouse = not UserInputService.TouchEnabled or UserInputService.MouseEnabled
 local controls: any = nil
+local aimRemote: UnreliableRemoteEvent? = nil
+local lastAimSent = 0
+local lastAimSentValue = Vector3.zero
 
 local KEYS: { [Enum.KeyCode]: Vector3 } = {
 	[Enum.KeyCode.W] = Vector3.new(0, 0, -1),
@@ -7729,6 +9532,13 @@ local function step()
 		aim = move.Unit
 	end
 	root.CFrame = CFrame.lookAt(root.Position, root.Position + aim)
+
+	-- Keep the server's idea of your aim fresh (weapon pushes and drags use it).
+	local now = os.clock()
+	if aimRemote and now - lastAimSent > 0.1 and aim:Dot(lastAimSentValue) < 0.995 then
+		lastAimSent, lastAimSentValue = now, aim
+		aimRemote:FireServer(aim)
+	end
 end
 
 local function onCharacter(character: Model)
@@ -7752,6 +9562,10 @@ local function onCharacter(character: Model)
 end
 
 function MovementController.start()
+	task.spawn(function()
+		local Remotes = require(game:GetService("ReplicatedStorage").Shared.Remotes)
+		aimRemote = Remotes.unreliable("Aim")
+	end)
 	task.spawn(function()
 		local ok, module = pcall(function()
 			return require(
@@ -7787,7 +9601,7 @@ return MovementController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[-- Plays short 2D sounds, quieter the farther they happen from you (the
@@ -7872,11 +9686,11 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="51">
+        <Item class="Folder" referent="52">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="52">
+          <Item class="ModuleScript" referent="53">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -7934,7 +9748,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="53">
+          <Item class="ModuleScript" referent="54">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
@@ -8063,9 +9877,12 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 			if itemId then
 				preview = UIKit.viewport(slot, ItemModels.build(itemId), { ZIndex = 2 })
 			end
-			local item = Items.get(itemId)
-			itemName.Text = if item then item.name else ""
 		end
+		local item = Items.get(itemId)
+		local charges = ClientState.my("HeldCharges")
+		itemName.Text = if item
+			then item.name .. (if typeof(charges) == "number" and charges > 0 then " x" .. charges else "")
+			else ""
 
 		local immunity = ClientState.my("Immunity") or 0
 		fill.Size = UDim2.fromScale(math.clamp(immunity / Config.IMMUNITY_MAX, 0, 1), 1)
@@ -8088,8 +9905,13 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						else "Tap SHOP to trade with the wizard"
 				elseif groundItem then
 					text = (if keys then "Press [E] to pick up " else "Tap PICK UP: ") .. groundItem.name
-				elseif itemId and keys then
-					text = "[Click] use   [G] drop"
+				elseif item and keys then
+					local verb = if item.kind == "Stream"
+						then "[Hold click] spray"
+						elseif item.kind == "Trap" then "[Click] drop one"
+						elseif item.kind == "Melee" then "[Click] swing  [Hold] drag furniture"
+						else "[Click] use"
+					text = verb .. "   [G] drop"
 				end
 			end
 		end
@@ -8101,7 +9923,7 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="54">
+          <Item class="ModuleScript" referent="55">
             <Properties>
               <string name="Name">BottomRight</string>
               <string name="Source"><![CDATA[-- Bottom-right: "Score" and "Speed Multiplier" (plus a 2x boost timer when
@@ -8170,7 +9992,7 @@ return BottomRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="55">
+          <Item class="ModuleScript" referent="56">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -8284,7 +10106,7 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="56">
+          <Item class="ModuleScript" referent="57">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
@@ -8485,7 +10307,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="57">
+          <Item class="ModuleScript" referent="58">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -8566,7 +10388,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="58">
+          <Item class="ModuleScript" referent="59">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -8664,7 +10486,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="60">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -9196,7 +11018,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -9424,7 +11246,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Top-left: five square icon buttons (menu, shop, settings, trophy, chat).
@@ -9476,7 +11298,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -9656,7 +11478,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -9886,7 +11708,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="64">
+      <Item class="LocalScript" referent="65">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -9896,13 +11718,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="65">
+  <Item class="TextChatService" referent="66">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="66">
+  <Item class="Workspace" referent="67">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

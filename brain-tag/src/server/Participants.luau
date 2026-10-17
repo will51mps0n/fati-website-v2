@@ -30,6 +30,13 @@ export type Participant = {
 	returnReadyAt: number,
 	stunUntil: number,
 	dragging: boolean,
+	streaming: boolean, -- holding the button with a water gun / leaf blower
+	nextStreamTick: number,
+	heldCharges: number?, -- uses left (banana peels)
+	boostUntil: number, -- energy drink
+	boostFactor: number,
+	slowUntil: number, -- snowball freeze
+	slowFactor: number,
 	spawning: boolean,
 	aim: Vector3,
 	profile: any?, -- saved data table for players (DataService)
@@ -82,6 +89,7 @@ function Participants.publish(p: Participant)
 	s:SetAttribute("Immunity", p.immunity)
 	s:SetAttribute("Scale", p.scale)
 	s:SetAttribute("HeldItem", p.heldItem or "")
+	s:SetAttribute("HeldCharges", p.heldCharges or 0)
 	s:SetAttribute("HumanSkin", p.humanSkin)
 	s:SetAttribute("ZombieSkin", p.zombieSkin)
 	s:SetAttribute("OwnedSkins", csv(p.ownedSkins))
@@ -138,6 +146,13 @@ function Participants.add(info: NewParticipant): Participant
 		returnReadyAt = 0,
 		stunUntil = 0,
 		dragging = false,
+		streaming = false,
+		nextStreamTick = 0,
+		heldCharges = nil,
+		boostUntil = 0,
+		boostFactor = 1,
+		slowUntil = 0,
+		slowFactor = 1,
 		spawning = false,
 		aim = Vector3.new(0, 0, -1),
 		profile = profile,

@@ -95,7 +95,9 @@ local DESIGNS: { [string]: Design } = {
 			for side = -1, 1, 2 do
 				c:top(side * (c.w / 2 - 0.45), 0.2, 0.9, c.d - 0.4, 0.5, 0.6, "2F7099") -- arms
 				c:top(side * (c.w / 4 - 0.2), 0.45, c.w / 2 - 1.3, c.d - 1.3, 0.15, 0.2, "5BA7D6") -- cushions
+				c:top(side * (c.w / 4 - 0.2), 0.45, c.w / 2 - 1.8, 0.12, 0.17, 0.2, "4A93C2") -- cushion seam
 			end
+			c:top(c.w / 2 - 1.6, -0.2, 1.2, 1.0, 0.35, 0.3, "F1C40F", 0.3) -- throw pillow
 		end,
 	},
 	Armchair = {
@@ -114,12 +116,20 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -0.3, c.w - 0.4, 0.12, 0.03, 0.06, "B9C0C8") -- door split
 			c:top(c.w / 2 - 0.7, c.d / 2 - 0.25, 0.25, 0.5, 0.06, 0.1, "8A939C") -- handle
 			c:top(0, 0, c.w - 0.3, c.d - 0.3, 0.01, 0.02, "F7F9FA")
+			c:disc(-0.9, 0.6, 0.4, 0.05, 0.06, "E5484D") -- fridge magnets
+			c:disc(-0.3, 0.9, 0.35, 0.05, 0.06, "3498DB")
+			c:top(0.6, 0.7, 0.6, 0.45, 0.05, 0.06, "FFE14D", 0.2) -- a note
 		end,
 	},
 	Stove = {
 		body = "E6E6E6",
 		draw = function(c)
 			c:top(0, -c.d / 2 + 0.3, c.w, 0.6, 0.35, 0.4, "BDBDBD") -- control strip
+			for i = -1, 1 do
+				c:disc(i * 1.1, -c.d / 2 + 0.3, 0.3, 0.42, 0.08, "333333") -- knobs
+			end
+			c:disc(0.9, 0.95, 0.95, 0.5, 0.5, "7F8C8D") -- a pot on the front burner
+			c:disc(0.9, 0.95, 0.75, 0.52, 0.5, "C0392B")
 			for _, x in { -0.9, 0.9 } do
 				for _, z in { -0.35, 0.95 } do
 					c:disc(x, z, 1.1, 0.06, 0.08, "3A3A3A")
@@ -141,6 +151,7 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -c.d / 2 + 0.5, c.w, 1.0, 0.5, 0.6, "E1E6EB") -- tank
 			c:disc(0, 0.45, 2.1, 0.04, 0.08, "DCE3E9") -- seat
 			c:disc(0, 0.45, 1.3, 0.06, 0.08, "A8D4EE") -- water
+			c:disc(c.w / 2 + 0.2, -c.d / 2 + 0.6, 0.7, -0.4, 0.5, "FFFFFF") -- paper roll
 		end,
 	},
 	Bathtub = {
@@ -148,6 +159,12 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:top(0, 0, c.w - 1.0, c.d - 1.0, 0.03, 0.06, "A9D6F0")
 			c:top(c.w / 2 - 0.4, 0, 0.4, 0.5, 0.3, 0.3, "8A939C") -- tap
+			c:ball(-1.5, c.h / 2 + 0.15, 0.3, 0.6, "FFD93B") -- rubber duck
+			c:ball(-1.25, c.h / 2 + 0.35, 0.3, 0.35, "FFD93B")
+			c:top(-1.0, 0.3, 0.2, 0.15, 0.4, 0.1, "F28C1C")
+			for i = 1, 4 do
+				c:disc(1.6 - i * 0.5, -0.6 + (i % 2) * 0.4, 0.35, 0.08, 0.06, "FFFFFF") -- bubbles
+			end
 		end,
 	},
 	Bed = {
@@ -160,12 +177,25 @@ local DESIGNS: { [string]: Design } = {
 			for side = -1, 1, 2 do
 				c:top(side * 1.55, -c.d / 2 + 1.3, 2.6, 1.4, 0.45, 0.4, "FFFFFF") -- pillows
 			end
+			for row = 0, 2 do
+				for col = -1, 1, 2 do
+					c:top(col * 1.5, c.d * 0.02 + row * 1.6, 2.4, 0.06, 0.32, 0.36, "27924A") -- quilt lines
+				end
+			end
+			c:ball(1.6, c.h / 2 + 0.55, -c.d / 2 + 2.6, 0.9, "A0582A") -- teddy bear
+			c:ball(1.6, c.h / 2 + 0.75, -c.d / 2 + 2.05, 0.6, "A0582A")
 		end,
 	},
 	Table = {
 		body = "B07A45",
 		draw = function(c)
 			c:top(0, 0, c.w - 0.6, c.d - 0.6, 0.02, 0.04, "C08A55")
+			for _, x in { -2.3, 0, 2.3 } do
+				c:disc(x, 0, 1.3, 0.06, 0.06, "F4F4F4") -- plates
+				c:disc(x, 0, 0.7, 0.08, 0.06, "E8E8E8")
+			end
+			c:disc(-1.2, 1.4, 0.45, 0.1, 0.1, "3498DB") -- cups
+			c:disc(1.2, -1.4, 0.45, 0.1, 0.1, "E5484D")
 		end,
 	},
 	CoffeeTable = {
@@ -178,6 +208,7 @@ local DESIGNS: { [string]: Design } = {
 		body = "C08A55",
 		draw = function(c)
 			c:top(0, -c.d / 2 + 0.2, c.w, 0.4, 0.8, 0.9, "8B5A2B")
+			c:top(0, 0.2, c.w - 0.6, c.d - 0.9, 0.05, 0.06, "C0392B") -- seat cushion
 		end,
 	},
 	Bookshelf = {
@@ -187,12 +218,14 @@ local DESIGNS: { [string]: Design } = {
 			local span = c.w - 0.6
 			for i = 1, count do
 				local x = -span / 2 + (i - 0.5) * span / count
+				local depth = c.d - 0.7 - (i % 3) * 0.2 -- books of different sizes
+				local raise = 0.04 + (i % 2) * 0.03
 				c:top(
 					x,
 					0.15,
 					span / count - 0.12,
-					c.d - 0.7,
-					0.04,
+					depth,
+					raise,
 					0.08,
 					BOOK_COLORS[(i - 1) % #BOOK_COLORS + 1]
 				)
@@ -204,6 +237,7 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:top(0, 0, 0.55, c.d, 0.02, 0.04, "E6CFA1") -- tape
 			c:top(0, 0, c.w, 0.08, 0.02, 0.04, "A88350") -- flap seam
+			c:top(0.75, 0.75, 0.7, 0.45, 0.03, 0.04, "F4F4F4") -- shipping label
 		end,
 	},
 	-- Wooden crate with a diagonal brace, like the original's.
@@ -323,16 +357,13 @@ local DESIGNS: { [string]: Design } = {
 		draw = function(c)
 			c:disc(0, 0, 2.0, -0.6, c.h - 0.6, "B5653A") -- pot
 			c:disc(0, 0, 1.6, -0.55, 0.1, "5A3A22") -- soil
-			for i = 0, 3 do
-				local a = i / 4 * math.pi * 2 + 0.4
-				c:ball(
-					math.cos(a) * 0.55,
-					c.h / 2 + 0.1,
-					math.sin(a) * 0.55,
-					1.2,
-					if i % 2 == 0 then "3E9B3A" else "4FB848"
-				)
+			for i = 0, 5 do
+				local a = i / 6 * math.pi * 2 + 0.4
+				local leaf = if i % 2 == 0 then "3E9B3A" else "4FB848"
+				c:ball(math.cos(a) * 0.6, c.h / 2 + 0.1, math.sin(a) * 0.6, 1.0, leaf)
 			end
+			c:ball(0, c.h / 2 + 0.45, 0, 0.5, "F48FB1") -- a flower
+			c:ball(0, c.h / 2 + 0.6, 0, 0.22, "FFE066")
 		end,
 	},
 	Picture = {
@@ -341,6 +372,90 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, 0, c.w - 0.7, c.d - 0.7, 0.03, 0.06, "7FB8E0") -- sky
 			c:top(0, 0.55, c.w - 0.7, 0.6, 0.05, 0.06, "5BAA4A") -- hill
 			c:disc(0.9, -0.35, 0.6, 0.07, 0.06, "FFD54A") -- sun
+		end,
+	},
+	Beanbag = {
+		body = "E74C3C",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w + 0.3, -0.25, c.h - 0.3, "A93226") -- outline
+			c:disc(0, 0, c.w, -0.2, c.h - 0.3, "E74C3C")
+			c:disc(0.3, 0.3, c.w * 0.55, -0.15, 0.1, "C0392B") -- the dent you sit in
+		end,
+	},
+	TrashCan = {
+		body = "7F8C8D",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w + 0.25, -0.1, c.h - 0.2, "4D5656")
+			c:disc(0, 0, c.w, -0.05, c.h - 0.2, "95A5A6")
+			c:disc(0, 0, c.w * 0.8, 0, 0.06, "7F8C8D") -- lid
+			c:top(0, 0, c.w * 0.5, 0.25, 0.08, 0.1, "4D5656") -- handle
+			c:top(0.5, 0.45, 0.6, 0.18, 0.12, 0.08, "F7DC6F", 0.6) -- a banana peel on top
+		end,
+	},
+	Aquarium = {
+		body = "7FC8F8",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.4, c.d - 0.4, 0.02, 0.04, "4FA3D9") -- water
+			c:top(0, c.d / 2 - 0.45, c.w - 0.5, 0.4, 0.03, 0.04, "E8D3A2") -- sand
+			local fishes: { { x: number, z: number, color: string } } = {
+				{ x = -1.6, z = -0.2, color = "F39C12" },
+				{ x = 0.4, z = 0.3, color = "E74C3C" },
+				{ x = 1.7, z = -0.4, color = "F1C40F" },
+			}
+			for i, fish in fishes do
+				local x, z, color = fish.x, fish.z, fish.color
+				c:top(x, z, 0.7, 0.35, 0.05 + i * 0.01, 0.04, color) -- fish
+				c:top(x + 0.45, z, 0.25, 0.3, 0.05 + i * 0.01, 0.04, color, math.rad(45)) -- tails
+			end
+			c:top(-2.3, 0.6, 0.15, 0.8, 0.04, 0.05, "27AE60") -- seaweed
+			c:disc(2.4, 0.5, 0.25, 0.07, 0.04, "FFFFFF") -- bubbles
+			c:disc(2.2, 0.1, 0.18, 0.07, 0.04, "FFFFFF")
+		end,
+	},
+	Arcade = {
+		body = "6C3483",
+		draw = function(c)
+			c:top(0, -0.35, c.w - 0.6, 1.4, 0.04, 0.06, "111111") -- screen
+			for i, color in { "E74C3C", "F1C40F", "2ECC71", "3498DB" } do
+				c:top(-0.9 + i * 0.36, -0.35 + (i % 2) * 0.3, 0.25, 0.25, 0.06, 0.04, color) -- pixels
+			end
+			c:disc(-0.6, 0.85, 0.45, 0.2, 0.25, "E74C3C") -- joystick
+			c:disc(0.4, 0.85, 0.3, 0.08, 0.08, "F1C40F") -- buttons
+			c:disc(0.9, 0.85, 0.3, 0.08, 0.08, "3498DB")
+		end,
+	},
+	VendingMachine = {
+		body = "C0392B",
+		draw = function(c)
+			c:top(-0.4, 0, c.w - 1.6, c.d - 0.6, 0.03, 0.05, "B3E5FC") -- glass
+			local colors = { "E74C3C", "3498DB", "2ECC71", "F1C40F", "9B59B6", "E67E22" }
+			for row = 0, 2 do
+				for col = 0, 2 do
+					c:disc(
+						-1.5 + col * 0.8,
+						-0.8 + row * 0.8,
+						0.45,
+						0.06,
+						0.04,
+						colors[(row * 3 + col) % #colors + 1]
+					) -- cans
+				end
+			end
+			c:top(c.w / 2 - 0.55, -0.4, 0.5, 0.9, 0.05, 0.06, "2B2B30") -- coin slot panel
+			c:top(c.w / 2 - 0.55, 0.6, 0.5, 0.25, 0.06, 0.06, "F1C40F")
+		end,
+	},
+	Treadmill = {
+		body = "3A3A3A",
+		draw = function(c)
+			c:top(0, 0.4, c.w - 0.8, c.d - 1.6, 0.02, 0.04, "222222") -- belt
+			for i = -2, 2 do
+				c:top(0, 0.4 + i * 1.1, c.w - 0.9, 0.06, 0.04, 0.03, "4A4A4A") -- belt slats
+			end
+			c:top(0, -c.d / 2 + 0.4, c.w, 0.8, 0.5, 0.5, "5D6D7E") -- console
+			c:top(0, -c.d / 2 + 0.4, 1.0, 0.4, 0.52, 0.5, "2ECC71") -- display
 		end,
 	},
 	-- Green rug with a pale border and a fringe on the short ends, like the original.
@@ -393,6 +508,19 @@ function FurnitureBuilder.build(spot: MapLayout.FurnitureSpot, parent: Instance)
 	model.PrimaryPart = body
 
 	design.draw(newCtx(model, body, spec.w, spec.d, spec.h))
+
+	if not design.transparentBody and not decor then
+		-- A darker, slightly bigger copy just under the top: from above it
+		-- draws the thick outline the original's furniture has.
+		local base = Color3.fromHex(design.body)
+		Parts.make({
+			name = "Outline",
+			size = Vector3.new(spec.w + 0.4, spec.h - 0.04, spec.d + 0.4),
+			cframe = home * CFrame.new(0, -0.02, 0),
+			color = Color3.new(base.R * 0.55, base.G * 0.55, base.B * 0.55),
+			parent = model,
+		})
+	end
 
 	if decor then
 		for _, part in model:GetDescendants() do
