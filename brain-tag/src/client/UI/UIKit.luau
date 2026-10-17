@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Sounds = require(script.Parent.Parent.Sounds)
 
 local UIKit = {}
 
@@ -133,6 +134,9 @@ function UIKit.button(props: Props, onClick: (() -> ())?): TextButton
 	end
 	local button = UIKit.new("TextButton", merged)
 	UIKit.corner(8).Parent = button
+	button.Activated:Connect(function()
+		Sounds.play("UiClick")
+	end)
 	if onClick then
 		button.Activated:Connect(onClick)
 	end

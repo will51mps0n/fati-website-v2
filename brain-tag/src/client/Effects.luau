@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ClientState = require(script.Parent.ClientState)
 local Knockback = require(ReplicatedStorage.Shared.Knockback)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -16,27 +17,13 @@ local Effects = {}
 local Items = require(ReplicatedStorage.Shared.Items)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 
--- Funny sounds made from the few sounds that ship with every Roblox client,
--- pitched up or down: { sound name in Config.SOUNDS, pitch, volume }.
-local SOUND_STYLES: { [string]: { any } } = {
-	Squeak = { "RoundEnd", 2.4, 0.6 },
-	Clang = { "RoundEnd", 0.55, 0.9 },
-	Boing = { "Lunge", 0.45, 0.9 },
-	Pop = { "RoundEnd", 3.2, 0.6 },
-	Swish = { "Whoosh", 1.5, 0.5 },
-	Twang = { "Lunge", 1.8, 0.6 },
-	Gulp = { "Pickup", 0.7, 0.6 },
-	Slip = { "Whoosh", 0.6, 0.8 },
-	Bump = { "Lunge", 0.35, 0.35 },
-}
-
+-- Plays an item's sound style (a SoundBank name) if it has one.
 local function playStyle(style: string?, position: Vector3?): boolean
-	local entry = style and SOUND_STYLES[style]
-	if not entry then
-		return false
+	if style and Sounds.has(style) then
+		Sounds.play(style, position)
+		return true
 	end
-	Sounds.play(entry[1], position, entry[3], entry[2])
-	return true
+	return false
 end
 
 local player = Players.LocalPlayer
@@ -326,7 +313,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	Shoot = function(data)
 		local character = data.character :: Model?
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		Sounds.play("Potato", root and root.Position)
+		Sounds.play("Shoot", root and root.Position)
 	end,
 	Splat = function(data)
 		local look = data.look
@@ -339,6 +326,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 			burst(data.position, "8C8C8C", 2.5)
 		else
 			burst(data.position, "C9A66B", 4)
+			Sounds.play("Splat", data.position)
 		end
 	end,
 	Blast = function(data)
@@ -352,8 +340,12 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	end,
 	Hit = function(data)
 		bits(data.fx, data.position)
+		Sounds.play("Hit", data.position)
 	end,
 	Plunged = function(data)
+		local target = data.character :: Model?
+		local hit = target and target:FindFirstChild("HumanoidRootPart") :: BasePart?
+		Sounds.play("Plunge", hit and hit.Position)
 		stickTo(data.character, data.seconds, function(root)
 			local s = bodyScale(root)
 			local plunger = ItemModels.build("Plunger")
@@ -380,6 +372,8 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	end,
 	Bubbled = function(data)
 		local character = data.character :: Model?
+		local inside = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		Sounds.play("Bubble", inside and inside.Position)
 		stickTo(character, data.seconds, function(root)
 			local s = bodyScale(root)
 			local bubble = Parts.make({
@@ -425,6 +419,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if root then
 			bits("Snow", root.Position)
+			Sounds.play("Freeze", root.Position)
 		end
 	end,
 	Slip = function(data)
@@ -433,7 +428,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		playStyle("Slip", data.position)
 	end,
 	Drop = function(data)
-		Sounds.play("Pickup", data.position, 0.4, 0.8)
+		Sounds.play("Drop", data.position)
 	end,
 	Gulp = function(data)
 		bits("Sparkle", data.position)
@@ -442,66 +437,43 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	Boom = function(data)
 		bits("Feathers", data.position)
 		burst(data.position, "FFD93B", 16)
-		playStyle("Squeak", data.position)
+		Sounds.play("Boom", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)
+		Sounds.play("WallBreak", data.cframe.Position)
 	end,
 	Infect = function(data)
 		burst(data.position, "7BC043", 10)
-		Sounds.play("Groan", data.position, 0.8)
+		Sounds.play("Infect", data.position)
+		task.delay(0.35, function()
+			Sounds.play("Groan", data.position, 0.8)
+		end)
 	end,
 	Eat = function(data)
 		burst(data.position, "F4F4F4", 4)
-		Sounds.play("Pickup", data.position, 0.5, 1.4)
+		Sounds.play("Eat", data.position)
 	end,
 	Pickup = function(data)
-		Sounds.play("Pickup", data.position, 0.5)
+		Sounds.play("Pickup", data.position)
 	end,
 	Outbreak = function()
-		Sounds.play("Groan", nil, 0.7, 0.8)
+		Sounds.play("Outbreak")
 	end,
-	RoundEnd = function()
-		Sounds.play("RoundEnd", nil, 0.7)
+	RoundEnd = function(data)
+		-- A happy chime if your side won, a sad one if it didn't.
+		local zombie = ClientState.isZombie()
+		local won = (data.winner == "Survivors" and not zombie) or (data.winner == "Zombies" and zombie)
+		Sounds.play(if won then "RoundWin" else "RoundLose")
+	end,
+	Wizard = function(data)
+		bits("Sparkle", data.position)
+		Sounds.play("Wizard")
+	end,
+	Warp = function(data)
+		Sounds.play("Warp", data.position)
 	end,
 }
-
--- Furniture scrape loop (only if Config.SOUNDS.Scrape is set).
-local function startScrape()
-	local loop = Sounds.loop("Scrape")
-	if not loop then
-		return
-	end
-	local furniture = workspace:WaitForChild("Furniture")
-	local playing = false
-	task.spawn(function()
-		while true do
-			task.wait(0.15)
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			local moving = false
-			if root and Sounds.enabled() then
-				for _, model in furniture:GetChildren() do
-					local body = model:FindFirstChild("Body") :: BasePart?
-					if body and not body.Anchored and body.AssemblyLinearVelocity.Magnitude > 2 then
-						if (body.Position - root.Position).Magnitude < 40 then
-							moving = true
-							break
-						end
-					end
-				end
-			end
-			if moving and not playing then
-				loop.Volume = 0.35
-				loop:Play()
-				playing = true
-			elseif not moving and playing then
-				loop:Stop()
-				playing = false
-			end
-		end
-	end)
-end
 
 -- Bumping into another character: a soft thud and a little puff where you
 -- touched, so collisions read clearly. Your character's "Shell" is the
@@ -569,7 +541,6 @@ function Effects.start()
 			end
 		end
 	end)
-	startScrape()
 end
 
 return Effects

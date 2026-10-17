@@ -440,6 +440,15 @@ local function spawnNew(p: Participant)
 	recount()
 end
 
+-- "Z": back to the zombie spawn, with a whoosh where you left.
+local function warp(p: Participant)
+	local root = Participants.body(p)
+	if root then
+		Announcer.fx("Warp", { position = root.Position })
+	end
+	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+end
+
 local function onZombieReturn(player: Player)
 	local p = Participants.fromPlayer(player)
 	if not p or p.team ~= "Zombie" or phase ~= "Infection" then
@@ -450,7 +459,7 @@ local function onZombieReturn(player: Player)
 		return
 	end
 	p.returnReadyAt = now + Config.ZOMBIE_RETURN_COOLDOWN
-	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+	warp(p)
 end
 
 function RoundManager.roundNumber(): number
@@ -496,7 +505,7 @@ end
 function RoundManager.zombieReturn(p: Participant)
 	if p.team == "Zombie" and phase == "Infection" and os.clock() >= p.returnReadyAt then
 		p.returnReadyAt = os.clock() + Config.ZOMBIE_RETURN_COOLDOWN
-		CharacterService.place(p, spawnFrame("Zombie", p.scale))
+		warp(p)
 	end
 end
 

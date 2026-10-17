@@ -1031,19 +1031,15 @@ Config.BOT_COUNT = 6
 Config.PLAYERS_COLLIDE = true
 
 -- Sounds ---------------------------------------------------------------------------------------
--- Paths are sounds that ship inside the Roblox client. Leave a value "" to skip
--- that sound, or paste an audio asset id ("rbxassetid://123") you own.
+-- Every sound is built from files that ship with Roblox (see the client's
+-- SoundBank). To swap one for an audio asset you own, paste its id here by
+-- name, e.g. Squeak = "rbxassetid://1234567890". Names: Whoosh, Lunge, Swish,
+-- Hit, Clang, Squeak, Boing, Pop, Twang, Gulp, Slip, Shoot, Shotgun, Boom,
+-- Splat, Plunge, Freeze, Bubble, WallBreak, Bump, Infect, Groan, Pickup, Drop,
+-- Eat, Warp, Outbreak, RoundWin, RoundLose, Tick, TickFinal, UiClick, Buy,
+-- Error, Wizard, Spray, Blower, Scrape, Footsteps.
 
-Config.SOUNDS = {
-	Whoosh = "rbxasset://sounds/swordslash.wav",
-	Lunge = "rbxasset://sounds/swordlunge.wav",
-	Groan = "rbxasset://sounds/uuhhh.mp3",
-	RoundEnd = "rbxasset://sounds/electronicpingshort.wav",
-	Pickup = "rbxasset://sounds/unsheath.wav",
-	Potato = "",
-	Shotgun = "",
-	Scrape = "", -- loop while furniture slides; add your own id
-}
+Config.SOUND_OVERRIDES = {} :: { [string]: string }
 
 -- Monetization ------------------------------------------------------------------------------------
 -- Create these on create.roblox.com > your experience > Monetization, then paste
@@ -8968,6 +8964,15 @@ local function spawnNew(p: Participant)
 	recount()
 end
 
+-- "Z": back to the zombie spawn, with a whoosh where you left.
+local function warp(p: Participant)
+	local root = Participants.body(p)
+	if root then
+		Announcer.fx("Warp", { position = root.Position })
+	end
+	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+end
+
 local function onZombieReturn(player: Player)
 	local p = Participants.fromPlayer(player)
 	if not p or p.team ~= "Zombie" or phase ~= "Infection" then
@@ -8978,7 +8983,7 @@ local function onZombieReturn(player: Player)
 		return
 	end
 	p.returnReadyAt = now + Config.ZOMBIE_RETURN_COOLDOWN
-	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+	warp(p)
 end
 
 function RoundManager.roundNumber(): number
@@ -9024,7 +9029,7 @@ end
 function RoundManager.zombieReturn(p: Participant)
 	if p.team == "Zombie" and phase == "Infection" and os.clock() >= p.returnReadyAt then
 		p.returnReadyAt = os.clock() + Config.ZOMBIE_RETURN_COOLDOWN
-		CharacterService.place(p, spawnFrame("Zombie", p.scale))
+		warp(p)
 	end
 end
 
@@ -9484,6 +9489,7 @@ function Wizard.arrive()
 		state:SetAttribute("WizardHere", true)
 	end
 	Announcer.chat("* The wizard has arrived! Press [B] at wizard to buy special items! *")
+	Announcer.fx("Wizard", { position = Vector3.new(spot.x, 2, spot.z) })
 end
 
 function Wizard.leave()
@@ -10020,6 +10026,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ClientState = require(script.Parent.ClientState)
 local Knockback = require(ReplicatedStorage.Shared.Knockback)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -10030,27 +10037,13 @@ local Effects = {}
 local Items = require(ReplicatedStorage.Shared.Items)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 
--- Funny sounds made from the few sounds that ship with every Roblox client,
--- pitched up or down: { sound name in Config.SOUNDS, pitch, volume }.
-local SOUND_STYLES: { [string]: { any } } = {
-	Squeak = { "RoundEnd", 2.4, 0.6 },
-	Clang = { "RoundEnd", 0.55, 0.9 },
-	Boing = { "Lunge", 0.45, 0.9 },
-	Pop = { "RoundEnd", 3.2, 0.6 },
-	Swish = { "Whoosh", 1.5, 0.5 },
-	Twang = { "Lunge", 1.8, 0.6 },
-	Gulp = { "Pickup", 0.7, 0.6 },
-	Slip = { "Whoosh", 0.6, 0.8 },
-	Bump = { "Lunge", 0.35, 0.35 },
-}
-
+-- Plays an item's sound style (a SoundBank name) if it has one.
 local function playStyle(style: string?, position: Vector3?): boolean
-	local entry = style and SOUND_STYLES[style]
-	if not entry then
-		return false
+	if style and Sounds.has(style) then
+		Sounds.play(style, position)
+		return true
 	end
-	Sounds.play(entry[1], position, entry[3], entry[2])
-	return true
+	return false
 end
 
 local player = Players.LocalPlayer
@@ -10340,7 +10333,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	Shoot = function(data)
 		local character = data.character :: Model?
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		Sounds.play("Potato", root and root.Position)
+		Sounds.play("Shoot", root and root.Position)
 	end,
 	Splat = function(data)
 		local look = data.look
@@ -10353,6 +10346,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 			burst(data.position, "8C8C8C", 2.5)
 		else
 			burst(data.position, "C9A66B", 4)
+			Sounds.play("Splat", data.position)
 		end
 	end,
 	Blast = function(data)
@@ -10366,8 +10360,12 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	end,
 	Hit = function(data)
 		bits(data.fx, data.position)
+		Sounds.play("Hit", data.position)
 	end,
 	Plunged = function(data)
+		local target = data.character :: Model?
+		local hit = target and target:FindFirstChild("HumanoidRootPart") :: BasePart?
+		Sounds.play("Plunge", hit and hit.Position)
 		stickTo(data.character, data.seconds, function(root)
 			local s = bodyScale(root)
 			local plunger = ItemModels.build("Plunger")
@@ -10394,6 +10392,8 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	end,
 	Bubbled = function(data)
 		local character = data.character :: Model?
+		local inside = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		Sounds.play("Bubble", inside and inside.Position)
 		stickTo(character, data.seconds, function(root)
 			local s = bodyScale(root)
 			local bubble = Parts.make({
@@ -10439,6 +10439,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if root then
 			bits("Snow", root.Position)
+			Sounds.play("Freeze", root.Position)
 		end
 	end,
 	Slip = function(data)
@@ -10447,7 +10448,7 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		playStyle("Slip", data.position)
 	end,
 	Drop = function(data)
-		Sounds.play("Pickup", data.position, 0.4, 0.8)
+		Sounds.play("Drop", data.position)
 	end,
 	Gulp = function(data)
 		bits("Sparkle", data.position)
@@ -10456,66 +10457,43 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 	Boom = function(data)
 		bits("Feathers", data.position)
 		burst(data.position, "FFD93B", 16)
-		playStyle("Squeak", data.position)
+		Sounds.play("Boom", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)
+		Sounds.play("WallBreak", data.cframe.Position)
 	end,
 	Infect = function(data)
 		burst(data.position, "7BC043", 10)
-		Sounds.play("Groan", data.position, 0.8)
+		Sounds.play("Infect", data.position)
+		task.delay(0.35, function()
+			Sounds.play("Groan", data.position, 0.8)
+		end)
 	end,
 	Eat = function(data)
 		burst(data.position, "F4F4F4", 4)
-		Sounds.play("Pickup", data.position, 0.5, 1.4)
+		Sounds.play("Eat", data.position)
 	end,
 	Pickup = function(data)
-		Sounds.play("Pickup", data.position, 0.5)
+		Sounds.play("Pickup", data.position)
 	end,
 	Outbreak = function()
-		Sounds.play("Groan", nil, 0.7, 0.8)
+		Sounds.play("Outbreak")
 	end,
-	RoundEnd = function()
-		Sounds.play("RoundEnd", nil, 0.7)
+	RoundEnd = function(data)
+		-- A happy chime if your side won, a sad one if it didn't.
+		local zombie = ClientState.isZombie()
+		local won = (data.winner == "Survivors" and not zombie) or (data.winner == "Zombies" and zombie)
+		Sounds.play(if won then "RoundWin" else "RoundLose")
+	end,
+	Wizard = function(data)
+		bits("Sparkle", data.position)
+		Sounds.play("Wizard")
+	end,
+	Warp = function(data)
+		Sounds.play("Warp", data.position)
 	end,
 }
-
--- Furniture scrape loop (only if Config.SOUNDS.Scrape is set).
-local function startScrape()
-	local loop = Sounds.loop("Scrape")
-	if not loop then
-		return
-	end
-	local furniture = workspace:WaitForChild("Furniture")
-	local playing = false
-	task.spawn(function()
-		while true do
-			task.wait(0.15)
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			local moving = false
-			if root and Sounds.enabled() then
-				for _, model in furniture:GetChildren() do
-					local body = model:FindFirstChild("Body") :: BasePart?
-					if body and not body.Anchored and body.AssemblyLinearVelocity.Magnitude > 2 then
-						if (body.Position - root.Position).Magnitude < 40 then
-							moving = true
-							break
-						end
-					end
-				end
-			end
-			if moving and not playing then
-				loop.Volume = 0.35
-				loop:Play()
-				playing = true
-			elseif not moving and playing then
-				loop:Stop()
-				playing = false
-			end
-		end
-	end)
-end
 
 -- Bumping into another character: a soft thud and a little puff where you
 -- touched, so collisions read clearly. Your character's "Shell" is the
@@ -10583,7 +10561,6 @@ function Effects.start()
 			end
 		end
 	end)
-	startScrape()
 end
 
 return Effects
@@ -10940,6 +10917,7 @@ require(Client.InputController).start()
 require(Client.FurnitureController).start()
 require(Client.BushController).start()
 require(Client.Effects).start()
+require(Client.SoundController).start()
 require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
@@ -11131,21 +11109,313 @@ return MovementController
         </Item>
         <Item class="ModuleScript" referent="55">
           <Properties>
+            <string name="Name">SoundBank</string>
+            <string name="Source"><![CDATA[-- Every sound in the game, built from the few sound files that ship inside
+-- the Roblox client (so they always load, in any experience, with no
+-- uploads). Each recipe picks a file and shapes it: pitch, volume, a slice of
+-- the file, audio effects, or a short sequence of notes.
+--
+-- To use your own uploaded sound instead, put its id in
+-- Config.SOUND_OVERRIDES, e.g. Squeak = "rbxassetid://1234567890".
+
+export type Note = {
+	file: string, -- key of FILES
+	pitch: number?,
+	volume: number?,
+	from: number?, -- play only this slice of the file (seconds)
+	to: number?,
+	effects: { string }?, -- Echo, Distort, Tremolo, Flange, Reverb, Muffle, Thin
+	delay: number?, -- seconds after the first note (sequences)
+}
+
+export type Recipe = { Note }
+
+local FILES: { [string]: string } = {
+	Fall = "rbxasset://sounds/action_falling.ogg", -- rushing air
+	Steps = "rbxasset://sounds/action_footsteps_plastic.mp3",
+	GetUp = "rbxasset://sounds/action_get_up.mp3",
+	Jump = "rbxasset://sounds/action_jump.mp3",
+	Land = "rbxasset://sounds/action_jump_land.mp3", -- thud
+	Swim = "rbxasset://sounds/action_swim.mp3",
+	Explosion = "rbxasset://sounds/impact_explosion_03.mp3",
+	Splash = "rbxasset://sounds/impact_water.mp3",
+	Oof = "rbxasset://sounds/oof.ogg",
+	Ouch = "rbxasset://sounds/ouch.ogg",
+	Click = "rbxasset://sounds/volume_slider.ogg",
+}
+
+local function note(file: string, pitch: number, volume: number, extra: { [string]: any }?): Note
+	local n: Note = { file = file, pitch = pitch, volume = volume }
+	if extra then
+		n.from = extra.from
+		n.to = extra.to
+		n.effects = extra.effects
+		n.delay = extra.delay
+	end
+	return n
+end
+
+local function chime(pitches: { number }, gap: number, volume: number, effects: { string }?): Recipe
+	local notes = {}
+	for i, pitch in pitches do
+		table.insert(notes, note("Click", pitch, volume, { delay = (i - 1) * gap, effects = effects }))
+	end
+	return notes
+end
+
+local RECIPES: { [string]: Recipe } = {
+	-- Weapons
+	Whoosh = { note("Fall", 2.4, 0.35, { from = 0.2, to = 0.5 }) },
+	Lunge = { note("Jump", 1.6, 0.45) },
+	Swish = { note("Fall", 1.6, 0.35, { from = 0.1, to = 0.45, effects = { "Flange" } }) },
+	Hit = { note("Land", 1.5, 0.7) },
+	Clang = {
+		note("Land", 2.6, 0.75, { effects = { "Echo", "Thin" } }),
+		note("Click", 0.7, 0.5, { effects = { "Echo" } }),
+	},
+	Squeak = { note("Oof", 2.4, 0.55) },
+	Boing = { note("Jump", 0.55, 0.7, { effects = { "Tremolo", "Flange" } }) },
+	Pop = { note("Click", 0.55, 1) },
+	Twang = { note("Jump", 2.2, 0.5, { effects = { "Tremolo" } }) },
+	Gulp = { note("Splash", 2.2, 0.45, { to = 0.35 }) },
+	Slip = { note("Fall", 1.8, 0.4, { to = 0.4 }), note("Oof", 1.4, 0.6, { delay = 0.25 }) },
+	Shoot = { note("Explosion", 2.8, 0.25, { to = 0.25 }) },
+	Shotgun = { note("Explosion", 1.5, 0.55, { to = 0.6 }) },
+	Boom = { note("Explosion", 1, 0.7), note("Oof", 2.4, 0.4, { delay = 0.1 }) },
+	Splat = { note("Splash", 1.6, 0.35, { to = 0.3 }), note("Land", 1.2, 0.3) },
+	Plunge = { note("Land", 0.8, 0.6), note("Splash", 2.5, 0.35, { to = 0.2 }) },
+	Freeze = {
+		note("Splash", 0.6, 0.35, { to = 0.5, effects = { "Echo" } }),
+		note("Click", 2.8, 0.5, { delay = 0.05 }),
+	},
+	Bubble = { note("Swim", 2, 0.35, { to = 0.4 }) },
+	WallBreak = { note("Explosion", 1.2, 0.6, { to = 0.8 }), note("Land", 0.7, 0.7) },
+
+	-- People
+	Bump = { note("Land", 1.9, 0.3) },
+	Infect = { note("Oof", 1, 0.9) }, -- the classic
+	Groan = { note("Ouch", 0.5, 0.55, { effects = { "Distort", "Reverb" } }) },
+	Pickup = { note("GetUp", 1.7, 0.45), note("Click", 1.6, 0.4, { delay = 0.06 }) },
+	Drop = { note("Land", 1.1, 0.35) },
+	Eat = { note("Click", 1.2, 0.5), note("GetUp", 2, 0.4, { delay = 0.05 }) },
+	Warp = { note("Fall", 0.8, 0.45, { to = 0.6, effects = { "Reverb" } }) },
+
+	-- Round and UI
+	Outbreak = {
+		note("Explosion", 0.45, 0.6),
+		note("Ouch", 0.45, 0.6, { delay = 0.2, effects = { "Distort", "Reverb" } }),
+	},
+	RoundWin = chime({ 1, 1.26, 1.5, 2 }, 0.12, 0.7, { "Reverb" }),
+	RoundLose = {
+		note("Ouch", 0.45, 0.6, { effects = { "Distort" } }),
+		note("Click", 1, 0.6, { delay = 0.15 }),
+		note("Click", 0.84, 0.6, { delay = 0.3 }),
+		note("Click", 0.7, 0.6, { delay = 0.45 }),
+		note("Click", 0.5, 0.6, { delay = 0.6 }),
+	},
+	Tick = { note("Click", 1.3, 0.5) },
+	TickFinal = { note("Click", 1.9, 0.75) },
+	UiClick = { note("Click", 1.5, 0.35) },
+	Buy = chime({ 2, 2.6 }, 0.09, 0.6),
+	Error = chime({ 0.6, 0.5 }, 0.1, 0.5),
+	Wizard = chime({ 1.5, 2, 2.5, 3 }, 0.07, 0.5, { "Echo" }),
+
+	-- Loops (started and stopped by SoundController)
+	Spray = { note("Swim", 1.5, 0.3) },
+	Blower = { note("Fall", 1.3, 0.3) },
+	Scrape = { note("Steps", 0.45, 0.25, { effects = { "Muffle" } }) },
+	Footsteps = { note("Steps", 1.1, 0.18) },
+}
+
+return {
+	FILES = FILES,
+	RECIPES = RECIPES,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="56">
+          <Properties>
+            <string name="Name">SoundController</string>
+            <string name="Source"><![CDATA[-- Sounds that follow what's going on rather than one-off events: countdown
+-- ticks in the last 10 seconds of prep and of the round, your footsteps,
+-- water guns and leaf blowers spraying, furniture scraping, and zombies
+-- groaning near you.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local ClientState = require(script.Parent.ClientState)
+local Sounds = require(script.Parent.Sounds)
+
+local SoundController = {}
+
+local player = Players.LocalPlayer
+local HEARING = 90
+local INTERVAL = 0.1
+local rng = Random.new()
+
+local function characters(): { Instance }
+	local list = workspace:GetChildren()
+	local bots = workspace:FindFirstChild("Bots")
+	if bots then
+		for _, bot in bots:GetChildren() do
+			table.insert(list, bot)
+		end
+	end
+	return list
+end
+
+local function rootOf(model: Instance): BasePart?
+	return model:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function setPlaying(sound: Sound?, on: boolean)
+	if not sound then
+		return
+	end
+	if on and not sound.IsPlaying then
+		sound:Play()
+	elseif not on and sound.IsPlaying then
+		sound:Stop()
+	end
+end
+
+function SoundController.start()
+	local footsteps = Sounds.loop("Footsteps")
+	local footstepsPitch = if footsteps then footsteps.PlaybackSpeed else 1
+	local scrape = Sounds.loop("Scrape")
+	local sprays: { [Instance]: { sound: Sound, volume: number } } = {}
+	local lastTick = -1
+	local nextGroan = os.clock() + 5
+	local furniture = workspace:WaitForChild("Furniture")
+
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed < INTERVAL then
+			return
+		end
+		elapsed = 0
+		local on = Sounds.enabled()
+		local character = player.Character
+		local me = character and rootOf(character)
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+		-- Countdown ticks.
+		local phase = ClientState.phase()
+		local left = ClientState.secondsLeft()
+		if (phase == "Prep" or phase == "Infection") and left > 0 and left <= 10 then
+			local second = math.ceil(left)
+			if second ~= lastTick then
+				lastTick = second
+				Sounds.play(if second <= 3 then "TickFinal" else "Tick")
+			end
+		else
+			lastTick = -1
+		end
+
+		-- Your footsteps, faster when you're faster.
+		local walking = on
+			and humanoid ~= nil
+			and humanoid.Health > 0
+			and humanoid.WalkSpeed > 0
+			and humanoid.MoveDirection.Magnitude > 0.1
+		if footsteps and humanoid then
+			footsteps.PlaybackSpeed = footstepsPitch * math.clamp(humanoid.WalkSpeed / 16, 0.8, 1.5)
+		end
+		setPlaying(footsteps, walking)
+
+		-- Furniture scraping along the floor near you.
+		local scraping = false
+		if on and me then
+			for _, model in furniture:GetChildren() do
+				local body = model:FindFirstChild("Body") :: BasePart?
+				if body and not body.Anchored and body.AssemblyLinearVelocity.Magnitude > 2 then
+					if (body.Position - me.Position).Magnitude < 40 then
+						scraping = true
+						break
+					end
+				end
+			end
+		end
+		setPlaying(scrape, scraping)
+
+		-- Water guns and leaf blowers, louder the closer they are.
+		local seen: { [Instance]: boolean } = {}
+		for _, model in characters() do
+			local kind = model:GetAttribute("Spraying")
+			local root = rootOf(model)
+			if on and typeof(kind) == "string" and root then
+				seen[model] = true
+				local entry = sprays[model]
+				if not entry then
+					local sound = Sounds.loop(if kind == "LeafBlower" then "Blower" else "Spray")
+					if sound then
+						entry = { sound = sound, volume = sound.Volume }
+						sprays[model] = entry
+						sound:Play()
+					end
+				end
+				if entry then
+					local distance = if me then (root.Position - me.Position).Magnitude else 0
+					entry.sound.Volume = entry.volume * math.clamp(1 - distance / HEARING, 0, 1)
+				end
+			end
+		end
+		for model, entry in sprays do
+			if not seen[model] then
+				entry.sound:Destroy()
+				sprays[model] = nil
+			end
+		end
+
+		-- Now and then a zombie near you groans.
+		local now = os.clock()
+		if on and me and now >= nextGroan then
+			nextGroan = now + rng:NextNumber(4, 8)
+			local nearby = {}
+			for _, model in characters() do
+				local root = rootOf(model)
+				if model ~= character and root and model:GetAttribute("Team") == "Zombie" then
+					if (root.Position - me.Position).Magnitude < 70 then
+						table.insert(nearby, root)
+					end
+				end
+			end
+			if #nearby > 0 then
+				local root = nearby[rng:NextInteger(1, #nearby)]
+				Sounds.play("Groan", root.Position, 0.6, rng:NextNumber(0.9, 1.15))
+			end
+		end
+	end)
+end
+
+return SoundController
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="57">
+          <Properties>
             <string name="Name">Sounds</string>
-            <string name="Source"><![CDATA[-- Plays short 2D sounds, quieter the farther they happen from you (the
--- camera is far overhead, so normal 3D falloff would make everything silent).
+            <string name="Source"><![CDATA[-- Plays the game's sounds (recipes in SoundBank), quieter the farther they
+-- happen from you (the camera is far overhead, so normal 3D falloff would
+-- make everything silent). A sound named in Config.SOUND_OVERRIDES plays that
+-- uploaded sound instead.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local SoundBank = require(script.Parent.SoundBank)
 
 local Sounds = {}
 
 local enabled = true
 local player = Players.LocalPlayer
 local HEARING = 90
+local rng = Random.new()
 
 function Sounds.setEnabled(on: boolean)
 	enabled = on
@@ -11155,36 +11425,87 @@ function Sounds.enabled(): boolean
 	return enabled
 end
 
+function Sounds.has(name: string?): boolean
+	return name ~= nil
+		and (SoundBank.RECIPES[name] ~= nil or (Config.SOUND_OVERRIDES :: { [string]: string })[name] ~= nil)
+end
+
 local function listener(): Vector3?
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	return root and root.Position
 end
 
-function Sounds.play(name: string, position: Vector3?, volume: number?, pitch: number?)
-	if not enabled then
-		return
-	end
-	local id = (Config.SOUNDS :: { [string]: string })[name]
-	if not id or id == "" then
-		return
-	end
-	local v = volume or 0.6
-	if position then
-		local here = listener()
-		if here then
-			local dx, dz = position.X - here.X, position.Z - here.Z
-			v *= math.clamp(1 - math.sqrt(dx * dx + dz * dz) / HEARING, 0, 1)
-		end
-		if v < 0.03 then
-			return
-		end
-	end
+local EFFECTS: { [string]: () -> SoundEffect } = {
+	Echo = function()
+		local e = Instance.new("EchoSoundEffect")
+		e.Delay = 0.07
+		e.Feedback = 0.35
+		e.WetLevel = -4
+		return e
+	end,
+	Distort = function()
+		local e = Instance.new("DistortionSoundEffect")
+		e.Level = 0.55
+		return e
+	end,
+	Tremolo = function()
+		local e = Instance.new("TremoloSoundEffect")
+		e.Frequency = 14
+		e.Depth = 0.8
+		return e
+	end,
+	Flange = function()
+		local e = Instance.new("FlangeSoundEffect")
+		e.Mix = 0.8
+		e.Rate = 5
+		e.Depth = 0.6
+		return e
+	end,
+	Reverb = function()
+		local e = Instance.new("ReverbSoundEffect")
+		e.DecayTime = 0.9
+		e.WetLevel = -6
+		return e
+	end,
+	Muffle = function()
+		local e = Instance.new("EqualizerSoundEffect")
+		e.HighGain = -25
+		e.MidGain = -6
+		e.LowGain = 4
+		return e
+	end,
+	Thin = function()
+		local e = Instance.new("EqualizerSoundEffect")
+		e.LowGain = -20
+		e.MidGain = 2
+		e.HighGain = 4
+		return e
+	end,
+}
+
+-- Builds (but doesn't play) one note.
+local function make(note: SoundBank.Note, volume: number, pitch: number): Sound
 	local sound = Instance.new("Sound")
-	sound.SoundId = id
-	sound.Volume = v
-	sound.PlaybackSpeed = pitch or 1
+	sound.SoundId = SoundBank.FILES[note.file] or ""
+	sound.Volume = (note.volume or 0.6) * volume
+	sound.PlaybackSpeed = (note.pitch or 1) * pitch
+	if note.from or note.to then
+		sound.PlaybackRegionsEnabled = true
+		sound.PlaybackRegion = NumberRange.new(note.from or 0, note.to or 60)
+	end
+	local effects: { string } = note.effects or {}
+	for _, name in effects do
+		local build = EFFECTS[name]
+		if build then
+			build().Parent = sound
+		end
+	end
 	sound.Parent = SoundService
+	return sound
+end
+
+local function playOnce(sound: Sound)
 	sound:Play()
 	sound.Ended:Once(function()
 		sound:Destroy()
@@ -11196,17 +11517,66 @@ function Sounds.play(name: string, position: Vector3?, volume: number?, pitch: n
 	end)
 end
 
--- A looping sound you can switch on and off (furniture scraping).
+-- `volume` and `pitch` scale the recipe's own values.
+function Sounds.play(name: string, position: Vector3?, volume: number?, pitch: number?)
+	if not enabled then
+		return
+	end
+	local v = volume or 1
+	if position then
+		local here = listener()
+		if here then
+			local dx, dz = position.X - here.X, position.Z - here.Z
+			v *= math.clamp(1 - math.sqrt(dx * dx + dz * dz) / HEARING, 0, 1)
+		end
+		if v < 0.03 then
+			return
+		end
+	end
+	local p = (pitch or 1) * rng:NextNumber(0.96, 1.04) -- a little variety
+	local override = (Config.SOUND_OVERRIDES :: { [string]: string })[name]
+	if override and override ~= "" then
+		local sound = Instance.new("Sound")
+		sound.SoundId = override
+		sound.Volume = 0.6 * v
+		sound.PlaybackSpeed = p
+		sound.Parent = SoundService
+		playOnce(sound)
+		return
+	end
+	local recipe = SoundBank.RECIPES[name]
+	if not recipe then
+		return
+	end
+	for _, n in recipe do
+		if n.delay and n.delay > 0 then
+			task.delay(n.delay, function()
+				if enabled then
+					playOnce(make(n, v, p))
+				end
+			end)
+		else
+			playOnce(make(n, v, p))
+		end
+	end
+end
+
+-- A looping sound you switch on and off (sprays, scraping, footsteps). Uses
+-- the first note of the recipe.
 function Sounds.loop(name: string): Sound?
-	local id = (Config.SOUNDS :: { [string]: string })[name]
-	if not id or id == "" then
+	local override = (Config.SOUND_OVERRIDES :: { [string]: string })[name]
+	local recipe = SoundBank.RECIPES[name]
+	local sound: Sound
+	if override and override ~= "" then
+		sound = Instance.new("Sound")
+		sound.SoundId = override
+		sound.Parent = SoundService
+	elseif recipe and recipe[1] then
+		sound = make(recipe[1], 1, 1)
+	else
 		return nil
 	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = id
 	sound.Looped = true
-	sound.Volume = 0
-	sound.Parent = SoundService
 	return sound
 end
 
@@ -11214,11 +11584,11 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="56">
+        <Item class="Folder" referent="58">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="57">
+          <Item class="ModuleScript" referent="59">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[-- The admin panel (F2, or the ADMIN button on the left). Only shown to
@@ -11555,7 +11925,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="58">
+          <Item class="ModuleScript" referent="60">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -11613,7 +11983,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
@@ -11797,7 +12167,7 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">BottomLeft</string>
               <string name="Source"><![CDATA[-- Bottom-left: your points, the speed boost and size they give you, and
@@ -11882,7 +12252,7 @@ return BottomLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -11996,7 +12366,7 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
@@ -12201,7 +12571,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -12282,7 +12652,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="66">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -12380,7 +12750,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -12399,6 +12769,7 @@ local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Skins = require(ReplicatedStorage.Shared.Skins)
+local Sounds = require(script.Parent.Parent.Sounds)
 local UIKit = require(script.Parent.UIKit)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -12712,6 +13083,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 						return buyItemRemote:InvokeServer(id, fromWizard)
 					end)
 					if ok then
+						Sounds.play(if okResult then "Buy" else "Error")
 						toast(
 							tostring(message),
 							if okResult then Config.COLORS.Good else Config.COLORS.ZombieText
@@ -12781,6 +13153,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 					elseif status == "promptPass" then
 						prompt("GamePass", message)
 					else
+						Sounds.play(if status == "error" then "Error" else "Buy")
 						toast(
 							tostring(message),
 							if status == "error" then Config.COLORS.ZombieText else Config.COLORS.Good
@@ -12912,7 +13285,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -13140,7 +13513,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Top-left: five square icon buttons (menu, shop, settings, trophy, chat).
@@ -13192,7 +13565,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="68">
+          <Item class="ModuleScript" referent="70">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -13372,7 +13745,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="71">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -13381,6 +13754,7 @@ return TopRight
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Sounds = require(script.Parent.Parent.Sounds)
 
 local UIKit = {}
 
@@ -13510,6 +13884,9 @@ function UIKit.button(props: Props, onClick: (() -> ())?): TextButton
 	end
 	local button = UIKit.new("TextButton", merged)
 	UIKit.corner(8).Parent = button
+	button.Activated:Connect(function()
+		Sounds.play("UiClick")
+	end)
 	if onClick then
 		button.Activated:Connect(onClick)
 	end
@@ -13602,7 +13979,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="70">
+      <Item class="LocalScript" referent="72">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -13612,13 +13989,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="71">
+  <Item class="TextChatService" referent="73">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="72">
+  <Item class="Workspace" referent="74">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

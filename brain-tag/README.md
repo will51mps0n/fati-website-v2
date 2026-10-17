@@ -271,9 +271,11 @@ Everything lives in `src/shared/Config.luau`:
 - **Furniture size:** `FurnitureSpecs.SIZE_SCALE` (and `KEEP_SIZE` for pieces that sit against walls).
 - **Points:** `INFECT_STEAL_FRACTION`, `GROUND_ITEMS_MIN` / `GROUND_ITEMS_MAX`.
 - **Bushes:** `BUSH_HEIGHT`, `BUSH_REVEAL_DISTANCE` (how close a bot must get to spot you), `BUSH_SEE_THROUGH`.
-- **Sounds:** `SOUNDS` uses sounds that ship with the Roblox client. Set any to
-  `""` to mute it, or paste your own `rbxassetid://` id. The furniture scrape
-  loop is off until you add a sound id.
+- **Sounds:** about 40 effects (swings, bonks, squeaks, the classic "oof" when
+  you're eaten, countdown ticks, footsteps, sprays, zombie groans, UI clicks,
+  win/lose chimes) are built in `src/client/SoundBank.luau` from the sound files
+  that ship with Roblox, so they always play with no uploads. To replace one
+  with an audio asset you own, add it to `Config.SOUND_OVERRIDES` by name.
 
 Furniture never slides: it moves only while pushed. Opposite pushes cancel, and
 a piece pressed against walls stays put. That is what makes a barricade hold.

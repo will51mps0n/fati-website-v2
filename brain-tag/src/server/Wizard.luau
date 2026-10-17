@@ -92,6 +92,7 @@ function Wizard.arrive()
 		state:SetAttribute("WizardHere", true)
 	end
 	Announcer.chat("* The wizard has arrived! Press [B] at wizard to buy special items! *")
+	Announcer.fx("Wizard", { position = Vector3.new(spot.x, 2, spot.z) })
 end
 
 function Wizard.leave()

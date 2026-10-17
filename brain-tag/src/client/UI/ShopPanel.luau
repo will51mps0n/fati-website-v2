@@ -14,6 +14,7 @@ local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Skins = require(ReplicatedStorage.Shared.Skins)
+local Sounds = require(script.Parent.Parent.Sounds)
 local UIKit = require(script.Parent.UIKit)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -327,6 +328,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 						return buyItemRemote:InvokeServer(id, fromWizard)
 					end)
 					if ok then
+						Sounds.play(if okResult then "Buy" else "Error")
 						toast(
 							tostring(message),
 							if okResult then Config.COLORS.Good else Config.COLORS.ZombieText
@@ -396,6 +398,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 					elseif status == "promptPass" then
 						prompt("GamePass", message)
 					else
+						Sounds.play(if status == "error" then "Error" else "Buy")
 						toast(
 							tostring(message),
 							if status == "error" then Config.COLORS.ZombieText else Config.COLORS.Good

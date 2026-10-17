@@ -157,19 +157,15 @@ Config.BOT_COUNT = 6
 Config.PLAYERS_COLLIDE = true
 
 -- Sounds ---------------------------------------------------------------------------------------
--- Paths are sounds that ship inside the Roblox client. Leave a value "" to skip
--- that sound, or paste an audio asset id ("rbxassetid://123") you own.
+-- Every sound is built from files that ship with Roblox (see the client's
+-- SoundBank). To swap one for an audio asset you own, paste its id here by
+-- name, e.g. Squeak = "rbxassetid://1234567890". Names: Whoosh, Lunge, Swish,
+-- Hit, Clang, Squeak, Boing, Pop, Twang, Gulp, Slip, Shoot, Shotgun, Boom,
+-- Splat, Plunge, Freeze, Bubble, WallBreak, Bump, Infect, Groan, Pickup, Drop,
+-- Eat, Warp, Outbreak, RoundWin, RoundLose, Tick, TickFinal, UiClick, Buy,
+-- Error, Wizard, Spray, Blower, Scrape, Footsteps.
 
-Config.SOUNDS = {
-	Whoosh = "rbxasset://sounds/swordslash.wav",
-	Lunge = "rbxasset://sounds/swordlunge.wav",
-	Groan = "rbxasset://sounds/uuhhh.mp3",
-	RoundEnd = "rbxasset://sounds/electronicpingshort.wav",
-	Pickup = "rbxasset://sounds/unsheath.wav",
-	Potato = "",
-	Shotgun = "",
-	Scrape = "", -- loop while furniture slides; add your own id
-}
+Config.SOUND_OVERRIDES = {} :: { [string]: string }
 
 -- Monetization ------------------------------------------------------------------------------------
 -- Create these on create.roblox.com > your experience > Monetization, then paste
