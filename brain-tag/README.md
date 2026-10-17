@@ -73,7 +73,8 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 - **Alone:** press **Play**. Every round fills up with 20 to 30 bots (Studio and
   live games; fewer as real players join, `Config.BOTS_MIN`, `BOTS_MAX`,
   `MAX_PARTICIPANTS`). They have funny names (Mario Robles, Fart Butt, Poop
-  Face, Fat Guy, Booger Bob...), random skins, and a level from 3 to 6; most
+  Face, Fat Guy, Booger Bob...), a level from 3 to 6, and the classic look
+  (only `Config.BOTS_WITH_SKINS` of them, 3 by default, wear special skins); most
   are 5 or 6, and Mario Robles is a 6. Zombie bots spread out over different
   humans, lead their target, shove through barricades and remember where you
   hid. Human bots start with weapons, hold them out toward zombies and swing,
@@ -135,14 +136,15 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 10% of their points. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 25% of their points. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
 Score (points) persists, buys items, and sets your speed and size, which
 update the moment your points change (bottom-left shows points, speed boost
-and size). A zombie that eats you takes 10% of your points
-(`INFECT_STEAL_FRACTION`), so zombies grow as they feed. Speed multiplier =
+and size). A zombie that eats you takes 25% of your points
+(`INFECT_STEAL_FRACTION`) plus a small flat bonus (`INFECT_REWARD`), so
+eating a big player is worth a lot and zombies grow as they feed. Speed multiplier =
 1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
 12,000-point player is about 2.5x a newcomer, like in the original. Bigger
 players push heavier furniture faster: each pusher's strength is size squared,

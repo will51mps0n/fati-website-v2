@@ -583,6 +583,17 @@ local function randomSkin(team: Skins.Team): string
 	return list[rng:NextInteger(1, #list)].id
 end
 
+-- Only a few bots dress up (Config.BOTS_WITH_SKINS); the rest look classic.
+local function dressedUp(): number
+	local count = 0
+	for _, p in active do
+		if p.humanSkin ~= Skins.DEFAULT_HUMAN then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function addBot(index: number)
 	local entry = ROSTER[index]
 	local level = LEVELS[entry.level] or LEVELS[5]
@@ -592,8 +603,12 @@ local function addBot(index: number)
 		name = entry.name,
 		isBot = true,
 	})
-	p.humanSkin = randomSkin("Human")
-	p.zombieSkin = randomSkin("Zombie")
+	if dressedUp() < Config.BOTS_WITH_SKINS and rng:NextNumber() < 0.35 then
+		repeat
+			p.humanSkin = randomSkin("Human")
+		until p.humanSkin ~= Skins.DEFAULT_HUMAN
+		p.zombieSkin = randomSkin("Zombie")
+	end
 	p.adminSpeed = level.speed
 	p.state:SetAttribute("BotLevel", entry.level)
 	Participants.publish(p)

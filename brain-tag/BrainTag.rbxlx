@@ -914,11 +914,11 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
-Config.INFECT_REWARD = 100
+Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
 -- ate you gets them (so zombies grow as they feed).
-Config.INFECT_STEAL_FRACTION = 0.1
+Config.INFECT_STEAL_FRACTION = 0.25 -- eat a big player, gain a lot
 
 -- Infection ----------------------------------------------------------------------
 
@@ -1026,6 +1026,7 @@ Config.BOTS = true
 Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
+Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
@@ -4878,6 +4879,17 @@ local function randomSkin(team: Skins.Team): string
 	return list[rng:NextInteger(1, #list)].id
 end
 
+-- Only a few bots dress up (Config.BOTS_WITH_SKINS); the rest look classic.
+local function dressedUp(): number
+	local count = 0
+	for _, p in active do
+		if p.humanSkin ~= Skins.DEFAULT_HUMAN then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function addBot(index: number)
 	local entry = ROSTER[index]
 	local level = LEVELS[entry.level] or LEVELS[5]
@@ -4887,8 +4899,12 @@ local function addBot(index: number)
 		name = entry.name,
 		isBot = true,
 	})
-	p.humanSkin = randomSkin("Human")
-	p.zombieSkin = randomSkin("Zombie")
+	if dressedUp() < Config.BOTS_WITH_SKINS and rng:NextNumber() < 0.35 then
+		repeat
+			p.humanSkin = randomSkin("Human")
+		until p.humanSkin ~= Skins.DEFAULT_HUMAN
+		p.zombieSkin = randomSkin("Zombie")
+	end
 	p.adminSpeed = level.speed
 	p.state:SetAttribute("BotLevel", entry.level)
 	Participants.publish(p)

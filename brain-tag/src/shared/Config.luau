@@ -40,11 +40,11 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
-Config.INFECT_REWARD = 100
+Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
 -- ate you gets them (so zombies grow as they feed).
-Config.INFECT_STEAL_FRACTION = 0.1
+Config.INFECT_STEAL_FRACTION = 0.25 -- eat a big player, gain a lot
 
 -- Infection ----------------------------------------------------------------------
 
@@ -152,6 +152,7 @@ Config.BOTS = true
 Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
+Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
