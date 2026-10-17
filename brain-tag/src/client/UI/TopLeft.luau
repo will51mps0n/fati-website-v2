@@ -1,5 +1,5 @@
 -- Left side bar: five big square icon buttons stacked down the left edge
--- (menu, shop, settings, trophy, chat).
+-- (info, shop, settings, trophy, chat).
 
 local UIKit = require(script.Parent.UIKit)
 
@@ -26,7 +26,7 @@ function TopLeft.build(parent: Instance, actions: Actions)
 	}, { UIKit.list(Enum.FillDirection.Vertical, TopLeft.GAP) })
 
 	local buttons: { { icon: string, action: () -> (), accent: boolean?, name: string } } = {
-		{ icon = "☰", action = actions.menu, accent = true, name = "Menu" },
+		{ icon = "i", action = actions.menu, accent = true, name = "Info" }, -- how to play
 		{ icon = "🛒", action = actions.shop, name = "Shop" },
 		{ icon = "⚙", action = actions.settings, name = "Settings" },
 		{ icon = "🏆", action = actions.trophy, name = "Trophy" },
@@ -36,8 +36,8 @@ function TopLeft.build(parent: Instance, actions: Actions)
 		UIKit.button({
 			Name = b.name,
 			Text = b.icon,
-			TextSize = 34,
-			Font = UIKit.BOLD,
+			TextSize = if b.name == "Info" then 44 else 34,
+			Font = if b.name == "Info" then Enum.Font.GothamBlack else UIKit.BOLD,
 			LayoutOrder = i,
 			Size = UDim2.fromOffset(TopLeft.BUTTON, TopLeft.BUTTON),
 			BackgroundColor3 = if b.accent then UIKit.ACCENT else UIKit.PANEL,

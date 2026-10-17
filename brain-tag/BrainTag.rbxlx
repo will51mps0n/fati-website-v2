@@ -899,7 +899,7 @@ Config.FIRST_ZOMBIES_TO_SPAWN = true -- teleport first zombies to the zombie spa
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.
-Config.MAP_ROTATION = { "Neighborhood", "Mansion" }
+Config.MAP_ROTATION = { "Neighborhood", "Mansion", "Haunted", "ChristmasTown" }
 Config.ROUNDS_PER_MAP = 2
 
 -- Movement and size ------------------------------------------------------------
@@ -1307,6 +1307,15 @@ local Specs: { [string]: Spec } = {
 	Arcade = { w = 3.2, d = 3, h = 6.5, weight = "Heavy" },
 	VendingMachine = { w = 4.5, d = 3, h = 7.5, weight = "Massive" },
 	Treadmill = { w = 3, d = 7, h = 2.4, weight = "Heavy" },
+	-- Haunted house.
+	Tombstone = { w = 3.2, d = 1.4, h = 4, weight = "Heavy" },
+	Coffin = { w = 3, d = 7, h = 2.2, weight = "Heavy" },
+	Candelabra = { w = 1.6, d = 1.6, h = 5, weight = "Light" }, -- gives off light
+	Cauldron = { w = 3.6, d = 3.6, h = 2.6, weight = "Medium" },
+	-- Christmas Town.
+	ChristmasTree = { w = 5, d = 5, h = 9, weight = "Medium" },
+	Present = { w = 2, d = 2, h = 2, weight = "Light" },
+	Snowman = { w = 3.4, d = 3.4, h = 6, weight = "Heavy" },
 }
 
 local FurnitureSpecs = { specs = Specs }
@@ -2388,6 +2397,11 @@ return Knockback
 -- house, with a large house above and the same plan turned 180 degrees below.
 -- Mansion: one big house modeled on the original's (orange brick rooms,
 -- a concrete garage), a pool and an orange shed out back, the road in front.
+-- Christmas Town: the Neighborhood under snow, with trees, presents and
+-- snowmen in the yards.
+-- Haunted: a dark manor of small rooms off one long hallway, a crypt, a
+-- garden shed and a graveyard of pushable tombstones (MapThemes Haunted:
+-- you only see near yourself; doors swing shut behind you).
 
 export type Rect = { x1: number, z1: number, x2: number, z2: number }
 export type Range = { number }
@@ -2444,6 +2458,8 @@ export type Layout = {
 	zombieSpawns: { Point },
 	wizardSpots: { Point },
 	start: Point, -- where every human starts the round, together
+	theme: string, -- MapThemes name: colors and lighting
+	swingDoors: boolean, -- doorways get walk-through doors that block the view
 }
 
 local MapLayout = {}
@@ -2503,6 +2519,8 @@ MapLayout.COLORS = {
 	BushGreen = "43A85A",
 	BushOrange = "E8913A",
 	ZombiePit = "6B2D2D",
+	Door = "6B4A33", -- swinging doors
+	DoorKnob = "D4A93A",
 }
 
 local T = MapLayout.WALL_THICKNESS
@@ -2881,6 +2899,8 @@ local function newLayout(name: string, title: string): Layout
 		zombieSpawns = {},
 		wizardSpots = {},
 		start = { x = 0, z = 0 },
+		theme = "Classic",
+		swingDoors = false,
 	}
 end
 
@@ -3123,11 +3143,318 @@ local function buildMansion(): Layout
 	return layout
 end
 
+-- Christmas Town ----------------------------------------------------------------------------
+
+local function buildChristmasTown(): Layout
+	local layout = buildNeighborhood()
+	layout.name = "ChristmasTown"
+	layout.title = "Christmas Town"
+	layout.theme = "Winter"
+	-- Yard decorations in the north half, mirrored into the south yards.
+	local north = {
+		piece("ChristmasTree", 100, -120),
+		piece("Present", 96, -114),
+		piece("Present", 104, -114),
+		piece("Present", 106, -121),
+		piece("ChristmasTree", -128, -152),
+		piece("Present", -124, -146),
+		piece("Present", -131.5, -146),
+		piece("Snowman", 80, -80),
+		piece("Snowman", -120, -55),
+		piece("Snowman", 120, -100, 270),
+	}
+	for _, p in north do
+		table.insert(layout.furniture, { kind = p.kind, x = p.x, z = p.z, rot = p.rot, house = "" })
+		table.insert(
+			layout.furniture,
+			{ kind = p.kind, x = -p.x, z = -p.z, rot = (p.rot + 180) % 360, house = "" }
+		)
+	end
+	return layout
+end
+
+-- Haunted house ---------------------------------------------------------------------------------
+
+-- 180 x 100: six small rooms along the back, a long hallway with a door at
+-- each end, five rooms along the front around the foyer.
+local MANOR: Plan = {
+	w = 180,
+	d = 100,
+	walls = {
+		wall(0, 0, 180, 0, { { 134.5, 141.5 } }, { { 8, 20 }, { 70, 86 }, { 156, 172 } }),
+		wall(0, 100, 180, 100, { { 86, 94 } }, { { 6, 18 }, { 40, 56 }, { 120, 136 }, { 154, 170 } }),
+		wall(0, 0, 0, 100, { { 46.5, 53.5 } }, { { 10, 30 }, { 68, 90 } }),
+		wall(180, 0, 180, 100, { { 46.5, 53.5 } }, { { 10, 30 }, { 68, 90 } }),
+		wall(0, 42, 180, 42, {
+			{ 14, 21 },
+			{ 44.5, 51.5 },
+			{ 74.5, 81.5 },
+			{ 107.5, 114.5 },
+			{ 134.5, 141.5 },
+			{ 161.5, 168.5 },
+		}),
+		wall(
+			0,
+			58,
+			180,
+			58,
+			{ { 11.5, 18.5 }, { 44.5, 51.5 }, { 74, 81 }, { 99, 106 }, { 125.5, 132.5 }, { 158.5, 165.5 } }
+		),
+		wall(36, 0, 36, 42, { { 17, 24 } }),
+		wall(60, 0, 60, 42),
+		wall(96, 0, 96, 42, { { 28, 35 } }),
+		wall(126, 0, 126, 42),
+		wall(150, 0, 150, 42, { { 17, 24 } }),
+		wall(30, 58, 30, 100, { { 75, 82 } }),
+		wall(66, 58, 66, 100),
+		wall(114, 58, 114, 100, { { 82, 89 } }),
+		wall(144, 58, 144, 100, { { 75, 82 } }),
+	},
+	rooms = {
+		room("Library", "Wood", 0, 0, 36, 42),
+		room("Closet", "Wood", 36, 0, 60, 42),
+		room("Bedroom", "Wood", 60, 0, 96, 42),
+		room("Bathroom", "Tile", 96, 0, 126, 42),
+		room("Study", "Wood", 126, 0, 150, 42),
+		room("Nursery", "Wood", 150, 0, 180, 42),
+		room("Hallway", "Tile", 0, 42, 180, 58),
+		room("Kitchen", "Tile", 0, 58, 30, 100),
+		room("Dining room", "Wood", 30, 58, 66, 100),
+		room("Foyer", "Brick", 66, 58, 114, 100),
+		room("Parlor", "Wood", 114, 58, 144, 100),
+		room("Chapel", "Concrete", 144, 58, 180, 100),
+	},
+	furniture = {
+		-- Library
+		piece("Bookshelf", 8, 2.8),
+		piece("Bookshelf", 24, 2.8),
+		piece("Bookshelf", 2.8, 20, 90),
+		piece("Desk", 20, 20),
+		piece("Chair", 20, 24, 180),
+		piece("Candelabra", 32, 4),
+		piece("Armchair", 30, 34),
+		piece("Rug", 18, 33),
+		-- Closet
+		piece("Wardrobe", 48, 3.2),
+		piece("Box", 40, 8),
+		piece("Box", 40, 11.6),
+		piece("Crate", 55, 10),
+		piece("Dresser", 57, 24, 90),
+		piece("Barrel", 55, 34),
+		piece("TrashCan", 40.5, 30),
+		-- Bedroom
+		piece("Bed", 70, 6.8),
+		piece("Wardrobe", 86, 3.2),
+		piece("Dresser", 63, 30, 90),
+		piece("Rug", 80, 22),
+		piece("Candelabra", 92, 12),
+		piece("Chair", 88, 30),
+		piece("Box", 66, 38),
+		piece("Plant", 92, 38),
+		-- Bathroom
+		piece("Bathtub", 111, 4.6),
+		piece("Toilet", 122.3, 14, 90),
+		piece("Sink", 122.8, 22, 270),
+		piece("Washer", 100, 4),
+		piece("Cauldron", 104, 26),
+		-- Study
+		piece("Desk", 129.5, 18, 90),
+		piece("Chair", 133, 18, 270),
+		piece("Bookshelf", 147.3, 29.5, 270),
+		piece("PoolTable", 138, 30),
+		piece("Candelabra", 146, 8),
+		-- Nursery
+		piece("Wardrobe", 176.8, 6.5, 90),
+		piece("Bed", 162, 6.8),
+		piece("Box", 172, 36),
+		piece("Armchair", 156, 32),
+		piece("Beanbag", 170, 24),
+		piece("Candelabra", 154, 12),
+		-- Hallway
+		piece("Bench", 32, 45.2),
+		piece("Candelabra", 60, 55),
+		piece("Armchair", 90, 45.9),
+		piece("Barrel", 120, 55),
+		piece("Candelabra", 150, 45),
+		piece("Crate", 172, 54.5),
+		-- Kitchen
+		piece("Fridge", 4.5, 95.9, 180),
+		piece("Stove", 10, 96.5, 180),
+		piece("Sink", 15.5, 96.8, 180),
+		piece("Cauldron", 24, 94),
+		piece("Table", 14, 76),
+		piece("Chair", 14, 71.3),
+		piece("Chair", 14, 80.7, 180),
+		piece("Barrel", 4, 62),
+		piece("TrashCan", 26, 62),
+		-- Dining room
+		piece("Table", 48, 80),
+		piece("Rug", 48, 80),
+		piece("Chair", 41, 80, 90),
+		piece("Chair", 55, 80, 270),
+		piece("Chair", 45, 75.2),
+		piece("Chair", 51, 75.2),
+		piece("Chair", 45, 84.8, 180),
+		piece("Chair", 51, 84.8, 180),
+		piece("Candelabra", 35, 96),
+		piece("Candelabra", 61, 96),
+		piece("Dresser", 48, 97.1, 180),
+		-- Foyer
+		piece("Armchair", 72, 92, 90),
+		piece("Armchair", 108, 92, 270),
+		piece("Rug", 90, 84),
+		piece("Candelabra", 70, 64),
+		piece("Candelabra", 110, 64),
+		piece("Coffin", 90, 76, 90),
+		piece("Plant", 80, 96),
+		piece("Plant", 100, 96),
+		piece("Box", 69.5, 72),
+		-- Parlor
+		piece("Piano", 129, 95.6, 180),
+		piece("Couch", 129, 70),
+		piece("Armchair", 121, 78),
+		piece("CoffeeTable", 129, 78),
+		piece("Candelabra", 117.5, 62),
+		piece("Bookshelf", 141.3, 68.5, 270),
+		-- Chapel
+		piece("Bench", 158, 70),
+		piece("Bench", 170, 70),
+		piece("Bench", 158, 77),
+		piece("Bench", 170, 77),
+		piece("Bench", 158, 84),
+		piece("Bench", 170, 84),
+		piece("Coffin", 164, 93, 90),
+		piece("Candelabra", 150, 93),
+		piece("Candelabra", 176, 93),
+	},
+	items = {
+		pt(20, 30),
+		pt(78, 22),
+		pt(112, 30),
+		pt(100, 50),
+		pt(20, 88),
+		pt(90, 90),
+		pt(160, 64),
+		pt(136, 86),
+	},
+}
+
+-- 30 x 24 stone crypt: three coffins and two candelabras.
+local CRYPT: Plan = {
+	w = 30,
+	d = 24,
+	walls = {
+		wall(0, 0, 30, 0),
+		wall(0, 24, 30, 24, { { 11.5, 18.5 } }),
+		wall(0, 0, 0, 24),
+		wall(30, 0, 30, 24),
+	},
+	rooms = { room("Crypt", "Concrete", 0, 0, 30, 24) },
+	furniture = {
+		piece("Coffin", 8, 11),
+		piece("Coffin", 15, 11),
+		piece("Coffin", 22, 11),
+		piece("Candelabra", 3.5, 3.5),
+		piece("Candelabra", 26.5, 3.5),
+	},
+	items = { pt(15, 19) },
+}
+
+-- 28 x 20 garden shed.
+local GARDEN_SHED: Plan = {
+	w = 28,
+	d = 20,
+	walls = {
+		wall(0, 0, 28, 0, { { 10.5, 17.5 } }),
+		wall(0, 20, 28, 20, nil, { { 8, 20 } }),
+		wall(0, 0, 0, 20),
+		wall(28, 0, 28, 20),
+	},
+	rooms = { room("Shed", "Wood", 0, 0, 28, 20) },
+	furniture = {
+		piece("Crate", 4, 16),
+		piece("Barrel", 9, 16.8),
+		piece("Box", 23.5, 16.5),
+		piece("Box", 23.5, 13),
+		piece("TrashCan", 4, 4),
+		piece("Cauldron", 22, 5),
+	},
+	items = { pt(14, 10) },
+}
+
+local function buildHaunted(): Layout
+	local layout = newLayout("Haunted", "The Haunted House")
+	layout.theme = "Haunted"
+	layout.swingDoors = true
+	layout.bounds = rect(-140, -135, 140, 135)
+	addHouse(layout, "Manor", MANOR, -90, -75, false, "Blue", "Huge")
+	addHouse(layout, "Crypt", CRYPT, 95, -120, false, "Orange", "Small")
+	addHouse(layout, "Shed", GARDEN_SHED, -128, 62, false, "Orange", "Small")
+
+	-- The graveyard: a dirt yard (no walls) full of tombstones you can push.
+	table.insert(
+		layout.rooms,
+		{ name = "Graveyard", floor = "Dirt", rect = rect(25, 45, 125, 120), house = "" }
+	)
+	for _, z in { 60, 76, 92, 108 } do
+		for _, x in { 40, 56, 72, 88, 104 } do
+			table.insert(layout.furniture, { kind = "Tombstone", x = x, z = z, rot = 0, house = "" })
+		end
+	end
+	for _, p in { piece("Coffin", 118, 72), piece("Bench", 70, 116), piece("Candelabra", 30, 50) } do
+		table.insert(layout.furniture, { kind = p.kind, x = p.x, z = p.z, rot = p.rot, house = "" })
+	end
+
+	layout.paths = {
+		rect(-4, 25, 4, 135), -- front door to the gate
+		rect(4, 80, 25, 86), -- into the graveyard
+		rect(106, -96, 114, -60), -- crypt door
+		rect(-118, 30, -110, 62), -- shed door
+	}
+	layout.patios = { rect(-14, 25, 14, 33) } -- the porch
+	layout.pools = { rect(-80, 70, -40, 100) } -- a murky pond
+
+	layout.bushes = {
+		bush(-130, -125, 5, "Green"),
+		bush(-128, -40, 4, "Orange"),
+		bush(-60, 115, 5, "Green"),
+		bush(-30, 60, 4, "Orange"),
+		bush(132, 20, 4, "Green"),
+		bush(130, -60, 5, "Orange"),
+		bush(-20, -120, 5, "Green"),
+		bush(60, -125, 4, "Orange"),
+		bush(-100, 110, 4, "Green"),
+	}
+
+	layout.humanSpawns = {
+		pt(-120, -20),
+		pt(-115, 20),
+		pt(-60, 45),
+		pt(20, 40),
+		pt(-30, 110),
+		pt(110, 20),
+		pt(60, -100),
+		pt(-60, -110),
+		pt(-120, -100),
+		pt(10, -110),
+		pt(132, 100),
+	}
+	layout.zombieSpawns = { pt(-125, 125), pt(128, -10) }
+	layout.start = pt(0, 50) -- the front path
+	layout.wizardSpots = { pt(-120, 100), pt(120, -70), pt(-100, -125), pt(10, 100) }
+	for _, p in { pt(48, 68), pt(96, 100) } do -- the graveyard
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
 MapLayout.maps = {
 	Neighborhood = buildNeighborhood(),
 	Mansion = buildMansion(),
+	ChristmasTown = buildChristmasTown(),
+	Haunted = buildHaunted(),
 } :: { [string]: Layout }
-MapLayout.names = { "Neighborhood", "Mansion" }
+MapLayout.names = { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" }
 MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood
@@ -3360,7 +3687,7 @@ export type Mark = {
 	d: number, -- footprint size along Z
 	rot: number, -- furniture: degrees turned about the vertical
 	id: string?, -- House: its name; Floor: the room's name
-	floor: string?, -- Floor: Brick, Tile, Wood or Concrete
+	floor: string?, -- Floor: Brick, Tile, Wood, Concrete or Dirt
 	outline: string?, -- House: Blue or Orange wall trim
 	color: string?, -- Bush: Green or Orange
 }
@@ -3375,7 +3702,7 @@ MapMarks.KINDS = {
 	{ kind = "Wall", about = "A wall. Long and thin; it is always rebuilt 3 studs thick." },
 	{ kind = "Door", about = "Put it on a wall to cut a doorway as wide as the part." },
 	{ kind = "Window", about = "Put it on a wall: that stretch becomes a (breakable) window." },
-	{ kind = "Floor", about = "A room's floor (Floor attribute: Brick, Tile, Wood or Concrete)." },
+	{ kind = "Floor", about = "A room's floor (Floor attribute: Brick, Tile, Wood, Concrete or Dirt)." },
 	{ kind = "HumanSpawn", about = "Where humans appear after the first spawn." },
 	{ kind = "ZombieSpawn", about = "Where zombies appear (a red pit)." },
 	{ kind = "Start", about = "Where everyone starts the round, together." },
@@ -3398,7 +3725,7 @@ for _, entry in MapMarks.KINDS do
 	KNOWN[entry.kind] = true
 end
 
-MapMarks.FLOORS = { "Brick", "Tile", "Wood", "Concrete" }
+MapMarks.FLOORS = { "Brick", "Tile", "Wood", "Concrete", "Dirt" }
 
 local T = MapLayout.WALL_THICKNESS
 
@@ -3757,8 +4084,8 @@ function MapMarks.fromLayout(layout: Layout): { Mark }
 	return marks
 end
 
--- A small map to start from: a road, one house with two rooms, a shed,
--- spawns, items, bushes.
+-- A map to start from (320 x 300, about the size of the built-in maps): a
+-- road, a house with two rooms, a cabin, a shed, spawns, items, bushes.
 function MapMarks.starter(): { Mark }
 	local marks: { Mark } = {}
 	local function add(kind: string, x1: number, z1: number, x2: number, z2: number): Mark
@@ -3787,11 +4114,11 @@ function MapMarks.starter(): { Mark }
 		add("Wall", x - 1.5, z1 - 1.5, x + 1.5, z2 + 1.5)
 	end
 
-	add("Bounds", -110, -110, 110, 110)
-	add("Sidewalk", -110, 62, 110, 72)
-	add("Road", -110, 72, 110, 100)
-	add("CenterLine", -110, 85.5, 110, 86.5)
-	add("Sidewalk", -110, 100, 110, 110)
+	add("Bounds", -160, -150, 160, 150)
+	add("Sidewalk", -160, 102, 160, 112)
+	add("Road", -160, 112, 160, 140)
+	add("CenterLine", -160, 125.5, 160, 126.5)
+	add("Sidewalk", -160, 140, 160, 150)
 
 	-- The house: living room (left) and kitchen (right), front door on the
 	-- road side, a back door, windows.
@@ -3835,22 +4162,56 @@ function MapMarks.starter(): { Mark }
 	piece("Box", 58, -52)
 	piece("Box", 82, -52, 90)
 
-	for _, p in { { -80, 40 }, { -40, 40 }, { 0, 40 }, { 40, 40 }, { 80, 40 }, { 60, 0 } } do
+	-- A one-room cabin with a front and a back door.
+	local cabin = add("House", 70, 10, 120, 50)
+	cabin.id, cabin.outline = "Cabin", "Orange"
+	local cabinFloor = add("Floor", 70, 10, 120, 50)
+	cabinFloor.id, cabinFloor.floor = "Cabin", "Wood"
+	wallH(10, 70, 120)
+	wallH(50, 70, 120)
+	wallV(70, 10, 50)
+	wallV(120, 10, 50)
+	add("Door", 90, 48.5, 98, 51.5) -- front door
+	add("Door", 68.5, 20, 71.5, 27) -- back door
+	add("Window", 80, 8.5, 92, 11.5)
+	add("Window", 118.5, 22, 121.5, 38)
+	piece("Bed", 112, 18)
+	piece("Dresser", 100, 13.2)
+	piece("Armchair", 78, 42)
+	piece("Lamp", 74, 14)
+	piece("Bookshelf", 117.3, 40, 270)
+	piece("Box", 84, 14)
+
+	for _, p in
+		{
+			{ -130, 60 },
+			{ -60, 60 },
+			{ 0, 75 },
+			{ 50, 80 },
+			{ 135, 75 },
+			{ 135, -80 },
+			{ -130, -100 },
+			{ 0, -110 },
+			{ -110, -40 },
+		}
+	do
 		point("HumanSpawn", p[1], p[2])
 	end
-	point("ZombieSpawn", 85, 86)
-	point("Start", -20, 45)
-	for _, p in { { -45, -20 }, { 5, -25 }, { 70, -45 }, { -90, -90 }, { 90, 30 }, { -90, 30 } } do
+	point("ZombieSpawn", 140, 126)
+	point("Start", -20, 55)
+	for _, p in { { -45, -20 }, { 5, -25 }, { 70, -45 }, { 95, 30 } } do
 		point("ItemSpot", p[1], p[2])
 	end
-	point("WizardSpot", -85, -60)
-	point("WizardSpot", 60, 45)
+	point("WizardSpot", -140, -130)
+	point("WizardSpot", 100, 90)
 	local function bush(x: number, z: number, r: number, color: string)
 		add("Bush", x - r, z - r, x + r, z + r).color = color
 	end
-	bush(-90, -20, 5, "Green")
-	bush(95, -90, 4, "Green")
-	bush(-20, -80, 5, "Orange")
+	bush(-140, -20, 5, "Green")
+	bush(145, -130, 4, "Green")
+	bush(-20, -120, 5, "Orange")
+	bush(145, 0, 4, "Orange")
+	bush(-140, 90, 4, "Green")
 	return marks
 end
 
@@ -3859,6 +4220,206 @@ return MapMarks
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">MapThemes</string>
+          <string name="Source"><![CDATA[--!strict
+-- Color schemes and lighting for maps. A layout names its theme (Classic if
+-- none); MapBuilder paints the ground, floors, walls and bushes with the
+-- theme's colors and sets the lighting. On a dark theme your own client
+-- hangs a lantern on you (DarknessController): you only see what's near you,
+-- other people's name tags show only up close, and bots can't see far either.
+-- Maps built in Studio pick one with the folder attribute Theme.
+
+local MapLayout = require(script.Parent.MapLayout)
+
+local MapThemes = {}
+
+export type Lighting = {
+	ambient: string,
+	outdoor: string,
+	brightness: number,
+	clock: number,
+	tint: string?, -- ColorCorrection tint
+	saturation: number?,
+	contrast: number?,
+}
+
+export type Lantern = { range: number, brightness: number, color: string }
+
+export type Theme = {
+	name: string,
+	about: string,
+	colors: { [string]: string }, -- overrides of MapLayout.COLORS
+	lighting: Lighting,
+	dark: boolean?,
+	sight: number?, -- dark themes: how far you (and bots) can see others, studs
+	lantern: Lantern?,
+}
+
+local THEMES: { [string]: Theme } = {
+	Classic = {
+		name = "Classic",
+		about = "Sunny grass, gray walls with blue or orange trim.",
+		colors = {},
+		lighting = { ambient = "BEBEBE", outdoor = "BEBEBE", brightness = 1, clock = 12 },
+	},
+	Haunted = {
+		name = "Haunted",
+		about = "Night. Dead grass, purple-black walls, murky water. You only see near yourself.",
+		colors = {
+			Grass = "3D4A3A",
+			Outside = "161B15",
+			BoundaryBrick = "3E383E",
+			BoundaryCap = "211D24",
+			GrassTuft = "2B3628",
+			Flower = "5E4A70",
+			FlowerCenter = "9BD86A",
+			Pebble = "50545A",
+			Twig = "35281F",
+			Dirt = "46372B",
+			DirtSpeck = "352920",
+			Sidewalk = "4E5258",
+			SidewalkSpeck = "3F4247",
+			Asphalt = "232327",
+			CenterLine = "6E6236",
+			EdgeLine = "7C7C7C",
+			Wall = "211A26",
+			OutlineBlue = "6A4C93",
+			OutlineOrange = "8E3B46",
+			Window = "51626E",
+			Brick = "553C45",
+			BrickMortar = "382930",
+			Tile = "4A4C54",
+			TileAlt = "3D3F46",
+			Wood = "47322A",
+			WoodLine = "30221B",
+			Concrete = "474A50",
+			ConcreteSpeck = "3B3D42",
+			PoolWater = "2B5546",
+			PoolRim = "575B60",
+			BushGreen = "2C4430",
+			BushOrange = "5E3427",
+			ZombiePit = "3A0F14",
+			Door = "2E2019",
+			DoorKnob = "8C7A55",
+		},
+		lighting = {
+			ambient = "3A3150",
+			outdoor = "3A3150",
+			brightness = 0,
+			clock = 0,
+			tint = "C9C0E8",
+			saturation = -0.25,
+			contrast = 0.1,
+		},
+		dark = true,
+		sight = 34,
+		lantern = { range = 30, brightness = 2.6, color = "FFD9A0" },
+	},
+	Winter = {
+		name = "Winter",
+		about = "Snow on the ground, icy blue trim, bright and cold. Christmas Town uses it.",
+		colors = {
+			Grass = "EAF2F6",
+			Outside = "B9CAD4",
+			BoundaryBrick = "9C5A45",
+			BoundaryCap = "F4F8FA",
+			GrassTuft = "CFDDE5",
+			Flower = "D8423F",
+			FlowerCenter = "F5F5F5",
+			Pebble = "AEBBC3",
+			Twig = "7A5B3E",
+			Dirt = "C9D6DD",
+			DirtSpeck = "B3C2CA",
+			Sidewalk = "C3D0D7",
+			SidewalkSpeck = "AEBDC5",
+			Asphalt = "4F5560",
+			Wall = "4B4F58",
+			OutlineBlue = "8FC1DE",
+			OutlineOrange = "C8463F",
+			Window = "D7F0FA",
+			PoolWater = "A9D8EE",
+			PoolRim = "F2F7FA",
+			BushGreen = "3E7A55",
+			BushOrange = "B5473F",
+		},
+		lighting = { ambient = "C9D3E0", outdoor = "C9D3E0", brightness = 1.2, clock = 13, tint = "EEF5FF" },
+	},
+	Lab = {
+		name = "Lab",
+		about = "Clean white and steel with teal trim, like a laboratory.",
+		colors = {
+			Grass = "8DAF8F",
+			Outside = "4B5D4C",
+			BoundaryBrick = "7D8590",
+			BoundaryCap = "4A5059",
+			Wall = "3E4650",
+			OutlineBlue = "2EC4B6",
+			OutlineOrange = "F2A541",
+			Window = "C8F3F0",
+			Brick = "C9CFD6",
+			BrickMortar = "AEB6BF",
+			Tile = "E3E8ED",
+			TileAlt = "D2D9E0",
+			Wood = "9AA4AE",
+			WoodLine = "86909A",
+			Concrete = "B4BCC4",
+			ConcreteSpeck = "A0A9B2",
+			PoolWater = "7CF2C9",
+			PoolRim = "DDE3E8",
+		},
+		lighting = { ambient = "D0D8DC", outdoor = "C2CCD0", brightness = 1, clock = 12, tint = "F0FFFD" },
+	},
+	Desert = {
+		name = "Desert",
+		about = "Sand and sandstone under a hot sun.",
+		colors = {
+			Grass = "E2C48E",
+			Outside = "B39461",
+			BoundaryBrick = "C08A55",
+			BoundaryCap = "8A5E36",
+			GrassTuft = "C9A86A",
+			Flower = "D9774A",
+			FlowerCenter = "F6D776",
+			Pebble = "B89B70",
+			Twig = "8A6A45",
+			Dirt = "C9A46B",
+			DirtSpeck = "B48F58",
+			Wall = "7A4E33",
+			OutlineBlue = "E0B07A",
+			OutlineOrange = "C2603A",
+			Brick = "D79D63",
+			BushGreen = "8C9E52",
+			BushOrange = "C98A3E",
+		},
+		lighting = { ambient = "E2D2BC", outdoor = "E2D2BC", brightness = 1.2, clock = 14, tint = "FFF4E2" },
+	},
+}
+
+MapThemes.NAMES = { "Classic", "Haunted", "Winter", "Lab", "Desert" }
+
+function MapThemes.get(name: string?): Theme
+	return THEMES[name or "Classic"] or THEMES.Classic
+end
+
+function MapThemes.exists(name: string): boolean
+	return THEMES[name] ~= nil
+end
+
+-- MapLayout.COLORS with the theme's colors laid over it.
+function MapThemes.palette(name: string?): typeof(MapLayout.COLORS)
+	local out = table.clone(MapLayout.COLORS) :: any
+	for key, value in MapThemes.get(name).colors do
+		out[key] = value
+	end
+	return out
+end
+
+return MapThemes
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">Parts</string>
           <string name="Source"><![CDATA[-- Part factory with Brain Tag's flat cartoon defaults: SmoothPlastic, no
@@ -3980,7 +4541,7 @@ return Parts
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Remotes</string>
           <string name="Source"><![CDATA[-- Every RemoteEvent and RemoteFunction the game uses. The server creates them
@@ -4065,7 +4626,7 @@ return Remotes
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">RoundRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -4197,7 +4758,7 @@ return RoundRules
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">Skins</string>
           <string name="Source"><![CDATA[--!strict
@@ -4464,7 +5025,7 @@ return Skins
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">Util</string>
           <string name="Source"><![CDATA[-- Small helpers shared by server and client.
@@ -4525,15 +5086,15 @@ return Util
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="19">
+  <Item class="ServerScriptService" referent="20">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="20">
+    <Item class="Folder" referent="21">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">AdminService</string>
           <string name="Source"><![CDATA[-- The admin panel's server side. Every request is checked here: only admins
@@ -4827,7 +5388,7 @@ return AdminService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">Announcer</string>
           <string name="Source"><![CDATA[-- Server -> client messages: yellow system lines in chat, short on-screen
@@ -4864,20 +5425,24 @@ return Announcer
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">BotService</string>
           <string name="Source"><![CDATA[-- Bots that fill every round (Config.BOTS_MIN to BOTS_MAX of them, fewer
 -- when real players join). They count as participants for every rule and
 -- wear random skins. Each has a level from 3 to 6; Mario Robles is a 6 and
 -- most of the roster is 5 or 6:
---   * zombies spread out over different humans, lead their target, and
---     remember where a human hid. A human they can't reach (barricaded in)
+--   * zombies spread out over different humans, lead their target,
+--     remember where a human hid, and circle round a weapon held out at
+--     them instead of walking into it. A human they can't reach (barricaded in)
 --     draws a crowd: the pack picks one door, lines up outside it and
 --     shoves through together (pushers in a line add their strength)
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
---     toward open ground away from every zombie, and hide in bushes
+--     toward open ground or through doorways away from every zombie, juke
+--     sideways when one is about to grab them, and hide in bushes
+--   * on dark maps (MapThemes) nobody sees far, and walls and closed doors
+--     block the view
 -- Movement never aims through walls: straight lines are checked with a
 -- body-wide sweep, everything else uses pathfinding, and a bot that stops
 -- making progress steps sideways and replans.
@@ -4896,6 +5461,7 @@ local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Participants = require(script.Parent.Participants)
 local RoundManager = require(script.Parent.RoundManager)
 local Skins = require(ReplicatedStorage.Shared.Skins)
@@ -4915,6 +5481,8 @@ type Level = {
 	flee: number, -- human: zombie distance that starts a run
 	directions: number, -- human: escape directions considered
 	hide: number, -- human: chance to be a bush hider
+	dodge: number, -- human: juke when a zombie closes in this near (0 = never)
+	flank: boolean, -- zombie: circle round a held-out weapon
 }
 
 local LEVELS: { [number]: Level } = {
@@ -4928,6 +5496,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 45,
 		directions = 8,
 		hide = 0.35,
+		dodge = 0,
+		flank = false,
 	},
 	[4] = {
 		think = 0.18,
@@ -4939,6 +5509,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 55,
 		directions = 10,
 		hide = 0.45,
+		dodge = 7,
+		flank = true,
 	},
 	[5] = {
 		think = 0.14,
@@ -4950,6 +5522,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 65,
 		directions = 12,
 		hide = 0.5,
+		dodge = 8,
+		flank = true,
 	},
 	[6] = {
 		think = 0.11,
@@ -4961,6 +5535,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 75,
 		directions = 12,
 		hide = 0.55,
+		dodge = 9.5,
+		flank = true,
 	},
 }
 
@@ -5155,6 +5731,39 @@ local function visible(entry: Seen, from: Vector3): boolean
 	return not entry.hidden or Util.flatDistance(entry.position, from) <= Config.BUSH_REVEAL_DISTANCE
 end
 
+-- On a dark map nobody sees far, and walls and closed doors block the view.
+local function inSight(from: Vector3, to: Vector3, distance: number): boolean
+	local theme = MapThemes.get(MapLayout.current().theme)
+	if not theme.dark then
+		return true
+	end
+	return distance <= (theme.sight or 40) + 6 and Combat.canSee(from, to)
+end
+
+-- A human holding a weapon out at us: a spot round the side it isn't
+-- pointing (the shaft only blocks straight ahead), or nil if we're already
+-- beside or behind it.
+local function flankAround(target: Seen, here: Vector3): Vector3?
+	local item = Items.get(target.p.heldItem)
+	if not item or item.kind ~= "Melee" then
+		return nil
+	end
+	local aim = Util.flatUnit(target.p.aim)
+	if not aim then
+		return nil
+	end
+	local rel = Util.flat(here - target.position)
+	local d = rel.Magnitude
+	local reach = (item.reach or 5) * math.max(1, target.p.scale * 0.9)
+	if d < 0.5 or d > reach + 8 or (rel / d):Dot(aim) < 0.35 then
+		return nil
+	end
+	local side = Vector3.new(-aim.Z, 0, aim.X)
+	local sign = if rel:Dot(side) >= 0 then 1 else -1
+	local around = (side * sign - aim * 0.35).Unit
+	return target.position + around * (reach * 0.75 + 2)
+end
+
 -- One bot ---------------------------------------------------------------------------------
 
 local function brain(p: Participant, level: Level, seed: number)
@@ -5190,6 +5799,8 @@ local function brain(p: Participant, level: Level, seed: number)
 	}
 	local siege: Siege? = nil
 	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
+	local dodgeSpot: Vector3? = nil
+	local dodgeUntil, nextDodge = 0, 0
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -5499,7 +6110,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			-- A barricaded human pulls the pack together instead (up to 6).
 			for _, entry in seenHumans do
 				local d = Util.flatDistance(entry.position, here)
-				if d <= level.sight and visible(entry, here) then
+				if d <= level.sight and visible(entry, here) and inSight(here, entry.position, d) then
 					local others = chasers(entry.p, p.id)
 					local rally = (fortified[entry.p] or 0) > now and others < 6
 					local score = d
@@ -5516,6 +6127,11 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
+				-- Holding a weapon out at us? Go round it.
+				local around = if level.flank then flankAround(best, here) else nil
+				if around and inBounds(around, 3) then
+					goal = around
+				end
 				if not breach(best.position, root, humanoid) then
 					goTo(goal, root, humanoid, true)
 					checkProgress(root, goal, humanoid)
@@ -5555,8 +6171,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		local closest: Seen? = nil
 		local closestDistance = math.huge
 		for _, entry in seenZombies do
-			if not entry.hidden or Util.flatDistance(entry.position, here) <= Config.BUSH_REVEAL_DISTANCE then
-				local d = Util.flatDistance(entry.position, here)
+			local d = Util.flatDistance(entry.position, here)
+			local seen = not entry.hidden or d <= Config.BUSH_REVEAL_DISTANCE
+			if seen and inSight(here, entry.position, d) then
 				if d <= level.flee then
 					table.insert(threats, entry)
 				end
@@ -5585,6 +6202,40 @@ local function brain(p: Participant, level: Level, seed: number)
 			face(root, humanoid, nil)
 		end
 
+		-- A zombie about to grab us: juke sideways so it overshoots (then a
+		-- moment before the next juke, or nobody could ever be caught).
+		if dodgeSpot and now < dodgeUntil then
+			humanoid:MoveTo(dodgeSpot)
+			continue
+		end
+		dodgeSpot = nil
+		if
+			closest
+			and level.dodge > 0
+			and now >= nextDodge
+			and closestDistance < level.dodge + p.scale * 1.5
+		then
+			local rel = Util.flat(here - closest.position)
+			local away = if rel.Magnitude > 0.1 then rel.Unit else Vector3.xAxis
+			if closest.velocity:Dot(away) > 6 then
+				local side = Vector3.new(-away.Z, 0, away.X)
+				local first = if random:NextNumber() < 0.5 then 1 else -1
+				local order: { number } = { first, -first }
+				for _, sign in order do
+					local spot = here + side * sign * 8 + away * 2
+					if inBounds(spot, 4) and Combat.clearWide(here, spot, radius()) then
+						dodgeSpot, dodgeUntil, nextDodge = spot, now + 0.4, now + 1.6
+						break
+					end
+				end
+				if dodgeSpot then
+					humanoid:MoveTo(dodgeSpot)
+					pathGoal = nil
+					continue
+				end
+			end
+		end
+
 		local hidden = BushService.hidden(p)
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
 			humanoid:MoveTo(here) -- stay still and hope
@@ -5609,6 +6260,22 @@ local function brain(p: Participant, level: Level, seed: number)
 							score = math.min(score, Util.flatDistance(spot, future))
 						end
 						table.insert(candidates, { spot = spot, score = score })
+					end
+				end
+				-- Doorways too: straight through one into the room (or out of it),
+				-- which zombies have to funnel through after us.
+				for _, door in doors() do
+					local center = Vector3.new(door.x, here.Y, door.z)
+					if Util.flatDistance(center, here) < 28 then
+						local beyond = center + across(door, center * 2 - here) * 7
+						if inBounds(beyond, 5) and Combat.clearWide(here, beyond, radius()) then
+							local score = math.huge
+							for _, zombie in threats do
+								local future = zombie.position + zombie.velocity * 0.6
+								score = math.min(score, Util.flatDistance(beyond, future))
+							end
+							table.insert(candidates, { spot = beyond, score = score + 4 })
+						end
 					end
 				end
 				table.sort(candidates, function(a, b)
@@ -5767,7 +6434,7 @@ return BotService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">BushService</string>
           <string name="Source"><![CDATA[-- Flags characters standing in a bush (character attribute "InBush") so bots
@@ -5828,7 +6495,7 @@ return BushService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">CharacterService</string>
           <string name="Source"><![CDATA[-- Spawns and dresses characters. Every player and bot uses the same custom
@@ -6157,7 +6824,7 @@ return CharacterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- Shoves and stuns. Weapons never kill: they push zombies away and freeze
@@ -6184,10 +6851,22 @@ local wallParams = RaycastParams.new()
 wallParams.FilterType = Enum.RaycastFilterType.Include
 local solidParams = RaycastParams.new()
 solidParams.FilterType = Enum.RaycastFilterType.Include
+local sightParams = RaycastParams.new()
+sightParams.FilterType = Enum.RaycastFilterType.Include
 
 function Combat.init()
 	wallParams.FilterDescendantsInstances = { MapBuilder.wallsFolder() }
 	solidParams.FilterDescendantsInstances = { MapBuilder.wallsFolder(), workspace:WaitForChild("Furniture") }
+	sightParams.FilterDescendantsInstances = { MapBuilder.wallsFolder(), MapBuilder.doorsFolder() }
+end
+
+-- Can someone at `from` see `to`? Walls and closed swinging doors block the
+-- view (bots on dark maps use this; doors swing open only on players' screens).
+function Combat.canSee(from: Vector3, to: Vector3): boolean
+	local y = MapLayout.HEIGHTS.Floor + 3
+	local a = Vector3.new(from.X, y, from.Z)
+	local b = Vector3.new(to.X, y, to.Z)
+	return workspace:Raycast(a, b - a, sightParams) == nil
 end
 
 -- Like lineOfSight, but furniture blocks too (used for infection, so a
@@ -6321,7 +7000,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">DataService</string>
           <string name="Source"><![CDATA[-- Saves each player's score, stats, skins and purchases with DataStoreService.
@@ -6610,7 +7289,7 @@ return DataService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">FurnitureBuilder</string>
           <string name="Source"><![CDATA[-- Builds one furniture piece: an invisible-to-physics stack of colored details
@@ -7106,6 +7785,99 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -c.d / 2 + 0.4, 1.0, 0.4, 0.52, 0.5, "2ECC71") -- display
 		end,
 	},
+	-- Haunted house ---------------------------------------------------------------
+	Tombstone = {
+		body = "7F858C",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.35, c.d - 0.35, 0.02, 0.04, "989EA5")
+			c:top(0, 0, 0.28, c.d - 0.7, 0.05, 0.04, "5C6167") -- engraved cross
+			c:top(0, -0.05, 1.3, 0.24, 0.05, 0.04, "5C6167")
+			c:disc(c.w / 2 - 0.6, 0.2, 0.55, 0.06, 0.04, "5E7A4A") -- moss
+		end,
+	},
+	Coffin = {
+		body = "3F271D",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.45, c.d - 0.45, 0.03, 0.06, "57362A") -- lid
+			c:top(0, -c.d / 2 + 2.2, 0.3, 2.4, 0.06, 0.05, "C9A35A") -- brass cross
+			c:top(0, -c.d / 2 + 1.7, 1.4, 0.3, 0.06, 0.05, "C9A35A")
+			for side = -1, 1, 2 do
+				c:top(side * (c.w / 2 + 0.08), 0, 0.16, 1.4, -0.6, 0.25, "8C7A55") -- handles
+			end
+		end,
+	},
+	Candelabra = {
+		body = "2E2626",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -c.h + 0.3, 0.3, "2E2626") -- base
+			c:disc(0, 0, 0.3, -0.5, c.h - 0.8, "2E2626") -- stem
+			c:top(0, 0, c.w + 0.4, 0.2, -0.45, 0.15, "2E2626") -- arms
+			for _, x in { -0.9, 0, 0.9 } do
+				c:disc(x, 0, 0.32, 0, 0.5, "F2E8D0") -- candles
+				c:ball(x, c.h / 2 + 0.2, 0, 0.32, "FFB347").Material = Enum.Material.Neon -- flames
+			end
+			local light = Instance.new("PointLight")
+			light.Range = 18
+			light.Brightness = 1.6
+			light.Color = Color3.fromHex("FFC27A")
+			light.Shadows = true
+			light.Parent = c.body
+		end,
+	},
+	Cauldron = {
+		body = "26262B",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -0.05, c.h - 0.1, "26262B")
+			c:disc(0, 0, c.w * 0.8, 0.0, 0.06, "4FC24F").Material = Enum.Material.Neon -- brew
+			c:disc(-0.5, 0.3, 0.6, 0.03, 0.06, "9BF59B")
+			c:disc(0.6, -0.4, 0.45, 0.03, 0.06, "9BF59B")
+		end,
+	},
+	-- Christmas Town --------------------------------------------------------------
+	ChristmasTree = {
+		body = "2E7D46",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, 0.8, -c.h + 1.2, 1.2, "6B4226") -- trunk
+			local layers = { { c.w, -c.h + 3.2 }, { c.w * 0.74, -2.6 }, { c.w * 0.46, -0.6 } }
+			for i, layer in layers do
+				c:disc(0, 0, layer[1], layer[2], 0.9, if i == 2 then "3A9455" else "2E7D46")
+			end
+			local ornaments = { "D8423F", "F5C542", "3B82F6", "F4F4F4", "D8423F", "F5C542" }
+			for i, color in ornaments do
+				local angle = i / #ornaments * math.pi * 2
+				local r = if i % 2 == 0 then c.w * 0.4 else c.w * 0.28
+				c:disc(math.cos(angle) * r, math.sin(angle) * r, 0.42, -2.6 + 0.05, 0.1, color)
+			end
+			c:ball(0, c.h / 2 + 0.1, 0, 0.8, "FFD54A").Material = Enum.Material.Neon -- star
+		end,
+	},
+	Present = {
+		body = "D8423F",
+		draw = function(c)
+			c:top(0, 0, 0.36, c.d, 0.02, 0.04, "F5C542") -- ribbon
+			c:top(0, 0, c.w, 0.36, 0.02, 0.04, "F5C542")
+			c:disc(0, 0, 0.7, 0.08, 0.1, "F5C542") -- bow
+		end,
+	},
+	Snowman = {
+		body = "F4F8FA",
+		transparentBody = true,
+		draw = function(c)
+			local white = "F4F8FA"
+			c:ball(0, -c.h / 2 + 1.5, 0, c.w, white)
+			c:ball(0, -c.h / 2 + 3.6, 0, c.w * 0.72, white)
+			c:ball(0, c.h / 2 - 1.0, 0, c.w * 0.5, white)
+			c:disc(0, 0, 1.1, 0.5, 0.9, "1C1C1C") -- top hat
+			c:disc(0, 0, 1.6, -0.35, 0.12, "1C1C1C") -- brim
+			c:top(0, 1.0, 0.24, 0.8, -0.85, 0.24, "F28C28") -- carrot nose (front)
+			for side = -1, 1, 2 do
+				c:top(side * 2.0, 0, 1.6, 0.14, -2.6, 0.14, "6B4226", side * 0.4) -- stick arms
+			end
+		end,
+	},
 	-- Green rug with a pale border and a fringe on the short ends, like the original.
 	Rug = {
 		body = "A9C7B8",
@@ -7249,7 +8021,7 @@ return FurnitureBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">FurnitureService</string>
           <string name="Source"><![CDATA[-- Owns every furniture piece: builds them, decides who simulates each one,
@@ -7781,7 +8553,7 @@ return FurnitureService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">ItemService</string>
           <string name="Source"><![CDATA[-- Held items and items lying on the ground. Each human holds at most one
@@ -8399,7 +9171,7 @@ return ItemService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="31">
+      <Item class="Script" referent="32">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -8515,23 +9287,27 @@ print("[Brain Tag] server ready")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">MapBuilder</string>
-          <string name="Source"><![CDATA[-- Builds the neighborhood from MapLayout: grass with little details, dirt
--- paths, the road, house floors with patterns, outlined walls split into
--- breakable segments, windows, bushes and an invisible boundary.
+          <string name="Source"><![CDATA[-- Builds a map from MapLayout: grass with little details, dirt paths, the
+-- road, house floors with patterns, outlined walls split into breakable
+-- segments, windows, bushes and an invisible boundary, all in the map's
+-- theme colors (MapThemes), with its lighting. Maps with swingDoors get a
+-- walk-through door in every doorway (DoorController swings them).
 
 local CollectionService = game:GetService("CollectionService")
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 
 local MapBuilder = {}
 
-local COLORS = MapLayout.COLORS
+local COLORS = MapLayout.COLORS -- the current map's theme palette (set in build)
 local H = MapLayout.HEIGHTS
 local WALL_HEIGHT = MapLayout.WALL_HEIGHT
 
@@ -8540,6 +9316,7 @@ type Layout = MapLayout.Layout
 
 local mapFolder: Folder
 local wallsFolder: Folder? = nil
+local doorsFolder: Folder? = nil
 local brokenSegments: { Model } = {}
 
 local function sub(name: string, parent: Instance): Folder
@@ -8817,6 +9594,9 @@ local function buildFloors(parent: Instance, layout: Layout)
 		local folder = sub(room.house .. " " .. room.name, parent)
 		if room.floor == "Brick" then
 			brickFloor(room.rect, folder)
+		elseif room.floor == "Dirt" then
+			slab("Dirt", room.rect, H.Floor, COLORS.Dirt, folder)
+			speckle(room.rect, H.Floor, COLORS.DirtSpeck, 30, rng, folder)
 		elseif room.floor == "Tile" then
 			tileFloor(room.rect, folder)
 		elseif room.floor == "Concrete" then
@@ -8886,11 +9666,24 @@ end
 
 -- Tall leaf cylinders you can walk into. Seen from the top-down camera they
 -- cover anyone standing inside (see Bushes.luau).
+-- A lighter (k > 1) or darker (k < 1) version of a hex color.
+local function shade(hex: string, k: number): string
+	local c = Color3.fromHex(hex)
+	if k >= 1 then
+		local t = k - 1
+		return Color3.new(c.R + (1 - c.R) * t, c.G + (1 - c.G) * t, c.B + (1 - c.B) * t):ToHex()
+	end
+	return Color3.new(c.R * k, c.G * k, c.B * k):ToHex()
+end
+
 local function buildBushes(parent: Instance, layout: Layout)
 	local height = Config.BUSH_HEIGHT
+	local classic = layout.theme == "Classic"
 	for _, bush in layout.bushes do
-		local base = if bush.color == "Orange" then COLORS.BushOrange else COLORS.BushGreen
-		local light = if bush.color == "Orange" then "F2AC62" else "5CBF67"
+		local orange = bush.color == "Orange"
+		local base = if orange then COLORS.BushOrange else COLORS.BushGreen
+		-- Classic keeps its hand-picked shades; other themes derive them.
+		local light = if classic then (if orange then "F2AC62" else "5CBF67") else shade(base, 1.3)
 		local model = Instance.new("Model")
 		model.Name = "Bush"
 		local blobs = {
@@ -8898,7 +9691,7 @@ local function buildBushes(parent: Instance, layout: Layout)
 			{ math.cos(0.7) * bush.r * 0.6, math.sin(0.7) * bush.r * 0.6, bush.r * 1.4 },
 			{ math.cos(3.5) * bush.r * 0.6, math.sin(3.5) * bush.r * 0.6, bush.r * 1.3 },
 		}
-		local outline = if bush.color == "Orange" then "B5651E" else "2E7D3E"
+		local outline = if classic then (if orange then "B5651E" else "2E7D3E") else shade(base, 0.65)
 		for _, blob in blobs do
 			-- A darker, slightly bigger, slightly lower disc draws the outline.
 			Parts.disc(
@@ -9044,16 +9837,82 @@ local function buildDecor(layout: Layout, walls: Folder)
 	end
 end
 
+-- Swinging doors: a panel across every doorway that anyone walks straight
+-- through. Closed, it hides the room beyond (it blocks light and the bots'
+-- view); each player's DoorController swings it open as people pass.
+local function buildSwingDoors(parent: Folder, layout: Layout)
+	local height = WALL_HEIGHT - 1.5
+	for _, door in MapLayout.doors(layout) do
+		local length = door.width - 0.3
+		local size = if door.horizontal
+			then Vector3.new(length, height, 0.5)
+			else Vector3.new(0.5, height, length)
+		local panel = Parts.make({
+			name = "SwingDoor",
+			size = size,
+			cframe = CFrame.new(door.x, H.Floor + height / 2, door.z),
+			color = COLORS.Door,
+			parent = parent,
+		})
+		panel.CanCollide = false
+		panel.CanTouch = false
+		panel.CastShadow = true
+		panel:SetAttribute("Horizontal", door.horizontal)
+		-- The knob, near the free end.
+		local along = if door.horizontal then Vector3.xAxis else Vector3.zAxis
+		local knob = Parts.make({
+			name = "Knob",
+			size = Vector3.new(0.7, 0.2, 0.7),
+			cframe = CFrame.new(
+				panel.Position + along * (length / 2 - 0.9) + Vector3.new(0, height / 2 + 0.1, 0)
+			),
+			color = COLORS.DoorKnob,
+			parent = panel,
+		})
+		knob.CanCollide = false
+		knob.CanQuery = false
+		knob.CanTouch = false
+	end
+end
+
+-- Sky and light for the map's theme.
+local function applyLighting(theme: MapThemes.Theme)
+	local l = theme.lighting
+	Lighting.Ambient = Color3.fromHex(l.ambient)
+	Lighting.OutdoorAmbient = Color3.fromHex(l.outdoor)
+	Lighting.Brightness = l.brightness
+	Lighting.ClockTime = l.clock
+	-- Dark maps need shadows so walls and closed doors stop your lantern.
+	Lighting.GlobalShadows = theme.dark == true
+	local tint = Lighting:FindFirstChild("ThemeColor") :: ColorCorrectionEffect?
+	if not tint then
+		local made = Instance.new("ColorCorrectionEffect")
+		made.Name = "ThemeColor"
+		made.Parent = Lighting
+		tint = made
+	end
+	assert(tint, "tint")
+	tint.TintColor = Color3.fromHex(l.tint or "FFFFFF")
+	tint.Saturation = l.saturation or 0
+	tint.Contrast = l.contrast or 0
+end
+
 function MapBuilder.build(layout: Layout)
 	mapFolder = workspace:WaitForChild("Map") :: Folder
+	local theme = MapThemes.get(layout.theme)
+	COLORS = MapThemes.palette(layout.theme)
+	applyLighting(theme)
 	local walls = wallsFolder or sub("Walls", mapFolder)
 	wallsFolder = walls
+	local doors = doorsFolder or sub("Doors", mapFolder)
+	doorsFolder = doors
 	for _, child in mapFolder:GetChildren() do
-		if child ~= walls then
+		if child ~= walls and child ~= doors then
 			child:Destroy()
 		end
 	end
 	walls:ClearAllChildren()
+	doors:ClearAllChildren()
 	table.clear(brokenSegments)
 
 	local ground = sub("Ground", mapFolder)
@@ -9069,17 +9928,27 @@ function MapBuilder.build(layout: Layout)
 	buildBushes(bushes, layout)
 	buildBoundary(sub("Boundary", mapFolder), layout)
 	buildDecor(layout, walls)
+	if layout.swingDoors then
+		buildSwingDoors(doors, layout)
+	end
 	for _, folder in { ground, road, floors } do
 		setPhysics(folder, SLIPPERY)
 	end
 	setPhysics(walls, GRIPPY)
 	setPhysics(pools, GRIPPY)
 	mapFolder:SetAttribute("MapName", layout.name)
+	mapFolder:SetAttribute("Theme", theme.name) -- clients light dark maps (DarknessController)
 end
 
 function MapBuilder.wallsFolder(): Folder
 	assert(wallsFolder, "MapBuilder.build has not run yet")
 	return wallsFolder
+end
+
+-- Swinging door panels (empty on maps without them).
+function MapBuilder.doorsFolder(): Folder
+	assert(doorsFolder, "MapBuilder.build has not run yet")
+	return doorsFolder
 end
 
 -- Shotgun hit: hide a wall segment until the next round.
@@ -9128,7 +9997,7 @@ return MapBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">MapStudio</string>
           <string name="Source"><![CDATA[-- Maps you build in Roblox Studio (README "Making your own maps").
@@ -9147,8 +10016,15 @@ return MapBuilder
 --   Maps.copy("Neighborhood")         -- edit a built-in map
 --   Maps.copy("Mansion", "Castle")    -- start a new map from a built-in one
 --   Maps.new("MyMap")                 -- a small starter map
+--   Maps.new("Spooky", "Haunted")     -- ...in a theme (MapThemes: Classic,
+--                                        Haunted, Winter, Lab, Desert)
+--   Maps.resize("MyMap", 400, 300)    -- make the play area bigger (studs)
 --   Maps.palette()                    -- one of every part, to copy from
 --   Maps.check()                      -- what each map has, and any mistakes
+--   Maps.unlock()                     -- unlock parts made by older versions
+--
+-- Map folder attributes: Title, Enabled, Theme (see MapThemes) and
+-- SwingDoors (walk-through doors in every doorway that block the view).
 
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -9157,6 +10033,7 @@ local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
 local FurnitureSpecs = require(game:GetService("ReplicatedStorage").Shared.FurnitureSpecs)
 local MapLayout = require(game:GetService("ReplicatedStorage").Shared.MapLayout)
 local MapMarks = require(game:GetService("ReplicatedStorage").Shared.MapMarks)
+local MapThemes = require(game:GetService("ReplicatedStorage").Shared.MapThemes)
 
 type Mark = MapMarks.Mark
 type Rect = MapLayout.Rect
@@ -9164,44 +10041,42 @@ type Rect = MapLayout.Rect
 local MapStudio = {}
 
 local FOLDER = "BrainTagMaps"
-local C = MapLayout.COLORS
 local H = MapLayout.HEIGHTS
 local WALL_H = MapLayout.WALL_HEIGHT
 
 -- How each kind looks while you edit (top = height of its top above the
--- ground, which is the top of the Bounds part).
+-- ground, which is the top of the Bounds part). `color` is a theme palette
+-- name (MapLayout.COLORS) or a hex color.
 type Look = {
 	color: string,
 	top: number,
 	height: number,
 	transparency: number?,
-	locked: boolean?, -- big plates: select them in the Explorer instead
 	disc: boolean?,
 	label: boolean?,
 	group: string,
 }
 
 local LOOKS: { [string]: Look } = {
-	Bounds = { color = C.Grass, top = 0, height = 1, locked = true, group = "Ground" },
-	Road = { color = C.Asphalt, top = H.Asphalt, height = 0.1, group = "Ground" },
-	Sidewalk = { color = C.Sidewalk, top = H.Sidewalk, height = 0.1, group = "Ground" },
-	CenterLine = { color = C.CenterLine, top = H.RoadLine, height = 0.05, group = "Ground" },
-	EdgeLine = { color = C.EdgeLine, top = H.RoadLine, height = 0.05, group = "Ground" },
-	Path = { color = C.Dirt, top = H.Dirt, height = 0.05, group = "Ground" },
-	Patio = { color = C.Concrete, top = H.Patio, height = 0.05, group = "Ground" },
-	Pool = { color = C.PoolWater, top = H.PoolRim, height = 0.3, group = "Ground" },
-	IslandWalk = { color = C.Sidewalk, top = H.IslandWalk, height = 0.1, group = "Ground" },
-	IslandGrass = { color = C.Grass, top = H.IslandGrass, height = 0.05, group = "Ground" },
+	Bounds = { color = "Grass", top = 0, height = 1, group = "Ground" },
+	Road = { color = "Asphalt", top = H.Asphalt, height = 0.1, group = "Ground" },
+	Sidewalk = { color = "Sidewalk", top = H.Sidewalk, height = 0.1, group = "Ground" },
+	CenterLine = { color = "CenterLine", top = H.RoadLine, height = 0.05, group = "Ground" },
+	EdgeLine = { color = "EdgeLine", top = H.RoadLine, height = 0.05, group = "Ground" },
+	Path = { color = "Dirt", top = H.Dirt, height = 0.05, group = "Ground" },
+	Patio = { color = "Concrete", top = H.Patio, height = 0.05, group = "Ground" },
+	Pool = { color = "PoolWater", top = H.PoolRim, height = 0.3, group = "Ground" },
+	IslandWalk = { color = "Sidewalk", top = H.IslandWalk, height = 0.1, group = "Ground" },
+	IslandGrass = { color = "Grass", top = H.IslandGrass, height = 0.05, group = "Ground" },
 	House = {
-		color = C.OutlineBlue,
+		color = "OutlineBlue",
 		top = 0.06,
 		height = 0.05,
 		transparency = 0.3,
-		locked = true,
 		group = "Buildings",
 	},
-	Floor = { color = C.Wood, top = H.Floor, height = 0.2, group = "Buildings" },
-	Wall = { color = C.Wall, top = WALL_H, height = WALL_H, group = "Buildings" },
+	Floor = { color = "Wood", top = H.Floor, height = 0.2, group = "Buildings" },
+	Wall = { color = "Wall", top = WALL_H, height = WALL_H, group = "Buildings" },
 	Door = {
 		color = "39D353",
 		top = WALL_H + 1,
@@ -9209,20 +10084,21 @@ local LOOKS: { [string]: Look } = {
 		transparency = 0.3,
 		group = "Buildings",
 	},
-	Window = { color = C.Window, top = WALL_H + 0.5, height = WALL_H + 0.5, group = "Buildings" },
+	Window = { color = "Window", top = WALL_H + 0.5, height = WALL_H + 0.5, group = "Buildings" },
 	HumanSpawn = { color = "3B82F6", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	ZombieSpawn = { color = "E0303A", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	Start = { color = "FFFFFF", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	ItemSpot = { color = "F5C542", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	WizardSpot = { color = "9B59B6", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
-	Bush = { color = C.BushGreen, top = 6, height = 6, disc = true, group = "Bushes" },
+	Bush = { color = "BushGreen", top = 6, height = 6, disc = true, group = "Bushes" },
 }
 
 local FLOOR_LOOKS: { [string]: { color: string, material: Enum.Material } } = {
-	Brick = { color = C.Brick, material = Enum.Material.Brick },
-	Tile = { color = C.Tile, material = Enum.Material.Slate },
-	Wood = { color = C.Wood, material = Enum.Material.WoodPlanks },
-	Concrete = { color = C.Concrete, material = Enum.Material.Concrete },
+	Dirt = { color = "Dirt", material = Enum.Material.Ground },
+	Brick = { color = "Brick", material = Enum.Material.Brick },
+	Tile = { color = "Tile", material = Enum.Material.Slate },
+	Wood = { color = "Wood", material = Enum.Material.WoodPlanks },
+	Concrete = { color = "Concrete", material = Enum.Material.Concrete },
 }
 
 -- Reading parts ---------------------------------------------------------------------------
@@ -9258,6 +10134,8 @@ local function floorOf(part: BasePart): string
 		or m == Enum.Material.Pavement
 	then
 		return "Concrete"
+	elseif m == Enum.Material.Ground or m == Enum.Material.Mud or m == Enum.Material.Sand then
+		return "Dirt"
 	elseif
 		m == Enum.Material.Slate
 		or m == Enum.Material.Marble
@@ -9360,6 +10238,16 @@ function MapStudio.read(folder: Instance): (MapLayout.Layout?, { string }, { str
 	visit(folder)
 	local layout, errors, warnings =
 		MapMarks.toLayout(folder.Name, attr(folder, "Title") or folder.Name, marks)
+	local theme = attr(folder, "Theme")
+	if theme and MapThemes.exists(theme) then
+		layout.theme = theme
+	elseif theme then
+		table.insert(
+			warnings,
+			"Unknown Theme " .. theme .. " (themes: " .. table.concat(MapThemes.NAMES, ", ") .. ")"
+		)
+	end
+	layout.swingDoors = folder:GetAttribute("SwingDoors") == true
 	return if #errors == 0 then layout else nil, errors, warnings, decor
 end
 
@@ -9456,7 +10344,7 @@ local function groupFolder(map: Instance, name: string): Instance
 	return folder
 end
 
-local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
+local function makeMark(m: Mark, origin: Vector3, parent: Instance, palette: { [string]: string }): Instance
 	if MapMarks.isFurniture(m.kind) then
 		local model = FurnitureBuilder.preview(
 			{ kind = m.kind, x = origin.X + m.x, z = origin.Z + m.z, rot = m.rot, house = "" },
@@ -9474,17 +10362,17 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	part.Material = Enum.Material.SmoothPlastic
-	local color = look.color
+	local color = palette[look.color] or look.color
 	if m.kind == "Floor" then
 		local floor = FLOOR_LOOKS[m.floor or "Wood"] or FLOOR_LOOKS.Wood
-		color = floor.color
+		color = palette[floor.color] or floor.color
 		part.Material = floor.material
 		part:SetAttribute("Floor", m.floor or "Wood")
 	elseif m.kind == "House" then
-		color = if m.outline == "Orange" then C.OutlineOrange else C.OutlineBlue
+		color = if m.outline == "Orange" then palette.OutlineOrange else palette.OutlineBlue
 		part:SetAttribute("Outline", m.outline or "Blue")
 	elseif m.kind == "Bush" then
-		color = if m.color == "Orange" then C.BushOrange else C.BushGreen
+		color = if m.color == "Orange" then palette.BushOrange else palette.BushGreen
 		part:SetAttribute("Color", m.color or "Green")
 	end
 	if m.id then
@@ -9492,7 +10380,6 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
 	end
 	part.Color = Color3.fromHex(color)
 	part.Transparency = look.transparency or 0
-	part.Locked = look.locked == true
 	local center = Vector3.new(origin.X + m.x, origin.Y + look.top - look.height / 2, origin.Z + m.z)
 	if look.disc then
 		local diameter = math.max(m.w, m.d, 1)
@@ -9563,7 +10450,13 @@ local function show(folder: Instance, origin: Vector3, bounds: Rect)
 	end)
 end
 
-local function place(name: string, title: string, marks: { Mark }): Instance?
+local function place(
+	name: string,
+	title: string,
+	marks: { Mark },
+	theme: string,
+	swingDoors: boolean
+): Instance?
 	if not editing() then
 		return nil
 	end
@@ -9588,9 +10481,12 @@ local function place(name: string, title: string, marks: { Mark }): Instance?
 	folder.Name = name
 	folder:SetAttribute("Title", title)
 	folder:SetAttribute("Enabled", true)
+	folder:SetAttribute("Theme", theme)
+	folder:SetAttribute("SwingDoors", swingDoors)
+	local palette = MapThemes.palette(theme) :: any
 	for _, m in marks do
 		local group = if MapMarks.isFurniture(m.kind) then "Furniture" else LOOKS[m.kind].group
-		makeMark(m, origin, groupFolder(folder, group))
+		makeMark(m, origin, groupFolder(folder, group), palette)
 	end
 	folder.Parent = root
 	show(folder, origin, bounds)
@@ -9617,13 +10513,73 @@ function MapStudio.copy(name: string, newName: string?): Instance?
 		return nil
 	end
 	local title = if newName then newName else layout.title
-	return place(newName or name, title, MapMarks.fromLayout(layout))
+	return place(newName or name, title, MapMarks.fromLayout(layout), layout.theme, layout.swingDoors)
 end
 
--- A small map to build on.
-function MapStudio.new(name: string?): Instance?
+-- A small map to build on, in a theme (Classic if none).
+function MapStudio.new(name: string?, theme: string?): Instance?
 	local mapName = name or "MyMap"
-	return place(mapName, mapName, MapMarks.starter())
+	local themeName = theme or "Classic"
+	if not MapThemes.exists(themeName) then
+		warn("[Maps] No theme called " .. themeName .. ". Themes: " .. table.concat(MapThemes.NAMES, ", "))
+		return nil
+	end
+	-- Dark maps get swinging doors (they hide the rooms beyond).
+	local dark = MapThemes.get(themeName).dark == true
+	return place(mapName, mapName, MapMarks.starter(), themeName, dark)
+end
+
+local function mapFolder(name: string): Instance?
+	local root = rootFolder()
+	local folder = root and root:FindFirstChild(name)
+	if not folder then
+		warn("[Maps] No map called " .. name .. " in Workspace.BrainTagMaps")
+	end
+	return folder
+end
+
+-- Makes a map's play area (its Bounds part) this many studs wide (X) and
+-- deep (Z), keeping its middle where it is.
+function MapStudio.resize(name: string, width: number, depth: number)
+	if not editing() then
+		return
+	end
+	local folder = mapFolder(name)
+	local bounds = folder and folder:FindFirstChild("Bounds", true)
+	if not (bounds and bounds:IsA("BasePart")) then
+		warn("[Maps] " .. name .. " has no Bounds part")
+		return
+	end
+	bounds.Locked = false
+	bounds.Size = Vector3.new(math.max(40, width), bounds.Size.Y, math.max(40, depth))
+	pcall(function()
+		game:GetService("ChangeHistoryService"):SetWaypoint("Resize map")
+	end)
+	print(
+		string.format(
+			"[Maps] %s is now %d x %d studs.",
+			name,
+			math.round(bounds.Size.X),
+			math.round(bounds.Size.Z)
+		)
+	)
+end
+
+-- Unlocks every part in your maps (older versions locked the ground and
+-- house plates, so Studio's tools couldn't move or scale them).
+function MapStudio.unlock()
+	local root = rootFolder()
+	if not root then
+		return
+	end
+	local count = 0
+	for _, part in root:GetDescendants() do
+		if part:IsA("BasePart") and part.Locked then
+			part.Locked = false
+			count += 1
+		end
+	end
+	print(string.format("[Maps] Unlocked %d parts.", count))
 end
 
 -- One of every part (and every furniture piece) beside your maps, to copy
@@ -9688,7 +10644,7 @@ function MapStudio.palette(): Instance?
 	for i, m in samples do
 		local col, row = (i - 1) % across, (i - 1) // across
 		m.x, m.z = (col + 0.5) * cell, (row + 0.5) * cell
-		local made = makeMark(m, origin, folder)
+		local made = makeMark(m, origin, folder, MapThemes.palette("Classic") :: any)
 		local part = if made:IsA("Model") then made.PrimaryPart else made :: BasePart
 		if part and not part:FindFirstChild("Label") then
 			label(part, m.kind)
@@ -9720,9 +10676,10 @@ function MapStudio.check(name: string?)
 			end
 			print(
 				string.format(
-					"[Maps] %s%s: %d walls, %d doors, %d windows, %d rooms, %d furniture, %d human spawns, %d zombie spawns, %d item spots, %d bushes",
+					"[Maps] %s%s (theme %s): %d walls, %d doors, %d windows, %d rooms, %d furniture, %d human spawns, %d zombie spawns, %d item spots, %d bushes",
 					folder.Name,
 					if folder:GetAttribute("Enabled") == false then " (turned off)" else "",
+					layout.theme,
 					#layout.walls,
 					doors,
 					windows,
@@ -9751,7 +10708,7 @@ return MapStudio
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[-- Robux purchases: game passes (permanent perks) and developer products
@@ -9956,7 +10913,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">Participants</string>
           <string name="Source"><![CDATA[-- Everyone taking part in rounds: real players and Studio test bots, behind
@@ -10243,7 +11200,7 @@ return Participants
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
@@ -10436,7 +11393,9 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 		workspace:WaitForChild("Effects"),
 	}
 	local map = workspace:WaitForChild("Map")
-	for _, name in { "Ground", "Road", "Floors" } do -- shots stop at the boundary wall
+	-- Shots stop at the boundary wall, but fly over the ground and through
+	-- swinging doors and non-solid scenery.
+	for _, name in { "Ground", "Road", "Floors", "Doors", "Custom" } do
 		local child = map:FindFirstChild(name)
 		if child then
 			table.insert(ignored, child)
@@ -10471,7 +11430,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">RoundManager</string>
           <string name="Source"><![CDATA[-- The round loop: Waiting -> Prep -> Outbreak -> Infection -> End -> (reset) -> Prep.
@@ -11079,7 +12038,7 @@ return RoundManager
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">ShopService</string>
           <string name="Source"><![CDATA[-- Score shop (B), the wizard's shop, skins and the first-join tutorial flag.
@@ -11248,7 +12207,7 @@ return ShopService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">TopScores</string>
           <string name="Source"><![CDATA[-- All-time top 10 (across servers) for the trophy panel, refreshed every
@@ -11305,7 +12264,7 @@ return TopScores
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">Traps</string>
           <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for everyone (the dropper gets
@@ -11422,7 +12381,7 @@ return Traps
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">Wizard</string>
           <string name="Source"><![CDATA[-- The wizard: shows up at a random moment during the prep phase in one of the
@@ -11559,7 +12518,7 @@ return Wizard
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">WorldSetup</string>
           <string name="Source"><![CDATA[-- One-time world settings: flat lighting, collision groups, the folders other
@@ -11647,7 +12606,7 @@ return WorldSetup
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="43">
+  <Item class="StarterPlayer" referent="44">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="AutoJumpEnabled">false</bool>
@@ -11656,11 +12615,11 @@ return WorldSetup
       <float name="CharacterWalkSpeed">16</float>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="44">
+    <Item class="StarterCharacterScripts" referent="45">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="45">
+      <Item class="LocalScript" referent="46">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[-- Intentionally empty. Brain Tag characters are flat top-down blobs with no
@@ -11669,20 +12628,21 @@ return WorldSetup
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="46">
+    <Item class="StarterPlayerScripts" referent="47">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="47">
+      <Item class="Folder" referent="48">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">BushController</string>
             <string name="Source"><![CDATA[-- Hiding in bushes, on your screen: the bush you stand in fades so you can
 -- see yourself (and anyone hiding with you), and the name tags of players
--- hiding in other bushes disappear.
+-- hiding in other bushes disappear. On dark maps, name tags also show only
+-- for people close enough to see (DarknessController).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11690,6 +12650,7 @@ local RunService = game:GetService("RunService")
 
 local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DarknessController = require(script.Parent.DarknessController)
 
 local BushController = {}
 
@@ -11741,7 +12702,7 @@ local function step()
 			local root = rootOf(model)
 			if tag and tag:IsA("BillboardGui") and root then
 				local theirs = Bushes.coverAt(root.Position)
-				local show = theirs == nil or theirs == mine
+				local show = (theirs == nil or theirs == mine) and DarknessController.sees(root.Position)
 				if tag.Enabled ~= show then
 					tag.Enabled = show
 				end
@@ -11772,7 +12733,7 @@ return BushController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">CameraController</string>
             <string name="Source"><![CDATA[-- Straight-down camera that follows your character. A narrow field of view
@@ -11835,7 +12796,7 @@ return CameraController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">ChatSetup</string>
             <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-right (bottom-left and
@@ -11933,7 +12894,7 @@ return ChatSetup
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">ClientState</string>
             <string name="Source"><![CDATA[-- Read-only view of the replicated game state for client code: the round
@@ -12045,7 +13006,239 @@ return ClientState
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
+          <Properties>
+            <string name="Name">DarknessController</string>
+            <string name="Source"><![CDATA[-- Dark maps (MapThemes with dark = true, like the haunted house): a lantern
+-- hangs on your own character, lit only on your screen, so you see what's
+-- near you and little beyond. Walls and closed doors stop its light. Other
+-- people's name tags show only within the theme's sight (BushController
+-- asks `sees`).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
+
+local DarknessController = {}
+
+local player = Players.LocalPlayer
+local theme = MapThemes.get("Classic")
+
+local function myRoot(): BasePart?
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function updateLantern()
+	local root = myRoot()
+	if not root then
+		return
+	end
+	local lamp = root:FindFirstChild("Lantern") :: PointLight?
+	local lantern = theme.lantern
+	if theme.dark and lantern then
+		if not lamp then
+			local made = Instance.new("PointLight")
+			made.Name = "Lantern"
+			made.Shadows = true
+			made.Parent = root
+			lamp = made
+		end
+		assert(lamp, "lamp")
+		lamp.Range = lantern.range
+		lamp.Brightness = lantern.brightness
+		lamp.Color = Color3.fromHex(lantern.color)
+	elseif lamp then
+		lamp:Destroy()
+	end
+end
+
+function DarknessController.isDark(): boolean
+	return theme.dark == true
+end
+
+-- Can you see someone standing at `position`?
+function DarknessController.sees(position: Vector3): boolean
+	if not theme.dark then
+		return true
+	end
+	local root = myRoot()
+	if not root then
+		return true
+	end
+	local offset = position - root.Position
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= (theme.sight or 40)
+end
+
+function DarknessController.start()
+	local map = workspace:WaitForChild("Map")
+	local function refresh()
+		local name = map:GetAttribute("Theme")
+		theme = MapThemes.get(if typeof(name) == "string" then name else nil)
+		updateLantern()
+	end
+	map:GetAttributeChangedSignal("Theme"):Connect(refresh)
+	refresh()
+	-- Characters (and their root) are rebuilt on respawn and resize: check
+	-- now and then that the lantern is still on the current one.
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed >= 0.5 then
+			elapsed = 0
+			updateLantern()
+		end
+	end)
+end
+
+return DarknessController
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="54">
+          <Properties>
+            <string name="Name">DoorController</string>
+            <string name="Source"><![CDATA[-- Swinging doors (maps with swingDoors, like the haunted house). Anyone walks
+-- straight through them; on your screen a door swings open away from whoever
+-- is passing and falls shut behind them. Shut, it hides the room beyond: it
+-- blocks your lantern's light, and bots can't see through it either.
+
+local RunService = game:GetService("RunService")
+
+local DoorController = {}
+
+type Door = {
+	part: BasePart,
+	closed: CFrame,
+	hinge: Vector3,
+	horizontal: boolean,
+	half: number, -- half the door's length
+	angle: number, -- radians, 0 = shut
+	attached: { { part: BasePart, offset: CFrame } }, -- the knob swings along
+}
+
+local OPEN = math.rad(85)
+local SPEED = 7 -- radians per second
+local REACH = 4.5 -- how far from the door line someone pushes it open
+
+local doors: { [BasePart]: Door } = {}
+
+local function track(part: Instance)
+	if not part:IsA("BasePart") or part.Name ~= "SwingDoor" then
+		return
+	end
+	local horizontal = part:GetAttribute("Horizontal") == true
+	local half = (if horizontal then part.Size.X else part.Size.Z) / 2
+	local along = if horizontal then Vector3.xAxis else Vector3.zAxis
+	local attached = {}
+	for _, child in part:GetChildren() do
+		if child:IsA("BasePart") then
+			table.insert(attached, { part = child, offset = part.CFrame:ToObjectSpace(child.CFrame) })
+		end
+	end
+	doors[part] = {
+		part = part,
+		closed = part.CFrame,
+		hinge = part.Position - along * half,
+		horizontal = horizontal,
+		half = half,
+		angle = 0,
+		attached = attached,
+	}
+	part.AncestryChanged:Connect(function()
+		if not part:IsDescendantOf(workspace) then
+			doors[part] = nil
+		end
+	end)
+end
+
+local function roots(): { BasePart }
+	local list = {}
+	local function scan(folder: Instance)
+		for _, model in folder:GetChildren() do
+			if model:IsA("Model") and model:GetAttribute("ParticipantId") then
+				local root = model:FindFirstChild("HumanoidRootPart")
+				if root and root:IsA("BasePart") then
+					table.insert(list, root)
+				end
+			end
+		end
+	end
+	scan(workspace)
+	local bots = workspace:FindFirstChild("Bots")
+	if bots then
+		scan(bots)
+	end
+	return list
+end
+
+local function step(dt: number)
+	if next(doors) == nil then
+		return
+	end
+	local people = roots()
+	for _, door in doors do
+		local center = door.closed.Position
+		-- Which way should it be open? Away from the nearest person in the doorway.
+		local target = 0
+		local nearest = math.huge
+		for _, root in people do
+			local rel = root.Position - center
+			local along = if door.horizontal then rel.X else rel.Z
+			local across = if door.horizontal then rel.Z else rel.X
+			if
+				math.abs(along) < door.half + 1.5
+				and math.abs(across) < REACH
+				and math.abs(across) < nearest
+			then
+				nearest = math.abs(across)
+				-- Turning the free end toward -across: a positive angle moves it
+				-- toward -Z (horizontal doors) or +X (vertical doors).
+				local away = if door.horizontal
+					then (if across > 0 then 1 else -1)
+					else (if across > 0 then -1 else 1)
+				-- Already open one way while someone is still in it: stay that way.
+				if door.angle ~= 0 then
+					away = if door.angle > 0 then 1 else -1
+				end
+				target = away * OPEN
+			end
+		end
+		if door.angle ~= target then
+			local delta = target - door.angle
+			local stepSize = SPEED * dt
+			door.angle = if math.abs(delta) <= stepSize
+				then target
+				else door.angle + math.sign(delta) * stepSize
+			local hinge = CFrame.new(door.hinge)
+			local cframe = hinge * CFrame.Angles(0, door.angle, 0) * hinge:Inverse() * door.closed
+			door.part.CFrame = cframe
+			for _, extra in door.attached do
+				extra.part.CFrame = cframe * extra.offset
+			end
+		end
+	end
+end
+
+function DoorController.start()
+	local map = workspace:WaitForChild("Map")
+	local folder = map:WaitForChild("Doors")
+	folder.ChildAdded:Connect(function(child)
+		task.defer(track, child)
+	end)
+	for _, child in folder:GetChildren() do
+		track(child)
+	end
+	RunService.RenderStepped:Connect(step)
+end
+
+return DoorController
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- Plays what the server announces: your own knockback, item swings, potato
@@ -12597,7 +13790,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">ForceField</string>
             <string name="Source"><![CDATA[-- Soft force fields around people and held weapons, felt by YOUR character
@@ -12756,7 +13949,7 @@ return ForceField
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">FurnitureController</string>
             <string name="Source"><![CDATA[-- Drives the furniture YOU are pushing, on your own machine, so it responds
@@ -12988,7 +14181,7 @@ return FurnitureController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">InputController</string>
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
@@ -13115,7 +14308,7 @@ return InputController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="56">
+        <Item class="LocalScript" referent="59">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Client entry point.
@@ -13128,13 +14321,15 @@ require(Client.MovementController).start()
 require(Client.InputController).start()
 require(Client.FurnitureController).start()
 require(Client.BushController).start()
+require(Client.DarknessController).start()
+require(Client.DoorController).start()
 require(Client.Effects).start()
 require(Client.SoundController).start()
 require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">MovementController</string>
             <string name="Source"><![CDATA[-- Moves the character in SCREEN directions (W = up the screen = world -Z)
@@ -13326,7 +14521,7 @@ return MovementController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">SoundBank</string>
             <string name="Source"><![CDATA[-- Every sound in the game, built from the few sound files that ship inside
@@ -13453,7 +14648,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">SoundController</string>
             <string name="Source"><![CDATA[-- Sounds that follow what's going on rather than one-off events: countdown
@@ -13614,7 +14809,7 @@ return SoundController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[-- Plays the game's sounds (recipes in SoundBank), quieter the farther they
@@ -13803,11 +14998,11 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="61">
+        <Item class="Folder" referent="64">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[-- The admin panel (F2, or the ADMIN button on the left). Only shown to
@@ -14189,7 +15384,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="66">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -14247,7 +15442,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the inventory
@@ -14478,7 +15673,7 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">BottomLeft</string>
               <string name="Source"><![CDATA[-- Bottom-left: your points, the speed boost and size they give you, and
@@ -14563,7 +15758,7 @@ return BottomLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -14677,7 +15872,7 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="70">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
@@ -14882,7 +16077,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="68">
+          <Item class="ModuleScript" referent="71">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -14963,7 +16158,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="72">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -15061,7 +16256,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="73">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -15592,7 +16787,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="74">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -15820,11 +17015,11 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="72">
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Left side bar: five big square icon buttons stacked down the left edge
--- (menu, shop, settings, trophy, chat).
+-- (info, shop, settings, trophy, chat).
 
 local UIKit = require(script.Parent.UIKit)
 
@@ -15851,7 +17046,7 @@ function TopLeft.build(parent: Instance, actions: Actions)
 	}, { UIKit.list(Enum.FillDirection.Vertical, TopLeft.GAP) })
 
 	local buttons: { { icon: string, action: () -> (), accent: boolean?, name: string } } = {
-		{ icon = "☰", action = actions.menu, accent = true, name = "Menu" },
+		{ icon = "i", action = actions.menu, accent = true, name = "Info" }, -- how to play
 		{ icon = "🛒", action = actions.shop, name = "Shop" },
 		{ icon = "⚙", action = actions.settings, name = "Settings" },
 		{ icon = "🏆", action = actions.trophy, name = "Trophy" },
@@ -15861,8 +17056,8 @@ function TopLeft.build(parent: Instance, actions: Actions)
 		UIKit.button({
 			Name = b.name,
 			Text = b.icon,
-			TextSize = 34,
-			Font = UIKit.BOLD,
+			TextSize = if b.name == "Info" then 44 else 34,
+			Font = if b.name == "Info" then Enum.Font.GothamBlack else UIKit.BOLD,
 			LayoutOrder = i,
 			Size = UDim2.fromOffset(TopLeft.BUTTON, TopLeft.BUTTON),
 			BackgroundColor3 = if b.accent then UIKit.ACCENT else UIKit.PANEL,
@@ -15876,7 +17071,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="73">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -16056,7 +17251,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="74">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -16295,7 +17490,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="75">
+      <Item class="LocalScript" referent="78">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -16305,13 +17500,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="76">
+  <Item class="TextChatService" referent="79">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="77">
+  <Item class="Workspace" referent="80">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

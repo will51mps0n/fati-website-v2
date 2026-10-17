@@ -38,7 +38,7 @@ local function pointRects(list: { MapLayout.Point }): { MapLayout.Rect }
 	return out
 end
 
-for _, name in { "Neighborhood", "Mansion" } do
+for _, name in { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" } do
 	test(name .. ": copied to Studio and back is the same map", function()
 		local original = MapLayout.get(name)
 		assert(original, name)
@@ -126,15 +126,15 @@ test("the starter map loads with no problems", function()
 	local layout, errors, warnings = MapMarks.toLayout("Starter", "Starter", MapMarks.starter())
 	expectEq(#errors, 0, "errors: " .. table.concat(errors, "; "))
 	expectEq(#warnings, 0, "warnings: " .. table.concat(warnings, "; "))
-	expect(#layout.walls == 9, "walls: " .. #layout.walls)
-	expect(#MapLayout.doors(layout) == 4, "doors: " .. #MapLayout.doors(layout))
+	expect(#layout.walls == 13, "walls: " .. #layout.walls)
+	expect(#MapLayout.doors(layout) == 6, "doors: " .. #MapLayout.doors(layout))
 	local exterior = 0
 	for _, d in MapLayout.doors(layout) do
 		if d.exterior then
 			exterior += 1
 		end
 	end
-	expectEq(exterior, 3, "doors to the outside")
+	expectEq(exterior, 5, "doors to the outside")
 	expect(#layout.furniture >= 10, "furniture")
 	expectEq(#layout.zombieSpawns, 1, "zombie spawn")
 end)

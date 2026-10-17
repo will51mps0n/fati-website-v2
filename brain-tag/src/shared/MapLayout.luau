@@ -7,6 +7,11 @@
 -- house, with a large house above and the same plan turned 180 degrees below.
 -- Mansion: one big house modeled on the original's (orange brick rooms,
 -- a concrete garage), a pool and an orange shed out back, the road in front.
+-- Christmas Town: the Neighborhood under snow, with trees, presents and
+-- snowmen in the yards.
+-- Haunted: a dark manor of small rooms off one long hallway, a crypt, a
+-- garden shed and a graveyard of pushable tombstones (MapThemes Haunted:
+-- you only see near yourself; doors swing shut behind you).
 
 export type Rect = { x1: number, z1: number, x2: number, z2: number }
 export type Range = { number }
@@ -63,6 +68,8 @@ export type Layout = {
 	zombieSpawns: { Point },
 	wizardSpots: { Point },
 	start: Point, -- where every human starts the round, together
+	theme: string, -- MapThemes name: colors and lighting
+	swingDoors: boolean, -- doorways get walk-through doors that block the view
 }
 
 local MapLayout = {}
@@ -122,6 +129,8 @@ MapLayout.COLORS = {
 	BushGreen = "43A85A",
 	BushOrange = "E8913A",
 	ZombiePit = "6B2D2D",
+	Door = "6B4A33", -- swinging doors
+	DoorKnob = "D4A93A",
 }
 
 local T = MapLayout.WALL_THICKNESS
@@ -500,6 +509,8 @@ local function newLayout(name: string, title: string): Layout
 		zombieSpawns = {},
 		wizardSpots = {},
 		start = { x = 0, z = 0 },
+		theme = "Classic",
+		swingDoors = false,
 	}
 end
 
@@ -742,11 +753,318 @@ local function buildMansion(): Layout
 	return layout
 end
 
+-- Christmas Town ----------------------------------------------------------------------------
+
+local function buildChristmasTown(): Layout
+	local layout = buildNeighborhood()
+	layout.name = "ChristmasTown"
+	layout.title = "Christmas Town"
+	layout.theme = "Winter"
+	-- Yard decorations in the north half, mirrored into the south yards.
+	local north = {
+		piece("ChristmasTree", 100, -120),
+		piece("Present", 96, -114),
+		piece("Present", 104, -114),
+		piece("Present", 106, -121),
+		piece("ChristmasTree", -128, -152),
+		piece("Present", -124, -146),
+		piece("Present", -131.5, -146),
+		piece("Snowman", 80, -80),
+		piece("Snowman", -120, -55),
+		piece("Snowman", 120, -100, 270),
+	}
+	for _, p in north do
+		table.insert(layout.furniture, { kind = p.kind, x = p.x, z = p.z, rot = p.rot, house = "" })
+		table.insert(
+			layout.furniture,
+			{ kind = p.kind, x = -p.x, z = -p.z, rot = (p.rot + 180) % 360, house = "" }
+		)
+	end
+	return layout
+end
+
+-- Haunted house ---------------------------------------------------------------------------------
+
+-- 180 x 100: six small rooms along the back, a long hallway with a door at
+-- each end, five rooms along the front around the foyer.
+local MANOR: Plan = {
+	w = 180,
+	d = 100,
+	walls = {
+		wall(0, 0, 180, 0, { { 134.5, 141.5 } }, { { 8, 20 }, { 70, 86 }, { 156, 172 } }),
+		wall(0, 100, 180, 100, { { 86, 94 } }, { { 6, 18 }, { 40, 56 }, { 120, 136 }, { 154, 170 } }),
+		wall(0, 0, 0, 100, { { 46.5, 53.5 } }, { { 10, 30 }, { 68, 90 } }),
+		wall(180, 0, 180, 100, { { 46.5, 53.5 } }, { { 10, 30 }, { 68, 90 } }),
+		wall(0, 42, 180, 42, {
+			{ 14, 21 },
+			{ 44.5, 51.5 },
+			{ 74.5, 81.5 },
+			{ 107.5, 114.5 },
+			{ 134.5, 141.5 },
+			{ 161.5, 168.5 },
+		}),
+		wall(
+			0,
+			58,
+			180,
+			58,
+			{ { 11.5, 18.5 }, { 44.5, 51.5 }, { 74, 81 }, { 99, 106 }, { 125.5, 132.5 }, { 158.5, 165.5 } }
+		),
+		wall(36, 0, 36, 42, { { 17, 24 } }),
+		wall(60, 0, 60, 42),
+		wall(96, 0, 96, 42, { { 28, 35 } }),
+		wall(126, 0, 126, 42),
+		wall(150, 0, 150, 42, { { 17, 24 } }),
+		wall(30, 58, 30, 100, { { 75, 82 } }),
+		wall(66, 58, 66, 100),
+		wall(114, 58, 114, 100, { { 82, 89 } }),
+		wall(144, 58, 144, 100, { { 75, 82 } }),
+	},
+	rooms = {
+		room("Library", "Wood", 0, 0, 36, 42),
+		room("Closet", "Wood", 36, 0, 60, 42),
+		room("Bedroom", "Wood", 60, 0, 96, 42),
+		room("Bathroom", "Tile", 96, 0, 126, 42),
+		room("Study", "Wood", 126, 0, 150, 42),
+		room("Nursery", "Wood", 150, 0, 180, 42),
+		room("Hallway", "Tile", 0, 42, 180, 58),
+		room("Kitchen", "Tile", 0, 58, 30, 100),
+		room("Dining room", "Wood", 30, 58, 66, 100),
+		room("Foyer", "Brick", 66, 58, 114, 100),
+		room("Parlor", "Wood", 114, 58, 144, 100),
+		room("Chapel", "Concrete", 144, 58, 180, 100),
+	},
+	furniture = {
+		-- Library
+		piece("Bookshelf", 8, 2.8),
+		piece("Bookshelf", 24, 2.8),
+		piece("Bookshelf", 2.8, 20, 90),
+		piece("Desk", 20, 20),
+		piece("Chair", 20, 24, 180),
+		piece("Candelabra", 32, 4),
+		piece("Armchair", 30, 34),
+		piece("Rug", 18, 33),
+		-- Closet
+		piece("Wardrobe", 48, 3.2),
+		piece("Box", 40, 8),
+		piece("Box", 40, 11.6),
+		piece("Crate", 55, 10),
+		piece("Dresser", 57, 24, 90),
+		piece("Barrel", 55, 34),
+		piece("TrashCan", 40.5, 30),
+		-- Bedroom
+		piece("Bed", 70, 6.8),
+		piece("Wardrobe", 86, 3.2),
+		piece("Dresser", 63, 30, 90),
+		piece("Rug", 80, 22),
+		piece("Candelabra", 92, 12),
+		piece("Chair", 88, 30),
+		piece("Box", 66, 38),
+		piece("Plant", 92, 38),
+		-- Bathroom
+		piece("Bathtub", 111, 4.6),
+		piece("Toilet", 122.3, 14, 90),
+		piece("Sink", 122.8, 22, 270),
+		piece("Washer", 100, 4),
+		piece("Cauldron", 104, 26),
+		-- Study
+		piece("Desk", 129.5, 18, 90),
+		piece("Chair", 133, 18, 270),
+		piece("Bookshelf", 147.3, 29.5, 270),
+		piece("PoolTable", 138, 30),
+		piece("Candelabra", 146, 8),
+		-- Nursery
+		piece("Wardrobe", 176.8, 6.5, 90),
+		piece("Bed", 162, 6.8),
+		piece("Box", 172, 36),
+		piece("Armchair", 156, 32),
+		piece("Beanbag", 170, 24),
+		piece("Candelabra", 154, 12),
+		-- Hallway
+		piece("Bench", 32, 45.2),
+		piece("Candelabra", 60, 55),
+		piece("Armchair", 90, 45.9),
+		piece("Barrel", 120, 55),
+		piece("Candelabra", 150, 45),
+		piece("Crate", 172, 54.5),
+		-- Kitchen
+		piece("Fridge", 4.5, 95.9, 180),
+		piece("Stove", 10, 96.5, 180),
+		piece("Sink", 15.5, 96.8, 180),
+		piece("Cauldron", 24, 94),
+		piece("Table", 14, 76),
+		piece("Chair", 14, 71.3),
+		piece("Chair", 14, 80.7, 180),
+		piece("Barrel", 4, 62),
+		piece("TrashCan", 26, 62),
+		-- Dining room
+		piece("Table", 48, 80),
+		piece("Rug", 48, 80),
+		piece("Chair", 41, 80, 90),
+		piece("Chair", 55, 80, 270),
+		piece("Chair", 45, 75.2),
+		piece("Chair", 51, 75.2),
+		piece("Chair", 45, 84.8, 180),
+		piece("Chair", 51, 84.8, 180),
+		piece("Candelabra", 35, 96),
+		piece("Candelabra", 61, 96),
+		piece("Dresser", 48, 97.1, 180),
+		-- Foyer
+		piece("Armchair", 72, 92, 90),
+		piece("Armchair", 108, 92, 270),
+		piece("Rug", 90, 84),
+		piece("Candelabra", 70, 64),
+		piece("Candelabra", 110, 64),
+		piece("Coffin", 90, 76, 90),
+		piece("Plant", 80, 96),
+		piece("Plant", 100, 96),
+		piece("Box", 69.5, 72),
+		-- Parlor
+		piece("Piano", 129, 95.6, 180),
+		piece("Couch", 129, 70),
+		piece("Armchair", 121, 78),
+		piece("CoffeeTable", 129, 78),
+		piece("Candelabra", 117.5, 62),
+		piece("Bookshelf", 141.3, 68.5, 270),
+		-- Chapel
+		piece("Bench", 158, 70),
+		piece("Bench", 170, 70),
+		piece("Bench", 158, 77),
+		piece("Bench", 170, 77),
+		piece("Bench", 158, 84),
+		piece("Bench", 170, 84),
+		piece("Coffin", 164, 93, 90),
+		piece("Candelabra", 150, 93),
+		piece("Candelabra", 176, 93),
+	},
+	items = {
+		pt(20, 30),
+		pt(78, 22),
+		pt(112, 30),
+		pt(100, 50),
+		pt(20, 88),
+		pt(90, 90),
+		pt(160, 64),
+		pt(136, 86),
+	},
+}
+
+-- 30 x 24 stone crypt: three coffins and two candelabras.
+local CRYPT: Plan = {
+	w = 30,
+	d = 24,
+	walls = {
+		wall(0, 0, 30, 0),
+		wall(0, 24, 30, 24, { { 11.5, 18.5 } }),
+		wall(0, 0, 0, 24),
+		wall(30, 0, 30, 24),
+	},
+	rooms = { room("Crypt", "Concrete", 0, 0, 30, 24) },
+	furniture = {
+		piece("Coffin", 8, 11),
+		piece("Coffin", 15, 11),
+		piece("Coffin", 22, 11),
+		piece("Candelabra", 3.5, 3.5),
+		piece("Candelabra", 26.5, 3.5),
+	},
+	items = { pt(15, 19) },
+}
+
+-- 28 x 20 garden shed.
+local GARDEN_SHED: Plan = {
+	w = 28,
+	d = 20,
+	walls = {
+		wall(0, 0, 28, 0, { { 10.5, 17.5 } }),
+		wall(0, 20, 28, 20, nil, { { 8, 20 } }),
+		wall(0, 0, 0, 20),
+		wall(28, 0, 28, 20),
+	},
+	rooms = { room("Shed", "Wood", 0, 0, 28, 20) },
+	furniture = {
+		piece("Crate", 4, 16),
+		piece("Barrel", 9, 16.8),
+		piece("Box", 23.5, 16.5),
+		piece("Box", 23.5, 13),
+		piece("TrashCan", 4, 4),
+		piece("Cauldron", 22, 5),
+	},
+	items = { pt(14, 10) },
+}
+
+local function buildHaunted(): Layout
+	local layout = newLayout("Haunted", "The Haunted House")
+	layout.theme = "Haunted"
+	layout.swingDoors = true
+	layout.bounds = rect(-140, -135, 140, 135)
+	addHouse(layout, "Manor", MANOR, -90, -75, false, "Blue", "Huge")
+	addHouse(layout, "Crypt", CRYPT, 95, -120, false, "Orange", "Small")
+	addHouse(layout, "Shed", GARDEN_SHED, -128, 62, false, "Orange", "Small")
+
+	-- The graveyard: a dirt yard (no walls) full of tombstones you can push.
+	table.insert(
+		layout.rooms,
+		{ name = "Graveyard", floor = "Dirt", rect = rect(25, 45, 125, 120), house = "" }
+	)
+	for _, z in { 60, 76, 92, 108 } do
+		for _, x in { 40, 56, 72, 88, 104 } do
+			table.insert(layout.furniture, { kind = "Tombstone", x = x, z = z, rot = 0, house = "" })
+		end
+	end
+	for _, p in { piece("Coffin", 118, 72), piece("Bench", 70, 116), piece("Candelabra", 30, 50) } do
+		table.insert(layout.furniture, { kind = p.kind, x = p.x, z = p.z, rot = p.rot, house = "" })
+	end
+
+	layout.paths = {
+		rect(-4, 25, 4, 135), -- front door to the gate
+		rect(4, 80, 25, 86), -- into the graveyard
+		rect(106, -96, 114, -60), -- crypt door
+		rect(-118, 30, -110, 62), -- shed door
+	}
+	layout.patios = { rect(-14, 25, 14, 33) } -- the porch
+	layout.pools = { rect(-80, 70, -40, 100) } -- a murky pond
+
+	layout.bushes = {
+		bush(-130, -125, 5, "Green"),
+		bush(-128, -40, 4, "Orange"),
+		bush(-60, 115, 5, "Green"),
+		bush(-30, 60, 4, "Orange"),
+		bush(132, 20, 4, "Green"),
+		bush(130, -60, 5, "Orange"),
+		bush(-20, -120, 5, "Green"),
+		bush(60, -125, 4, "Orange"),
+		bush(-100, 110, 4, "Green"),
+	}
+
+	layout.humanSpawns = {
+		pt(-120, -20),
+		pt(-115, 20),
+		pt(-60, 45),
+		pt(20, 40),
+		pt(-30, 110),
+		pt(110, 20),
+		pt(60, -100),
+		pt(-60, -110),
+		pt(-120, -100),
+		pt(10, -110),
+		pt(132, 100),
+	}
+	layout.zombieSpawns = { pt(-125, 125), pt(128, -10) }
+	layout.start = pt(0, 50) -- the front path
+	layout.wizardSpots = { pt(-120, 100), pt(120, -70), pt(-100, -125), pt(10, 100) }
+	for _, p in { pt(48, 68), pt(96, 100) } do -- the graveyard
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
 MapLayout.maps = {
 	Neighborhood = buildNeighborhood(),
 	Mansion = buildMansion(),
+	ChristmasTown = buildChristmasTown(),
+	Haunted = buildHaunted(),
 } :: { [string]: Layout }
-MapLayout.names = { "Neighborhood", "Mansion" }
+MapLayout.names = { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" }
 MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood

@@ -491,6 +491,99 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, -c.d / 2 + 0.4, 1.0, 0.4, 0.52, 0.5, "2ECC71") -- display
 		end,
 	},
+	-- Haunted house ---------------------------------------------------------------
+	Tombstone = {
+		body = "7F858C",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.35, c.d - 0.35, 0.02, 0.04, "989EA5")
+			c:top(0, 0, 0.28, c.d - 0.7, 0.05, 0.04, "5C6167") -- engraved cross
+			c:top(0, -0.05, 1.3, 0.24, 0.05, 0.04, "5C6167")
+			c:disc(c.w / 2 - 0.6, 0.2, 0.55, 0.06, 0.04, "5E7A4A") -- moss
+		end,
+	},
+	Coffin = {
+		body = "3F271D",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.45, c.d - 0.45, 0.03, 0.06, "57362A") -- lid
+			c:top(0, -c.d / 2 + 2.2, 0.3, 2.4, 0.06, 0.05, "C9A35A") -- brass cross
+			c:top(0, -c.d / 2 + 1.7, 1.4, 0.3, 0.06, 0.05, "C9A35A")
+			for side = -1, 1, 2 do
+				c:top(side * (c.w / 2 + 0.08), 0, 0.16, 1.4, -0.6, 0.25, "8C7A55") -- handles
+			end
+		end,
+	},
+	Candelabra = {
+		body = "2E2626",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -c.h + 0.3, 0.3, "2E2626") -- base
+			c:disc(0, 0, 0.3, -0.5, c.h - 0.8, "2E2626") -- stem
+			c:top(0, 0, c.w + 0.4, 0.2, -0.45, 0.15, "2E2626") -- arms
+			for _, x in { -0.9, 0, 0.9 } do
+				c:disc(x, 0, 0.32, 0, 0.5, "F2E8D0") -- candles
+				c:ball(x, c.h / 2 + 0.2, 0, 0.32, "FFB347").Material = Enum.Material.Neon -- flames
+			end
+			local light = Instance.new("PointLight")
+			light.Range = 18
+			light.Brightness = 1.6
+			light.Color = Color3.fromHex("FFC27A")
+			light.Shadows = true
+			light.Parent = c.body
+		end,
+	},
+	Cauldron = {
+		body = "26262B",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -0.05, c.h - 0.1, "26262B")
+			c:disc(0, 0, c.w * 0.8, 0.0, 0.06, "4FC24F").Material = Enum.Material.Neon -- brew
+			c:disc(-0.5, 0.3, 0.6, 0.03, 0.06, "9BF59B")
+			c:disc(0.6, -0.4, 0.45, 0.03, 0.06, "9BF59B")
+		end,
+	},
+	-- Christmas Town --------------------------------------------------------------
+	ChristmasTree = {
+		body = "2E7D46",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, 0.8, -c.h + 1.2, 1.2, "6B4226") -- trunk
+			local layers = { { c.w, -c.h + 3.2 }, { c.w * 0.74, -2.6 }, { c.w * 0.46, -0.6 } }
+			for i, layer in layers do
+				c:disc(0, 0, layer[1], layer[2], 0.9, if i == 2 then "3A9455" else "2E7D46")
+			end
+			local ornaments = { "D8423F", "F5C542", "3B82F6", "F4F4F4", "D8423F", "F5C542" }
+			for i, color in ornaments do
+				local angle = i / #ornaments * math.pi * 2
+				local r = if i % 2 == 0 then c.w * 0.4 else c.w * 0.28
+				c:disc(math.cos(angle) * r, math.sin(angle) * r, 0.42, -2.6 + 0.05, 0.1, color)
+			end
+			c:ball(0, c.h / 2 + 0.1, 0, 0.8, "FFD54A").Material = Enum.Material.Neon -- star
+		end,
+	},
+	Present = {
+		body = "D8423F",
+		draw = function(c)
+			c:top(0, 0, 0.36, c.d, 0.02, 0.04, "F5C542") -- ribbon
+			c:top(0, 0, c.w, 0.36, 0.02, 0.04, "F5C542")
+			c:disc(0, 0, 0.7, 0.08, 0.1, "F5C542") -- bow
+		end,
+	},
+	Snowman = {
+		body = "F4F8FA",
+		transparentBody = true,
+		draw = function(c)
+			local white = "F4F8FA"
+			c:ball(0, -c.h / 2 + 1.5, 0, c.w, white)
+			c:ball(0, -c.h / 2 + 3.6, 0, c.w * 0.72, white)
+			c:ball(0, c.h / 2 - 1.0, 0, c.w * 0.5, white)
+			c:disc(0, 0, 1.1, 0.5, 0.9, "1C1C1C") -- top hat
+			c:disc(0, 0, 1.6, -0.35, 0.12, "1C1C1C") -- brim
+			c:top(0, 1.0, 0.24, 0.8, -0.85, 0.24, "F28C28") -- carrot nose (front)
+			for side = -1, 1, 2 do
+				c:top(side * 2.0, 0, 1.6, 0.14, -2.6, 0.14, "6B4226", side * 0.4) -- stick arms
+			end
+		end,
+	},
 	-- Green rug with a pale border and a fringe on the short ends, like the original.
 	Rug = {
 		body = "A9C7B8",

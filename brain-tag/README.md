@@ -121,6 +121,20 @@ rank 254+ in the owning group) in live servers, and to any UserId listed in
 The server checks every request, so the panel can't be used by anyone else
 even if they find it.
 
+## Maps
+
+Four maps take turns (`Config.MAP_ROTATION`, two rounds each):
+
+- **The Neighborhood:** two big houses across a road and a little one on the island.
+- **The Mansion:** one huge house, a pool and a shed.
+- **The Haunted House:** night. A manor of small rooms off one long hallway,
+  a crypt, a shed, a pond and a graveyard of tombstones you can push. You
+  only see around yourself (your own lantern), name tags show only up close,
+  and every doorway has a swinging door that hides the room behind it until
+  someone walks through. Bots can't see far either.
+- **Christmas Town:** the Neighborhood under snow, with Christmas trees,
+  presents and snowmen in the yards.
+
 ## Making your own maps
 
 You build maps right in Studio, out of ordinary parts. Each part's **name**
@@ -137,7 +151,15 @@ With the game installed, stop playing and paste one of these into the
 ```lua
 require(game.ServerScriptService.Server.MapStudio).new("MyMap")
 ```
-A small starter map: a house with two rooms, a shed, a road, spawns.
+A starter map (320 x 300 studs, about the size of the built-in ones): a house
+with two rooms, a cabin, a shed, a road, spawns.
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).new("Spooky", "Haunted")
+```
+The same in a theme: `Classic`, `Haunted` (dark: you only see around
+yourself, with swinging doors), `Winter` (snow), `Lab` (white and teal) or
+`Desert`.
 
 ```lua
 require(game.ServerScriptService.Server.MapStudio).copy("Mansion", "Castle")
@@ -158,6 +180,22 @@ One of every part and every furniture piece, laid out beside your maps
 the copy into your map's folder in the Explorer.
 
 Each map is a folder in **Workspace > BrainTagMaps**. The camera jumps to it.
+Click **Top** on the view cube (top right of the 3D view) to look straight
+down, like the game camera.
+
+### Make it bigger
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).resize("MyMap", 400, 360)
+```
+makes the play area (the green `Bounds` part) 400 studs wide and 360 deep,
+keeping its middle in place. You can also select `Bounds` and drag it with
+the **Scale** tool. Maps made before this update had the ground locked;
+unlock everything once with:
+
+```lua
+require(game.ServerScriptService.Server.MapStudio).unlock()
+```
 
 ### Edit it
 
@@ -166,11 +204,11 @@ each name means:
 
 | Part name | What it is |
 | --- | --- |
-| `Bounds` | The play area (the big grass plate). A brick wall goes around its edge. One per map. Locked: select it in the Explorer. |
+| `Bounds` | The play area (the big grass plate). A brick wall goes around its edge. One per map. |
 | `Wall` | A wall. Draw it long and thin; it is always rebuilt 3 studs thick, centered where you put it. Shotguns can break it. |
 | `Door` (green) | Put it on a wall: it cuts a doorway as wide as the part. |
 | `Window` (light blue) | Put it on a wall: that stretch becomes a breakable window. |
-| `Floor` | A room's floor. Attribute `Floor`: `Brick`, `Tile`, `Wood` or `Concrete` (or just set the part's Material). |
+| `Floor` | A room's floor. Attribute `Floor`: `Brick`, `Tile`, `Wood`, `Concrete` or `Dirt` (or just set the part's Material). A floor with no walls makes a yard, like the haunted graveyard. |
 | `House` | A house's outline (flat plate under the floors): walls on it get blue or orange trim (attribute `Outline`). Optional. |
 | `HumanSpawn` (blue) | Where humans appear. At least one. |
 | `ZombieSpawn` (red) | Where zombies appear (a red pit). At least one. |
@@ -186,9 +224,18 @@ model) appears in the game exactly as you built it. If it can be bumped into
 (`CanCollide` on), it works like a wall that never breaks. Sub-folders are
 fine for keeping things tidy.
 
-Folder attributes: `Title` (the name shown in game) and `Enabled` (untick to
-leave a map out without deleting it). A folder whose name starts with `_` is
-ignored.
+Folder attributes (select the map's folder, then **Properties > Attributes**):
+
+- `Title`: the name shown in game.
+- `Enabled`: untick to leave a map out without deleting it.
+- `Theme`: `Classic`, `Haunted`, `Winter`, `Lab` or `Desert` (colors and lighting).
+- `SwingDoors`: tick to put a walk-through door in every doorway. Shut, it
+  hides the room behind it (and on dark maps blocks your light); it swings
+  open as anyone passes.
+
+A folder whose name starts with `_` is ignored. Copying a built-in map keeps
+its theme: `copy("Haunted", "MyHauntedHouse")` gives you the haunted house to
+change.
 
 ### Check and play
 
@@ -415,7 +462,7 @@ Developer checks (need the standalone `luau` binary from
 [luau-lang/luau releases](https://github.com/luau-lang/luau/releases)):
 
 ```
-python3 tools/run_tests.py path/to/luau      # 35 logic tests, incl. "every room is reachable" and Studio map round trips
+python3 tools/run_tests.py path/to/luau      # 57 logic tests, incl. "every room is reachable" and Studio map round trips
 python3 tools/render_map.py path/to/luau     # writes tools/out/map.png ("Starter" draws the Studio starter map)
 python3 tools/build_installer.py path/to/rojo   # regenerates studio/ (the Command Bar installer)
 python3 tools/render_looks.py path/to/luau out.png Alpha:Zombie Furniture:Car   # top-down previews

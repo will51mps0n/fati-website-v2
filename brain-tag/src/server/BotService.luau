@@ -2,13 +2,17 @@
 -- when real players join). They count as participants for every rule and
 -- wear random skins. Each has a level from 3 to 6; Mario Robles is a 6 and
 -- most of the roster is 5 or 6:
---   * zombies spread out over different humans, lead their target, and
---     remember where a human hid. A human they can't reach (barricaded in)
+--   * zombies spread out over different humans, lead their target,
+--     remember where a human hid, and circle round a weapon held out at
+--     them instead of walking into it. A human they can't reach (barricaded in)
 --     draws a crowd: the pack picks one door, lines up outside it and
 --     shoves through together (pushers in a line add their strength)
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
---     toward open ground away from every zombie, and hide in bushes
+--     toward open ground or through doorways away from every zombie, juke
+--     sideways when one is about to grab them, and hide in bushes
+--   * on dark maps (MapThemes) nobody sees far, and walls and closed doors
+--     block the view
 -- Movement never aims through walls: straight lines are checked with a
 -- body-wide sweep, everything else uses pathfinding, and a bot that stops
 -- making progress steps sideways and replans.
@@ -27,6 +31,7 @@ local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Participants = require(script.Parent.Participants)
 local RoundManager = require(script.Parent.RoundManager)
 local Skins = require(ReplicatedStorage.Shared.Skins)
@@ -46,6 +51,8 @@ type Level = {
 	flee: number, -- human: zombie distance that starts a run
 	directions: number, -- human: escape directions considered
 	hide: number, -- human: chance to be a bush hider
+	dodge: number, -- human: juke when a zombie closes in this near (0 = never)
+	flank: boolean, -- zombie: circle round a held-out weapon
 }
 
 local LEVELS: { [number]: Level } = {
@@ -59,6 +66,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 45,
 		directions = 8,
 		hide = 0.35,
+		dodge = 0,
+		flank = false,
 	},
 	[4] = {
 		think = 0.18,
@@ -70,6 +79,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 55,
 		directions = 10,
 		hide = 0.45,
+		dodge = 7,
+		flank = true,
 	},
 	[5] = {
 		think = 0.14,
@@ -81,6 +92,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 65,
 		directions = 12,
 		hide = 0.5,
+		dodge = 8,
+		flank = true,
 	},
 	[6] = {
 		think = 0.11,
@@ -92,6 +105,8 @@ local LEVELS: { [number]: Level } = {
 		flee = 75,
 		directions = 12,
 		hide = 0.55,
+		dodge = 9.5,
+		flank = true,
 	},
 }
 
@@ -286,6 +301,39 @@ local function visible(entry: Seen, from: Vector3): boolean
 	return not entry.hidden or Util.flatDistance(entry.position, from) <= Config.BUSH_REVEAL_DISTANCE
 end
 
+-- On a dark map nobody sees far, and walls and closed doors block the view.
+local function inSight(from: Vector3, to: Vector3, distance: number): boolean
+	local theme = MapThemes.get(MapLayout.current().theme)
+	if not theme.dark then
+		return true
+	end
+	return distance <= (theme.sight or 40) + 6 and Combat.canSee(from, to)
+end
+
+-- A human holding a weapon out at us: a spot round the side it isn't
+-- pointing (the shaft only blocks straight ahead), or nil if we're already
+-- beside or behind it.
+local function flankAround(target: Seen, here: Vector3): Vector3?
+	local item = Items.get(target.p.heldItem)
+	if not item or item.kind ~= "Melee" then
+		return nil
+	end
+	local aim = Util.flatUnit(target.p.aim)
+	if not aim then
+		return nil
+	end
+	local rel = Util.flat(here - target.position)
+	local d = rel.Magnitude
+	local reach = (item.reach or 5) * math.max(1, target.p.scale * 0.9)
+	if d < 0.5 or d > reach + 8 or (rel / d):Dot(aim) < 0.35 then
+		return nil
+	end
+	local side = Vector3.new(-aim.Z, 0, aim.X)
+	local sign = if rel:Dot(side) >= 0 then 1 else -1
+	local around = (side * sign - aim * 0.35).Unit
+	return target.position + around * (reach * 0.75 + 2)
+end
+
 -- One bot ---------------------------------------------------------------------------------
 
 local function brain(p: Participant, level: Level, seed: number)
@@ -321,6 +369,8 @@ local function brain(p: Participant, level: Level, seed: number)
 	}
 	local siege: Siege? = nil
 	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
+	local dodgeSpot: Vector3? = nil
+	local dodgeUntil, nextDodge = 0, 0
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -630,7 +680,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			-- A barricaded human pulls the pack together instead (up to 6).
 			for _, entry in seenHumans do
 				local d = Util.flatDistance(entry.position, here)
-				if d <= level.sight and visible(entry, here) then
+				if d <= level.sight and visible(entry, here) and inSight(here, entry.position, d) then
 					local others = chasers(entry.p, p.id)
 					local rally = (fortified[entry.p] or 0) > now and others < 6
 					local score = d
@@ -647,6 +697,11 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
+				-- Holding a weapon out at us? Go round it.
+				local around = if level.flank then flankAround(best, here) else nil
+				if around and inBounds(around, 3) then
+					goal = around
+				end
 				if not breach(best.position, root, humanoid) then
 					goTo(goal, root, humanoid, true)
 					checkProgress(root, goal, humanoid)
@@ -686,8 +741,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		local closest: Seen? = nil
 		local closestDistance = math.huge
 		for _, entry in seenZombies do
-			if not entry.hidden or Util.flatDistance(entry.position, here) <= Config.BUSH_REVEAL_DISTANCE then
-				local d = Util.flatDistance(entry.position, here)
+			local d = Util.flatDistance(entry.position, here)
+			local seen = not entry.hidden or d <= Config.BUSH_REVEAL_DISTANCE
+			if seen and inSight(here, entry.position, d) then
 				if d <= level.flee then
 					table.insert(threats, entry)
 				end
@@ -716,6 +772,40 @@ local function brain(p: Participant, level: Level, seed: number)
 			face(root, humanoid, nil)
 		end
 
+		-- A zombie about to grab us: juke sideways so it overshoots (then a
+		-- moment before the next juke, or nobody could ever be caught).
+		if dodgeSpot and now < dodgeUntil then
+			humanoid:MoveTo(dodgeSpot)
+			continue
+		end
+		dodgeSpot = nil
+		if
+			closest
+			and level.dodge > 0
+			and now >= nextDodge
+			and closestDistance < level.dodge + p.scale * 1.5
+		then
+			local rel = Util.flat(here - closest.position)
+			local away = if rel.Magnitude > 0.1 then rel.Unit else Vector3.xAxis
+			if closest.velocity:Dot(away) > 6 then
+				local side = Vector3.new(-away.Z, 0, away.X)
+				local first = if random:NextNumber() < 0.5 then 1 else -1
+				local order: { number } = { first, -first }
+				for _, sign in order do
+					local spot = here + side * sign * 8 + away * 2
+					if inBounds(spot, 4) and Combat.clearWide(here, spot, radius()) then
+						dodgeSpot, dodgeUntil, nextDodge = spot, now + 0.4, now + 1.6
+						break
+					end
+				end
+				if dodgeSpot then
+					humanoid:MoveTo(dodgeSpot)
+					pathGoal = nil
+					continue
+				end
+			end
+		end
+
 		local hidden = BushService.hidden(p)
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
 			humanoid:MoveTo(here) -- stay still and hope
@@ -740,6 +830,22 @@ local function brain(p: Participant, level: Level, seed: number)
 							score = math.min(score, Util.flatDistance(spot, future))
 						end
 						table.insert(candidates, { spot = spot, score = score })
+					end
+				end
+				-- Doorways too: straight through one into the room (or out of it),
+				-- which zombies have to funnel through after us.
+				for _, door in doors() do
+					local center = Vector3.new(door.x, here.Y, door.z)
+					if Util.flatDistance(center, here) < 28 then
+						local beyond = center + across(door, center * 2 - here) * 7
+						if inBounds(beyond, 5) and Combat.clearWide(here, beyond, radius()) then
+							local score = math.huge
+							for _, zombie in threats do
+								local future = zombie.position + zombie.velocity * 0.6
+								score = math.min(score, Util.flatDistance(beyond, future))
+							end
+							table.insert(candidates, { spot = beyond, score = score + 4 })
+						end
 					end
 				end
 				table.sort(candidates, function(a, b)

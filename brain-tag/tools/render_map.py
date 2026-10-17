@@ -22,6 +22,7 @@ DUMP = """
 local MapLayout = require(script.Parent.MapLayout)
 local FurnitureSpecs = require(script.Parent.FurnitureSpecs)
 local MapMarks = require(script.Parent.MapMarks)
+local MapThemes = require(script.Parent.MapThemes)
 -- "Starter" is the map MapStudio.new() makes in Studio.
 local layout = MapLayout.get("__MAP__") or MapMarks.toLayout("__MAP__", "__MAP__", MapMarks.starter())
 
@@ -61,7 +62,7 @@ end
 
 print(encode({
 	bounds = layout.bounds,
-	colors = MapLayout.COLORS,
+	colors = MapThemes.palette(layout.theme),
 	road = layout.road,
 	islands = layout.islands,
 	paths = layout.paths,
@@ -114,6 +115,13 @@ FURNITURE_COLORS = {
     "Arcade": "6C3483",
     "VendingMachine": "C0392B",
     "Treadmill": "2C3E50",
+    "Tombstone": "8A9096",
+    "Coffin": "57362A",
+    "Candelabra": "FFB347",
+    "Cauldron": "4FC24F",
+    "ChristmasTree": "2E7D46",
+    "Present": "D8423F",
+    "Snowman": "F4F8FA",
 }
 
 
@@ -173,7 +181,7 @@ def main() -> int:
         box({"x1": r["x1"] - 1.5, "z1": r["z1"] - 1.5, "x2": r["x2"] + 1.5, "z2": r["z2"] + 1.5}, c["PoolRim"])
         box(r, c["PoolWater"])
 
-    floor_colors = {"Brick": c["Brick"], "Tile": c["Tile"], "Wood": c["Wood"], "Concrete": c["Concrete"]}
+    floor_colors = {"Brick": c["Brick"], "Tile": c["Tile"], "Wood": c["Wood"], "Concrete": c["Concrete"], "Dirt": c["Dirt"]}
     for room in data["rooms"]:
         box(room["rect"], floor_colors[room["floor"]])
 

@@ -49,6 +49,15 @@ local Specs: { [string]: Spec } = {
 	Arcade = { w = 3.2, d = 3, h = 6.5, weight = "Heavy" },
 	VendingMachine = { w = 4.5, d = 3, h = 7.5, weight = "Massive" },
 	Treadmill = { w = 3, d = 7, h = 2.4, weight = "Heavy" },
+	-- Haunted house.
+	Tombstone = { w = 3.2, d = 1.4, h = 4, weight = "Heavy" },
+	Coffin = { w = 3, d = 7, h = 2.2, weight = "Heavy" },
+	Candelabra = { w = 1.6, d = 1.6, h = 5, weight = "Light" }, -- gives off light
+	Cauldron = { w = 3.6, d = 3.6, h = 2.6, weight = "Medium" },
+	-- Christmas Town.
+	ChristmasTree = { w = 5, d = 5, h = 9, weight = "Medium" },
+	Present = { w = 2, d = 2, h = 2, weight = "Light" },
+	Snowman = { w = 3.4, d = 3.4, h = 6, weight = "Heavy" },
 }
 
 local FurnitureSpecs = { specs = Specs }

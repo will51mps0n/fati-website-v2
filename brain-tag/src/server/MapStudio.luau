@@ -14,8 +14,15 @@
 --   Maps.copy("Neighborhood")         -- edit a built-in map
 --   Maps.copy("Mansion", "Castle")    -- start a new map from a built-in one
 --   Maps.new("MyMap")                 -- a small starter map
+--   Maps.new("Spooky", "Haunted")     -- ...in a theme (MapThemes: Classic,
+--                                        Haunted, Winter, Lab, Desert)
+--   Maps.resize("MyMap", 400, 300)    -- make the play area bigger (studs)
 --   Maps.palette()                    -- one of every part, to copy from
 --   Maps.check()                      -- what each map has, and any mistakes
+--   Maps.unlock()                     -- unlock parts made by older versions
+--
+-- Map folder attributes: Title, Enabled, Theme (see MapThemes) and
+-- SwingDoors (walk-through doors in every doorway that block the view).
 
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -24,6 +31,7 @@ local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
 local FurnitureSpecs = require(game:GetService("ReplicatedStorage").Shared.FurnitureSpecs)
 local MapLayout = require(game:GetService("ReplicatedStorage").Shared.MapLayout)
 local MapMarks = require(game:GetService("ReplicatedStorage").Shared.MapMarks)
+local MapThemes = require(game:GetService("ReplicatedStorage").Shared.MapThemes)
 
 type Mark = MapMarks.Mark
 type Rect = MapLayout.Rect
@@ -31,44 +39,42 @@ type Rect = MapLayout.Rect
 local MapStudio = {}
 
 local FOLDER = "BrainTagMaps"
-local C = MapLayout.COLORS
 local H = MapLayout.HEIGHTS
 local WALL_H = MapLayout.WALL_HEIGHT
 
 -- How each kind looks while you edit (top = height of its top above the
--- ground, which is the top of the Bounds part).
+-- ground, which is the top of the Bounds part). `color` is a theme palette
+-- name (MapLayout.COLORS) or a hex color.
 type Look = {
 	color: string,
 	top: number,
 	height: number,
 	transparency: number?,
-	locked: boolean?, -- big plates: select them in the Explorer instead
 	disc: boolean?,
 	label: boolean?,
 	group: string,
 }
 
 local LOOKS: { [string]: Look } = {
-	Bounds = { color = C.Grass, top = 0, height = 1, locked = true, group = "Ground" },
-	Road = { color = C.Asphalt, top = H.Asphalt, height = 0.1, group = "Ground" },
-	Sidewalk = { color = C.Sidewalk, top = H.Sidewalk, height = 0.1, group = "Ground" },
-	CenterLine = { color = C.CenterLine, top = H.RoadLine, height = 0.05, group = "Ground" },
-	EdgeLine = { color = C.EdgeLine, top = H.RoadLine, height = 0.05, group = "Ground" },
-	Path = { color = C.Dirt, top = H.Dirt, height = 0.05, group = "Ground" },
-	Patio = { color = C.Concrete, top = H.Patio, height = 0.05, group = "Ground" },
-	Pool = { color = C.PoolWater, top = H.PoolRim, height = 0.3, group = "Ground" },
-	IslandWalk = { color = C.Sidewalk, top = H.IslandWalk, height = 0.1, group = "Ground" },
-	IslandGrass = { color = C.Grass, top = H.IslandGrass, height = 0.05, group = "Ground" },
+	Bounds = { color = "Grass", top = 0, height = 1, group = "Ground" },
+	Road = { color = "Asphalt", top = H.Asphalt, height = 0.1, group = "Ground" },
+	Sidewalk = { color = "Sidewalk", top = H.Sidewalk, height = 0.1, group = "Ground" },
+	CenterLine = { color = "CenterLine", top = H.RoadLine, height = 0.05, group = "Ground" },
+	EdgeLine = { color = "EdgeLine", top = H.RoadLine, height = 0.05, group = "Ground" },
+	Path = { color = "Dirt", top = H.Dirt, height = 0.05, group = "Ground" },
+	Patio = { color = "Concrete", top = H.Patio, height = 0.05, group = "Ground" },
+	Pool = { color = "PoolWater", top = H.PoolRim, height = 0.3, group = "Ground" },
+	IslandWalk = { color = "Sidewalk", top = H.IslandWalk, height = 0.1, group = "Ground" },
+	IslandGrass = { color = "Grass", top = H.IslandGrass, height = 0.05, group = "Ground" },
 	House = {
-		color = C.OutlineBlue,
+		color = "OutlineBlue",
 		top = 0.06,
 		height = 0.05,
 		transparency = 0.3,
-		locked = true,
 		group = "Buildings",
 	},
-	Floor = { color = C.Wood, top = H.Floor, height = 0.2, group = "Buildings" },
-	Wall = { color = C.Wall, top = WALL_H, height = WALL_H, group = "Buildings" },
+	Floor = { color = "Wood", top = H.Floor, height = 0.2, group = "Buildings" },
+	Wall = { color = "Wall", top = WALL_H, height = WALL_H, group = "Buildings" },
 	Door = {
 		color = "39D353",
 		top = WALL_H + 1,
@@ -76,20 +82,21 @@ local LOOKS: { [string]: Look } = {
 		transparency = 0.3,
 		group = "Buildings",
 	},
-	Window = { color = C.Window, top = WALL_H + 0.5, height = WALL_H + 0.5, group = "Buildings" },
+	Window = { color = "Window", top = WALL_H + 0.5, height = WALL_H + 0.5, group = "Buildings" },
 	HumanSpawn = { color = "3B82F6", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	ZombieSpawn = { color = "E0303A", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	Start = { color = "FFFFFF", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	ItemSpot = { color = "F5C542", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	WizardSpot = { color = "9B59B6", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
-	Bush = { color = C.BushGreen, top = 6, height = 6, disc = true, group = "Bushes" },
+	Bush = { color = "BushGreen", top = 6, height = 6, disc = true, group = "Bushes" },
 }
 
 local FLOOR_LOOKS: { [string]: { color: string, material: Enum.Material } } = {
-	Brick = { color = C.Brick, material = Enum.Material.Brick },
-	Tile = { color = C.Tile, material = Enum.Material.Slate },
-	Wood = { color = C.Wood, material = Enum.Material.WoodPlanks },
-	Concrete = { color = C.Concrete, material = Enum.Material.Concrete },
+	Dirt = { color = "Dirt", material = Enum.Material.Ground },
+	Brick = { color = "Brick", material = Enum.Material.Brick },
+	Tile = { color = "Tile", material = Enum.Material.Slate },
+	Wood = { color = "Wood", material = Enum.Material.WoodPlanks },
+	Concrete = { color = "Concrete", material = Enum.Material.Concrete },
 }
 
 -- Reading parts ---------------------------------------------------------------------------
@@ -125,6 +132,8 @@ local function floorOf(part: BasePart): string
 		or m == Enum.Material.Pavement
 	then
 		return "Concrete"
+	elseif m == Enum.Material.Ground or m == Enum.Material.Mud or m == Enum.Material.Sand then
+		return "Dirt"
 	elseif
 		m == Enum.Material.Slate
 		or m == Enum.Material.Marble
@@ -227,6 +236,16 @@ function MapStudio.read(folder: Instance): (MapLayout.Layout?, { string }, { str
 	visit(folder)
 	local layout, errors, warnings =
 		MapMarks.toLayout(folder.Name, attr(folder, "Title") or folder.Name, marks)
+	local theme = attr(folder, "Theme")
+	if theme and MapThemes.exists(theme) then
+		layout.theme = theme
+	elseif theme then
+		table.insert(
+			warnings,
+			"Unknown Theme " .. theme .. " (themes: " .. table.concat(MapThemes.NAMES, ", ") .. ")"
+		)
+	end
+	layout.swingDoors = folder:GetAttribute("SwingDoors") == true
 	return if #errors == 0 then layout else nil, errors, warnings, decor
 end
 
@@ -323,7 +342,7 @@ local function groupFolder(map: Instance, name: string): Instance
 	return folder
 end
 
-local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
+local function makeMark(m: Mark, origin: Vector3, parent: Instance, palette: { [string]: string }): Instance
 	if MapMarks.isFurniture(m.kind) then
 		local model = FurnitureBuilder.preview(
 			{ kind = m.kind, x = origin.X + m.x, z = origin.Z + m.z, rot = m.rot, house = "" },
@@ -341,17 +360,17 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	part.Material = Enum.Material.SmoothPlastic
-	local color = look.color
+	local color = palette[look.color] or look.color
 	if m.kind == "Floor" then
 		local floor = FLOOR_LOOKS[m.floor or "Wood"] or FLOOR_LOOKS.Wood
-		color = floor.color
+		color = palette[floor.color] or floor.color
 		part.Material = floor.material
 		part:SetAttribute("Floor", m.floor or "Wood")
 	elseif m.kind == "House" then
-		color = if m.outline == "Orange" then C.OutlineOrange else C.OutlineBlue
+		color = if m.outline == "Orange" then palette.OutlineOrange else palette.OutlineBlue
 		part:SetAttribute("Outline", m.outline or "Blue")
 	elseif m.kind == "Bush" then
-		color = if m.color == "Orange" then C.BushOrange else C.BushGreen
+		color = if m.color == "Orange" then palette.BushOrange else palette.BushGreen
 		part:SetAttribute("Color", m.color or "Green")
 	end
 	if m.id then
@@ -359,7 +378,6 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance): Instance
 	end
 	part.Color = Color3.fromHex(color)
 	part.Transparency = look.transparency or 0
-	part.Locked = look.locked == true
 	local center = Vector3.new(origin.X + m.x, origin.Y + look.top - look.height / 2, origin.Z + m.z)
 	if look.disc then
 		local diameter = math.max(m.w, m.d, 1)
@@ -430,7 +448,13 @@ local function show(folder: Instance, origin: Vector3, bounds: Rect)
 	end)
 end
 
-local function place(name: string, title: string, marks: { Mark }): Instance?
+local function place(
+	name: string,
+	title: string,
+	marks: { Mark },
+	theme: string,
+	swingDoors: boolean
+): Instance?
 	if not editing() then
 		return nil
 	end
@@ -455,9 +479,12 @@ local function place(name: string, title: string, marks: { Mark }): Instance?
 	folder.Name = name
 	folder:SetAttribute("Title", title)
 	folder:SetAttribute("Enabled", true)
+	folder:SetAttribute("Theme", theme)
+	folder:SetAttribute("SwingDoors", swingDoors)
+	local palette = MapThemes.palette(theme) :: any
 	for _, m in marks do
 		local group = if MapMarks.isFurniture(m.kind) then "Furniture" else LOOKS[m.kind].group
-		makeMark(m, origin, groupFolder(folder, group))
+		makeMark(m, origin, groupFolder(folder, group), palette)
 	end
 	folder.Parent = root
 	show(folder, origin, bounds)
@@ -484,13 +511,73 @@ function MapStudio.copy(name: string, newName: string?): Instance?
 		return nil
 	end
 	local title = if newName then newName else layout.title
-	return place(newName or name, title, MapMarks.fromLayout(layout))
+	return place(newName or name, title, MapMarks.fromLayout(layout), layout.theme, layout.swingDoors)
 end
 
--- A small map to build on.
-function MapStudio.new(name: string?): Instance?
+-- A small map to build on, in a theme (Classic if none).
+function MapStudio.new(name: string?, theme: string?): Instance?
 	local mapName = name or "MyMap"
-	return place(mapName, mapName, MapMarks.starter())
+	local themeName = theme or "Classic"
+	if not MapThemes.exists(themeName) then
+		warn("[Maps] No theme called " .. themeName .. ". Themes: " .. table.concat(MapThemes.NAMES, ", "))
+		return nil
+	end
+	-- Dark maps get swinging doors (they hide the rooms beyond).
+	local dark = MapThemes.get(themeName).dark == true
+	return place(mapName, mapName, MapMarks.starter(), themeName, dark)
+end
+
+local function mapFolder(name: string): Instance?
+	local root = rootFolder()
+	local folder = root and root:FindFirstChild(name)
+	if not folder then
+		warn("[Maps] No map called " .. name .. " in Workspace.BrainTagMaps")
+	end
+	return folder
+end
+
+-- Makes a map's play area (its Bounds part) this many studs wide (X) and
+-- deep (Z), keeping its middle where it is.
+function MapStudio.resize(name: string, width: number, depth: number)
+	if not editing() then
+		return
+	end
+	local folder = mapFolder(name)
+	local bounds = folder and folder:FindFirstChild("Bounds", true)
+	if not (bounds and bounds:IsA("BasePart")) then
+		warn("[Maps] " .. name .. " has no Bounds part")
+		return
+	end
+	bounds.Locked = false
+	bounds.Size = Vector3.new(math.max(40, width), bounds.Size.Y, math.max(40, depth))
+	pcall(function()
+		game:GetService("ChangeHistoryService"):SetWaypoint("Resize map")
+	end)
+	print(
+		string.format(
+			"[Maps] %s is now %d x %d studs.",
+			name,
+			math.round(bounds.Size.X),
+			math.round(bounds.Size.Z)
+		)
+	)
+end
+
+-- Unlocks every part in your maps (older versions locked the ground and
+-- house plates, so Studio's tools couldn't move or scale them).
+function MapStudio.unlock()
+	local root = rootFolder()
+	if not root then
+		return
+	end
+	local count = 0
+	for _, part in root:GetDescendants() do
+		if part:IsA("BasePart") and part.Locked then
+			part.Locked = false
+			count += 1
+		end
+	end
+	print(string.format("[Maps] Unlocked %d parts.", count))
 end
 
 -- One of every part (and every furniture piece) beside your maps, to copy
@@ -555,7 +642,7 @@ function MapStudio.palette(): Instance?
 	for i, m in samples do
 		local col, row = (i - 1) % across, (i - 1) // across
 		m.x, m.z = (col + 0.5) * cell, (row + 0.5) * cell
-		local made = makeMark(m, origin, folder)
+		local made = makeMark(m, origin, folder, MapThemes.palette("Classic") :: any)
 		local part = if made:IsA("Model") then made.PrimaryPart else made :: BasePart
 		if part and not part:FindFirstChild("Label") then
 			label(part, m.kind)
@@ -587,9 +674,10 @@ function MapStudio.check(name: string?)
 			end
 			print(
 				string.format(
-					"[Maps] %s%s: %d walls, %d doors, %d windows, %d rooms, %d furniture, %d human spawns, %d zombie spawns, %d item spots, %d bushes",
+					"[Maps] %s%s (theme %s): %d walls, %d doors, %d windows, %d rooms, %d furniture, %d human spawns, %d zombie spawns, %d item spots, %d bushes",
 					folder.Name,
 					if folder:GetAttribute("Enabled") == false then " (turned off)" else "",
+					layout.theme,
 					#layout.walls,
 					doors,
 					windows,

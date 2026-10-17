@@ -22,10 +22,22 @@ local wallParams = RaycastParams.new()
 wallParams.FilterType = Enum.RaycastFilterType.Include
 local solidParams = RaycastParams.new()
 solidParams.FilterType = Enum.RaycastFilterType.Include
+local sightParams = RaycastParams.new()
+sightParams.FilterType = Enum.RaycastFilterType.Include
 
 function Combat.init()
 	wallParams.FilterDescendantsInstances = { MapBuilder.wallsFolder() }
 	solidParams.FilterDescendantsInstances = { MapBuilder.wallsFolder(), workspace:WaitForChild("Furniture") }
+	sightParams.FilterDescendantsInstances = { MapBuilder.wallsFolder(), MapBuilder.doorsFolder() }
+end
+
+-- Can someone at `from` see `to`? Walls and closed swinging doors block the
+-- view (bots on dark maps use this; doors swing open only on players' screens).
+function Combat.canSee(from: Vector3, to: Vector3): boolean
+	local y = MapLayout.HEIGHTS.Floor + 3
+	local a = Vector3.new(from.X, y, from.Z)
+	local b = Vector3.new(to.X, y, to.Z)
+	return workspace:Raycast(a, b - a, sightParams) == nil
 end
 
 -- Like lineOfSight, but furniture blocks too (used for infection, so a

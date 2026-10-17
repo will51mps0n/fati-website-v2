@@ -1,17 +1,21 @@
--- Builds the neighborhood from MapLayout: grass with little details, dirt
--- paths, the road, house floors with patterns, outlined walls split into
--- breakable segments, windows, bushes and an invisible boundary.
+-- Builds a map from MapLayout: grass with little details, dirt paths, the
+-- road, house floors with patterns, outlined walls split into breakable
+-- segments, windows, bushes and an invisible boundary, all in the map's
+-- theme colors (MapThemes), with its lighting. Maps with swingDoors get a
+-- walk-through door in every doorway (DoorController swings them).
 
 local CollectionService = game:GetService("CollectionService")
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
+local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 
 local MapBuilder = {}
 
-local COLORS = MapLayout.COLORS
+local COLORS = MapLayout.COLORS -- the current map's theme palette (set in build)
 local H = MapLayout.HEIGHTS
 local WALL_HEIGHT = MapLayout.WALL_HEIGHT
 
@@ -20,6 +24,7 @@ type Layout = MapLayout.Layout
 
 local mapFolder: Folder
 local wallsFolder: Folder? = nil
+local doorsFolder: Folder? = nil
 local brokenSegments: { Model } = {}
 
 local function sub(name: string, parent: Instance): Folder
@@ -297,6 +302,9 @@ local function buildFloors(parent: Instance, layout: Layout)
 		local folder = sub(room.house .. " " .. room.name, parent)
 		if room.floor == "Brick" then
 			brickFloor(room.rect, folder)
+		elseif room.floor == "Dirt" then
+			slab("Dirt", room.rect, H.Floor, COLORS.Dirt, folder)
+			speckle(room.rect, H.Floor, COLORS.DirtSpeck, 30, rng, folder)
 		elseif room.floor == "Tile" then
 			tileFloor(room.rect, folder)
 		elseif room.floor == "Concrete" then
@@ -366,11 +374,24 @@ end
 
 -- Tall leaf cylinders you can walk into. Seen from the top-down camera they
 -- cover anyone standing inside (see Bushes.luau).
+-- A lighter (k > 1) or darker (k < 1) version of a hex color.
+local function shade(hex: string, k: number): string
+	local c = Color3.fromHex(hex)
+	if k >= 1 then
+		local t = k - 1
+		return Color3.new(c.R + (1 - c.R) * t, c.G + (1 - c.G) * t, c.B + (1 - c.B) * t):ToHex()
+	end
+	return Color3.new(c.R * k, c.G * k, c.B * k):ToHex()
+end
+
 local function buildBushes(parent: Instance, layout: Layout)
 	local height = Config.BUSH_HEIGHT
+	local classic = layout.theme == "Classic"
 	for _, bush in layout.bushes do
-		local base = if bush.color == "Orange" then COLORS.BushOrange else COLORS.BushGreen
-		local light = if bush.color == "Orange" then "F2AC62" else "5CBF67"
+		local orange = bush.color == "Orange"
+		local base = if orange then COLORS.BushOrange else COLORS.BushGreen
+		-- Classic keeps its hand-picked shades; other themes derive them.
+		local light = if classic then (if orange then "F2AC62" else "5CBF67") else shade(base, 1.3)
 		local model = Instance.new("Model")
 		model.Name = "Bush"
 		local blobs = {
@@ -378,7 +399,7 @@ local function buildBushes(parent: Instance, layout: Layout)
 			{ math.cos(0.7) * bush.r * 0.6, math.sin(0.7) * bush.r * 0.6, bush.r * 1.4 },
 			{ math.cos(3.5) * bush.r * 0.6, math.sin(3.5) * bush.r * 0.6, bush.r * 1.3 },
 		}
-		local outline = if bush.color == "Orange" then "B5651E" else "2E7D3E"
+		local outline = if classic then (if orange then "B5651E" else "2E7D3E") else shade(base, 0.65)
 		for _, blob in blobs do
 			-- A darker, slightly bigger, slightly lower disc draws the outline.
 			Parts.disc(
@@ -524,16 +545,82 @@ local function buildDecor(layout: Layout, walls: Folder)
 	end
 end
 
+-- Swinging doors: a panel across every doorway that anyone walks straight
+-- through. Closed, it hides the room beyond (it blocks light and the bots'
+-- view); each player's DoorController swings it open as people pass.
+local function buildSwingDoors(parent: Folder, layout: Layout)
+	local height = WALL_HEIGHT - 1.5
+	for _, door in MapLayout.doors(layout) do
+		local length = door.width - 0.3
+		local size = if door.horizontal
+			then Vector3.new(length, height, 0.5)
+			else Vector3.new(0.5, height, length)
+		local panel = Parts.make({
+			name = "SwingDoor",
+			size = size,
+			cframe = CFrame.new(door.x, H.Floor + height / 2, door.z),
+			color = COLORS.Door,
+			parent = parent,
+		})
+		panel.CanCollide = false
+		panel.CanTouch = false
+		panel.CastShadow = true
+		panel:SetAttribute("Horizontal", door.horizontal)
+		-- The knob, near the free end.
+		local along = if door.horizontal then Vector3.xAxis else Vector3.zAxis
+		local knob = Parts.make({
+			name = "Knob",
+			size = Vector3.new(0.7, 0.2, 0.7),
+			cframe = CFrame.new(
+				panel.Position + along * (length / 2 - 0.9) + Vector3.new(0, height / 2 + 0.1, 0)
+			),
+			color = COLORS.DoorKnob,
+			parent = panel,
+		})
+		knob.CanCollide = false
+		knob.CanQuery = false
+		knob.CanTouch = false
+	end
+end
+
+-- Sky and light for the map's theme.
+local function applyLighting(theme: MapThemes.Theme)
+	local l = theme.lighting
+	Lighting.Ambient = Color3.fromHex(l.ambient)
+	Lighting.OutdoorAmbient = Color3.fromHex(l.outdoor)
+	Lighting.Brightness = l.brightness
+	Lighting.ClockTime = l.clock
+	-- Dark maps need shadows so walls and closed doors stop your lantern.
+	Lighting.GlobalShadows = theme.dark == true
+	local tint = Lighting:FindFirstChild("ThemeColor") :: ColorCorrectionEffect?
+	if not tint then
+		local made = Instance.new("ColorCorrectionEffect")
+		made.Name = "ThemeColor"
+		made.Parent = Lighting
+		tint = made
+	end
+	assert(tint, "tint")
+	tint.TintColor = Color3.fromHex(l.tint or "FFFFFF")
+	tint.Saturation = l.saturation or 0
+	tint.Contrast = l.contrast or 0
+end
+
 function MapBuilder.build(layout: Layout)
 	mapFolder = workspace:WaitForChild("Map") :: Folder
+	local theme = MapThemes.get(layout.theme)
+	COLORS = MapThemes.palette(layout.theme)
+	applyLighting(theme)
 	local walls = wallsFolder or sub("Walls", mapFolder)
 	wallsFolder = walls
+	local doors = doorsFolder or sub("Doors", mapFolder)
+	doorsFolder = doors
 	for _, child in mapFolder:GetChildren() do
-		if child ~= walls then
+		if child ~= walls and child ~= doors then
 			child:Destroy()
 		end
 	end
 	walls:ClearAllChildren()
+	doors:ClearAllChildren()
 	table.clear(brokenSegments)
 
 	local ground = sub("Ground", mapFolder)
@@ -549,17 +636,27 @@ function MapBuilder.build(layout: Layout)
 	buildBushes(bushes, layout)
 	buildBoundary(sub("Boundary", mapFolder), layout)
 	buildDecor(layout, walls)
+	if layout.swingDoors then
+		buildSwingDoors(doors, layout)
+	end
 	for _, folder in { ground, road, floors } do
 		setPhysics(folder, SLIPPERY)
 	end
 	setPhysics(walls, GRIPPY)
 	setPhysics(pools, GRIPPY)
 	mapFolder:SetAttribute("MapName", layout.name)
+	mapFolder:SetAttribute("Theme", theme.name) -- clients light dark maps (DarknessController)
 end
 
 function MapBuilder.wallsFolder(): Folder
 	assert(wallsFolder, "MapBuilder.build has not run yet")
 	return wallsFolder
+end
+
+-- Swinging door panels (empty on maps without them).
+function MapBuilder.doorsFolder(): Folder
+	assert(doorsFolder, "MapBuilder.build has not run yet")
+	return doorsFolder
 end
 
 -- Shotgun hit: hide a wall segment until the next round.

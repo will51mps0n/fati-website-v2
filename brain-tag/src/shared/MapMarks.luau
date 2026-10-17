@@ -25,7 +25,7 @@ export type Mark = {
 	d: number, -- footprint size along Z
 	rot: number, -- furniture: degrees turned about the vertical
 	id: string?, -- House: its name; Floor: the room's name
-	floor: string?, -- Floor: Brick, Tile, Wood or Concrete
+	floor: string?, -- Floor: Brick, Tile, Wood, Concrete or Dirt
 	outline: string?, -- House: Blue or Orange wall trim
 	color: string?, -- Bush: Green or Orange
 }
@@ -40,7 +40,7 @@ MapMarks.KINDS = {
 	{ kind = "Wall", about = "A wall. Long and thin; it is always rebuilt 3 studs thick." },
 	{ kind = "Door", about = "Put it on a wall to cut a doorway as wide as the part." },
 	{ kind = "Window", about = "Put it on a wall: that stretch becomes a (breakable) window." },
-	{ kind = "Floor", about = "A room's floor (Floor attribute: Brick, Tile, Wood or Concrete)." },
+	{ kind = "Floor", about = "A room's floor (Floor attribute: Brick, Tile, Wood, Concrete or Dirt)." },
 	{ kind = "HumanSpawn", about = "Where humans appear after the first spawn." },
 	{ kind = "ZombieSpawn", about = "Where zombies appear (a red pit)." },
 	{ kind = "Start", about = "Where everyone starts the round, together." },
@@ -63,7 +63,7 @@ for _, entry in MapMarks.KINDS do
 	KNOWN[entry.kind] = true
 end
 
-MapMarks.FLOORS = { "Brick", "Tile", "Wood", "Concrete" }
+MapMarks.FLOORS = { "Brick", "Tile", "Wood", "Concrete", "Dirt" }
 
 local T = MapLayout.WALL_THICKNESS
 
@@ -422,8 +422,8 @@ function MapMarks.fromLayout(layout: Layout): { Mark }
 	return marks
 end
 
--- A small map to start from: a road, one house with two rooms, a shed,
--- spawns, items, bushes.
+-- A map to start from (320 x 300, about the size of the built-in maps): a
+-- road, a house with two rooms, a cabin, a shed, spawns, items, bushes.
 function MapMarks.starter(): { Mark }
 	local marks: { Mark } = {}
 	local function add(kind: string, x1: number, z1: number, x2: number, z2: number): Mark
@@ -452,11 +452,11 @@ function MapMarks.starter(): { Mark }
 		add("Wall", x - 1.5, z1 - 1.5, x + 1.5, z2 + 1.5)
 	end
 
-	add("Bounds", -110, -110, 110, 110)
-	add("Sidewalk", -110, 62, 110, 72)
-	add("Road", -110, 72, 110, 100)
-	add("CenterLine", -110, 85.5, 110, 86.5)
-	add("Sidewalk", -110, 100, 110, 110)
+	add("Bounds", -160, -150, 160, 150)
+	add("Sidewalk", -160, 102, 160, 112)
+	add("Road", -160, 112, 160, 140)
+	add("CenterLine", -160, 125.5, 160, 126.5)
+	add("Sidewalk", -160, 140, 160, 150)
 
 	-- The house: living room (left) and kitchen (right), front door on the
 	-- road side, a back door, windows.
@@ -500,22 +500,56 @@ function MapMarks.starter(): { Mark }
 	piece("Box", 58, -52)
 	piece("Box", 82, -52, 90)
 
-	for _, p in { { -80, 40 }, { -40, 40 }, { 0, 40 }, { 40, 40 }, { 80, 40 }, { 60, 0 } } do
+	-- A one-room cabin with a front and a back door.
+	local cabin = add("House", 70, 10, 120, 50)
+	cabin.id, cabin.outline = "Cabin", "Orange"
+	local cabinFloor = add("Floor", 70, 10, 120, 50)
+	cabinFloor.id, cabinFloor.floor = "Cabin", "Wood"
+	wallH(10, 70, 120)
+	wallH(50, 70, 120)
+	wallV(70, 10, 50)
+	wallV(120, 10, 50)
+	add("Door", 90, 48.5, 98, 51.5) -- front door
+	add("Door", 68.5, 20, 71.5, 27) -- back door
+	add("Window", 80, 8.5, 92, 11.5)
+	add("Window", 118.5, 22, 121.5, 38)
+	piece("Bed", 112, 18)
+	piece("Dresser", 100, 13.2)
+	piece("Armchair", 78, 42)
+	piece("Lamp", 74, 14)
+	piece("Bookshelf", 117.3, 40, 270)
+	piece("Box", 84, 14)
+
+	for _, p in
+		{
+			{ -130, 60 },
+			{ -60, 60 },
+			{ 0, 75 },
+			{ 50, 80 },
+			{ 135, 75 },
+			{ 135, -80 },
+			{ -130, -100 },
+			{ 0, -110 },
+			{ -110, -40 },
+		}
+	do
 		point("HumanSpawn", p[1], p[2])
 	end
-	point("ZombieSpawn", 85, 86)
-	point("Start", -20, 45)
-	for _, p in { { -45, -20 }, { 5, -25 }, { 70, -45 }, { -90, -90 }, { 90, 30 }, { -90, 30 } } do
+	point("ZombieSpawn", 140, 126)
+	point("Start", -20, 55)
+	for _, p in { { -45, -20 }, { 5, -25 }, { 70, -45 }, { 95, 30 } } do
 		point("ItemSpot", p[1], p[2])
 	end
-	point("WizardSpot", -85, -60)
-	point("WizardSpot", 60, 45)
+	point("WizardSpot", -140, -130)
+	point("WizardSpot", 100, 90)
 	local function bush(x: number, z: number, r: number, color: string)
 		add("Bush", x - r, z - r, x + r, z + r).color = color
 	end
-	bush(-90, -20, 5, "Green")
-	bush(95, -90, 4, "Green")
-	bush(-20, -80, 5, "Orange")
+	bush(-140, -20, 5, "Green")
+	bush(145, -130, 4, "Green")
+	bush(-20, -120, 5, "Orange")
+	bush(145, 0, 4, "Orange")
+	bush(-140, 90, 4, "Green")
 	return marks
 end
 

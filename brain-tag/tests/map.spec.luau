@@ -7,6 +7,8 @@ local Config = require(script.Parent.Config)
 local EXTERIOR_DOORS: { [string]: { [string]: number } } = {
 	Neighborhood = { North = 3, South = 3, Island = 2 },
 	Mansion = { Mansion = 4, Shed = 2 },
+	ChristmasTown = { North = 3, South = 3, Island = 2 },
+	Haunted = { Manor = 4, Crypt = 1, Shed = 1 },
 }
 
 local function furnitureRect(spot)
@@ -41,7 +43,26 @@ for _, mapName in MapLayout.names do
 		expect(massive >= 4, "some furniture only big players can move: " .. massive)
 	end)
 
-	test("every piece sits inside exactly one room", function()
+	-- Yard pieces (snowmen, a Christmas tree) stand outdoors, clear of houses.
+	local function inYard(r: MapLayout.Rect): boolean
+		local b = layout.bounds
+		if r.x1 < b.x1 or r.x2 > b.x2 or r.z1 < b.z1 or r.z2 > b.z2 then
+			return false
+		end
+		for _, house in layout.houses do
+			if MapLayout.rectsOverlap(r, house.rect, 2) then
+				return false
+			end
+		end
+		for _, room in layout.rooms do
+			if MapLayout.rectsOverlap(r, room.rect) then
+				return false
+			end
+		end
+		return true
+	end
+
+	test("every piece sits inside exactly one room, or out in a yard", function()
 		for _, spot in layout.furniture do
 			local r = furnitureRect(spot)
 			local inside = 0
@@ -56,7 +77,9 @@ for _, mapName in MapLayout.names do
 					inside += 1
 				end
 			end
-			expectEq(inside, 1, describe(spot) .. " rooms containing it")
+			if not (inside == 0 and inYard(r)) then
+				expectEq(inside, 1, describe(spot) .. " rooms containing it")
+			end
 		end
 	end)
 
@@ -293,8 +316,16 @@ for _, mapName in MapLayout.names do
 		for _, p in layout.wizardSpots do
 			expect(not insideHouse(p.x, p.z), "wizard spot in a yard")
 		end
+		local function inRoom(x: number, z: number): boolean
+			for _, room in layout.rooms do
+				if MapLayout.inRect(room.rect, x, z) then
+					return true
+				end
+			end
+			return false
+		end
 		for _, p in layout.itemSpots do
-			expect(insideHouse(p.x, p.z), "item spot inside a house")
+			expect(insideHouse(p.x, p.z) or inRoom(p.x, p.z), "item spot inside a house or yard room")
 			for _, spot in layout.furniture do
 				if not FurnitureSpecs.get(spot.kind).decor then
 					expect(
