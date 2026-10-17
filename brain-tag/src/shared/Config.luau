@@ -56,7 +56,7 @@ Config.IMMUNITY_WEIGHT = 0.8 -- pick weight = 1 - immunity/100 * this
 
 Config.CAMERA_HEIGHT = 150
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
-Config.CAMERA_SMOOTHING = 12 -- higher follows tighter
+Config.CAMERA_SMOOTHING = 0 -- 0 = locked to you like the original; e.g. 12 for a soft follow
 Config.CAMERA_ZOOMS = { Close = 120, Normal = 150, Far = 195 }
 Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
 

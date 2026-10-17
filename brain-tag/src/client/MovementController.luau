@@ -83,6 +83,15 @@ local function step()
 	local move = rawMove()
 	humanoid:Move(move, false) -- false = world space, not camera space
 
+	-- Sharp, like the original: full speed the instant a key goes down, a dead
+	-- stop the instant it comes up (a Humanoid alone eases in and out). Left
+	-- alone while a knockback shove is playing.
+	if not root:FindFirstChild("KnockbackForce") then
+		local v = root.AssemblyLinearVelocity
+		local speed = humanoid.WalkSpeed
+		root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+	end
+
 	local camera = workspace.CurrentCamera
 	if usingMouse and camera then
 		local mouse = UserInputService:GetMouseLocation()

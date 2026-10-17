@@ -36,8 +36,8 @@ local function update(dt: number)
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root then
 		local target = Vector3.new(root.Position.X, 0, root.Position.Z)
-		if not focus or (focus - target).Magnitude > 60 then
-			focus = target -- snap after spawns and teleports
+		if not focus or Config.CAMERA_SMOOTHING <= 0 or (focus - target).Magnitude > 60 then
+			focus = target -- locked on (and snaps after spawns and teleports)
 		else
 			focus = focus:Lerp(target, 1 - math.exp(-Config.CAMERA_SMOOTHING * dt))
 		end

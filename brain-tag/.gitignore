@@ -1,6 +1,8 @@
-# Built place files (regenerate with `rojo build -o BrainTag.rbxlx`)
-*.rbxlx
+# Built place files. BrainTag.rbxlx itself is committed so it can be downloaded
+# in one step; anything else built locally stays out.
 *.rbxl
+*.rbxlx
+!BrainTag.rbxlx
 *.rbxlx.lock
 *.rbxl.lock
 sourcemap.json
