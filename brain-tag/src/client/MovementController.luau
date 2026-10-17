@@ -6,6 +6,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local ClientState = require(script.Parent.ClientState)
+local ForceField = require(script.Parent.ForceField)
+
 local MovementController = {}
 
 local player = Players.LocalPlayer
@@ -89,10 +92,14 @@ local function step()
 	-- Sharp, like the original: full speed the instant a key goes down, a dead
 	-- stop the instant it comes up (a Humanoid alone eases in and out). Left
 	-- alone while a knockback shove is playing.
+	-- Soft force fields from people and weapons nearby are added on top, so
+	-- nobody stacks and pushing always meets a little resistance.
 	if not root:FindFirstChild("KnockbackForce") then
 		local v = root.AssemblyLinearVelocity
 		local speed = humanoid.WalkSpeed
-		root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+		local field =
+			ForceField.velocity(root, aim, ClientState.my("HeldItem"), character:GetAttribute("Team"))
+		root.AssemblyLinearVelocity = Vector3.new(move.X * speed + field.X, v.Y, move.Z * speed + field.Z)
 	end
 
 	local camera = workspace.CurrentCamera

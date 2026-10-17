@@ -104,9 +104,17 @@ test("bigger players push heavier furniture", function()
 	local big = RoundRules.pushStrength(2)
 	expect(RoundRules.pushFraction(mass.Light, small) > 0.8, "light moves fast")
 	expect(RoundRules.pushFraction(mass.Heavy, small) > 0.25, "a newcomer can still move a couch")
-	expectEq(RoundRules.pushFraction(mass.Massive, small), 0, "a newcomer can't move a piano")
+	local alone = RoundRules.pushFraction(mass.Massive, small)
+	expect(alone > 0 and alone < 0.2, "a newcomer only creeps a pool table")
 	expect(RoundRules.pushFraction(mass.Massive, big) > 0.6, "a big player can")
-	expect(RoundRules.pushFraction(mass.Massive, small + small) > 0, "two newcomers together can")
+	expect(RoundRules.pushFraction(mass.Massive, small + small) > 0.4, "two newcomers together can")
+	-- A queue of five newcomers, each leaning on the one ahead.
+	local queue, share = 0, 1
+	for _ = 1, 5 do
+		queue += small * share
+		share *= Config.PUSH_CHAIN_SHARE
+	end
+	expect(RoundRules.pushFraction(mass.Massive, queue) > 0.7, "a queue shoves it easily")
 	expect(
 		RoundRules.pushFraction(mass.Heavy, big) > RoundRules.pushFraction(mass.Heavy, small),
 		"size helps"

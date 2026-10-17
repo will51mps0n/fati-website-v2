@@ -252,20 +252,34 @@ local STYLES: { [string]: Style } = {
 		k.bar(0, -0.75, 1.4, 0.14, 1.07, "2B2B30") -- visor slit
 		k.pill(0, 0.5, 0.45, 1.4, 1.12, skin.accent or "C0392B") -- plume
 	end,
-	Hotdog = function(k, skin)
-		for i = -2, 2 do
-			k.bar(
-				i * 0.32,
-				-0.1 + (i % 2) * 0.25,
-				0.32,
-				0.12,
-				1.03,
-				skin.accent or "F7DC6F",
-				(i % 2) * 0.8 - 0.4
-			) -- mustard
+	-- The awesome face, drawn on top of the head (its forehead toward the
+	-- front): yellow with a thick black outline, big white eyes looking up
+	-- and a huge open grin with a pink tongue.
+	Awesome = function(k, skin)
+		local black = "141414"
+		k.dot(0, 0, 2.62, 1.0, black)
+		k.dot(0, 0, 2.34, 1.02, skin.hair)
+		-- The grin: a black-rimmed half-moon, its top half hidden under
+		-- yellow so the top edge is nearly flat.
+		k.dot(0, 0.12, 1.8, 1.04, black)
+		k.dot(0, 0.12, 1.58, 1.06, skin.accent or "7A1F45")
+		k.pill(0, 0.6, 0.78, 0.44, 1.08, "F27A9B") -- tongue
+		k.pill(0, -0.33, 2.0, 0.76, 1.1, skin.hair)
+		k.bar(0, 0.1, 1.74, 0.11, 1.12, black)
+		-- Eyes: tall white ovals with the pupils up top.
+		for side = -1, 1, 2 do
+			k.pill(side * 0.4, -0.45, 0.6, 0.84, 1.14, black)
+			k.pill(side * 0.4, -0.45, 0.46, 0.7, 1.16, "FFFFFF")
+			k.dot(side * 0.43, -0.62, 0.3, 1.18, black)
 		end
 	end,
 }
+
+-- A zombie's arms reach this far in front of its body center (studs at
+-- scale 1), this far either side. Infection and furniture pushing both use
+-- this box, in the zombie's own frame.
+CharacterLook.ZOMBIE_ARM_REACH = 2.65
+CharacterLook.ZOMBIE_ARM_SPAN = 1.85
 
 -- Where the right hand holds an item, relative to the root (front is -Z).
 function CharacterLook.grip(scale: number): CFrame
@@ -710,15 +724,18 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
-	-- A little nose poking out past the front of the head, like the original.
+	-- A little nose poking out past the front of the head, like the original
+	-- (not on a face drawn over the whole head).
 	local nose = 0.3 * hd
-	attach(
-		root,
-		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
-		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
-		model
-	)
-	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	if skin.hat ~= "Awesome" then
+		attach(
+			root,
+			disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+			CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+			model
+		)
+		attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	end
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 

@@ -91,9 +91,13 @@ Config.COLORS = {
 -- How hard each weight class is to move. Pushers add their strength (size
 -- squared), and a piece moves at walk speed * (1 - mass / strength), capped
 -- at PUSH_MAX_FRACTION. At size 1 a couch moves at a third of your speed and a
--- piano not at all; at size 2 both move easily. Two players can team up.
-Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 1.15 }
+-- pool table or piano only creeps; at size 2 both move easily. Pushers team
+-- up, and a line of people walking into each other's backs adds up too.
+Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 0.9 }
 Config.PUSH_MAX_FRACTION = 0.9
+-- Each person behind the one touching a piece lends this share of their
+-- (already compounded) strength, so five zombies in a queue shove like ~3.7.
+Config.PUSH_CHAIN_SHARE = 0.85
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
@@ -121,6 +125,13 @@ Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 Config.SHAFT_ZOMBIE_PUSH = 22
 Config.SHAFT_PULSE_SHARE = 0.75 -- share of each push tick a firm weapon pushes; the rest the zombie can steer
 Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
+-- Soft force fields you feel on your own screen (client ForceField): how
+-- fast people / weapons push you apart per stud of overlap, and the caps.
+Config.FIELD_BODY = 10
+Config.FIELD_BODY_MAX = 14
+Config.FIELD_WEAPON = 14
+Config.FIELD_WEAPON_MAX = 24
+Config.FIELD_RECOIL = 6 -- your weapon pressing into someone pushes you back this hard
 
 -- Wizard ------------------------------------------------------------------------------------
 
@@ -195,7 +206,7 @@ Config.MONETIZATION = {
 		SkinRobot = 0,
 		SkinAlien = 0,
 		SkinShark = 0,
-		SkinHotdog = 0,
+		SkinAwesome = 0,
 	},
 	VIP_SCORE_BONUS = 0.2,
 	DOUBLE_SCORE_BONUS = 1,

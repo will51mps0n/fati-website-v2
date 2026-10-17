@@ -2,8 +2,8 @@
 -- instantly and stops the moment you stop. The server hands you a piece when
 -- you claim it and takes it back if someone else pushes it too.
 --
--- You move furniture by walking into it, or with a held weapon: its shaft
--- is solid and pushes whatever it touches.
+-- You move furniture by walking into it, with a zombie's arms, or with a
+-- held weapon: its shaft is solid and pushes whatever it touches.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -83,6 +83,33 @@ local function collect(): FurniturePush.Pushes
 		local probe, size = FurniturePush.moverProbe(root, dir, scale)
 		for _, body in query(probe, size) do
 			FurniturePush.add(pushes, body, dir * walk, strength, probe.Position)
+		end
+	end
+
+	-- A zombie's arms are solid: walking, they push what they touch; standing
+	-- or turning, they shove it out of the way.
+	if ClientState.isZombie() and walk > 0 then
+		local probe, size = FurniturePush.armsProbe(
+			root,
+			scale,
+			CharacterLook.ZOMBIE_ARM_REACH,
+			CharacterLook.ZOMBIE_ARM_SPAN
+		)
+		for _, body in query(probe, size) do
+			if not pushes[body] then
+				if moving then
+					FurniturePush.add(pushes, body, dir * walk, strength, probe.Position)
+				else
+					local exit = FurniturePush.shaftExit(root.Position, probe.LookVector, body)
+					FurniturePush.add(
+						pushes,
+						body,
+						exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+						strength,
+						nil
+					)
+				end
+			end
 		end
 	end
 

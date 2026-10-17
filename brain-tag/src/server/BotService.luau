@@ -2,9 +2,10 @@
 -- when real players join). They count as participants for every rule and
 -- wear random skins. Each has a level from 3 to 6; Mario Robles is a 6 and
 -- most of the roster is 5 or 6:
---   * zombies spread out over different humans, lead their target, shove
---     through barricades, remember where a human hid, and press Z sooner
---     when stuck
+--   * zombies spread out over different humans, lead their target, and
+--     remember where a human hid. A human they can't reach (barricaded in)
+--     draws a crowd: the pack picks one door, lines up outside it and
+--     shoves through together (pushers in a line add their strength)
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
 --     toward open ground away from every zombie, and hide in bushes
@@ -21,6 +22,8 @@ local BushService = require(script.Parent.BushService)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
+local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
@@ -162,6 +165,49 @@ local function look()
 	end
 end
 
+-- Barricades ---------------------------------------------------------------------------
+-- A human the zombies can't reach is "fortified" for a few seconds: zombies
+-- rally on them instead of spreading out, and break in through one door.
+local fortified: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any -- human -> until
+local sieging: { [string]: { [string]: number } } = {} -- door -> bot id -> last push
+local leaning: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any -- bot -> last shove
+local doorsOf = ""
+local doorList: { MapLayout.Door } = {}
+
+local function doors(): { MapLayout.Door }
+	local layout = MapLayout.current()
+	if doorsOf ~= layout.name then
+		doorsOf = layout.name
+		doorList = MapLayout.doors(layout)
+		table.clear(sieging)
+	end
+	return doorList
+end
+
+local function doorKey(door: MapLayout.Door): string
+	return string.format("%d,%d", math.floor(door.x + 0.5), math.floor(door.z + 0.5))
+end
+
+-- Unit vector across a door, toward the side `toward` is on.
+local function across(door: MapLayout.Door, toward: Vector3): Vector3
+	if door.horizontal then
+		return Vector3.new(0, 0, if toward.Z >= door.z then 1 else -1)
+	end
+	return Vector3.new(if toward.X >= door.x then 1 else -1, 0, 0)
+end
+
+-- Zombies pushing on this door right now.
+local function pushingDoor(key: string, now: number): number
+	local count = 0
+	local pushers: { [string]: number } = sieging[key] or {}
+	for _, seen in pushers do
+		if now - seen < 1 then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function chasers(target: Participant, except: string): number
 	local count = 0
 	for id, p in chasing do
@@ -260,6 +306,21 @@ local function brain(p: Participant, level: Level, seed: number)
 	local lastSeenAt = 0
 	local armedRound = -1
 	local hider = random:NextNumber() < level.hide
+	local pathFailed = false -- the last path asked for doesn't reach its goal
+	local leanFrom = 0 -- when we started leaning on furniture that won't give
+	type Siege = {
+		door: MapLayout.Door,
+		key: string,
+		across: Vector3, -- unit, from outside the door toward the human
+		center: Vector3,
+		goal: Vector3,
+		committed: boolean,
+		startedAt: number,
+		movedAt: number,
+		from: Vector3,
+	}
+	local siege: Siege? = nil
+	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -305,8 +366,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			if ok and (path :: Path).Status == Enum.PathStatus.Success then
 				waypoints = (path :: Path):GetWaypoints()
 				waypointIndex = math.min(2, #waypoints)
+				pathFailed = false
 			else
 				waypoints = {}
+				pathFailed = true
 			end
 		end
 		-- Skip ahead to the farthest waypoint we can walk straight to.
@@ -358,19 +421,170 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 	end
 
-	-- No progress for a moment while trying to move: step aside, then replan.
-	local function checkProgress(root: BasePart, goal: Vector3?)
+	-- Leaning on something that can give: furniture right where we're
+	-- walking (in reach of body or arms), or the back of another zombie
+	-- that is leaning on something (a queue: our strength adds to theirs).
+	local function leaningOn(root: BasePart, humanoid: Humanoid): boolean
+		local dir = Util.flatUnit(humanoid.MoveDirection)
+		if not dir then
+			return false
+		end
+		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
+		if #FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale)) > 0 then
+			return true
+		end
+		local now = os.clock()
+		for _, entry in seenZombies do
+			if entry.p ~= p and now - (leaning[entry.p] or 0) < 1 then
+				local rel = Util.flat(entry.position - root.Position)
+				local along = rel:Dot(dir)
+				if along > 0.5 and along < 4 * p.scale and (rel - dir * along).Magnitude < 2.5 * p.scale then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
+	-- No progress for a moment while trying to move: step aside, then
+	-- replan. A zombie leaning on furniture keeps shoving for a while
+	-- instead (the others are on their way to help).
+	local function checkProgress(root: BasePart, goal: Vector3?, humanoid: Humanoid)
 		local now = os.clock()
 		if (root.Position - progressFrom).Magnitude > 1.2 then
 			progressFrom, progressAt = root.Position, now
+			leanFrom = 0
 			return
 		end
 		if goal and now - progressAt > 0.9 and not (detour and now < detourUntil) then
+			if p.team == "Zombie" and leaningOn(root, humanoid) then
+				if leanFrom == 0 then
+					leanFrom = now
+				end
+				if now - leanFrom < 6 then
+					progressAt = now
+					leaning[p] = now
+					local target = chasing[p.id]
+					if target then
+						fortified[target] = now + 8
+					end
+					return
+				end
+			end
+			leanFrom = 0
 			detour = sidestep(root, goal)
 			detourUntil = now + 0.7
 			pathGoal = nil
 			progressAt = now
 		end
+	end
+
+	-- Breaking in. When no path reaches `goal` and walls stand between us,
+	-- furniture is blocking every way in: walk to just outside the door
+	-- closest to it (the door the other zombies already use, if any), then
+	-- shove straight through. Returns false when there's nothing to break.
+	local function breach(goal: Vector3, root: BasePart, humanoid: Humanoid): boolean
+		local now = os.clock()
+		local here = root.Position
+		local r = radius()
+		local s = siege
+		if s and Util.flatDistance(s.goal, goal) > 15 then
+			s = nil
+		end
+		if not s then
+			local failed = pathFailed
+				and pathGoal ~= nil
+				and Util.flatDistance(pathGoal :: Vector3, goal) < 10
+			if not failed or Combat.clearWide(here, goal, r, true) then
+				siege = nil
+				return false
+			end
+			local best: MapLayout.Door? = nil
+			local bestScore = math.huge
+			for _, door in doors() do
+				local key = doorKey(door)
+				if (badDoors[key] or 0) > now or door.width < r * 2 + 0.6 then
+					continue
+				end
+				local center = Vector3.new(door.x, here.Y, door.z)
+				local d = Util.flatDistance(center, goal)
+				if d > 70 then
+					continue
+				end
+				local n = across(door, goal)
+				if not Combat.clearWide(center + n * 2.5, goal, r * 0.8, true) then
+					continue -- this door doesn't lead to them
+				end
+				local outside = center - n * (4 + r)
+				local score = d + 0.5 * Util.flatDistance(outside, here) - 12 * pushingDoor(key, now)
+				if score < bestScore then
+					best, bestScore = door, score
+				end
+			end
+			if not best then
+				return false
+			end
+			s = {
+				door = best,
+				key = doorKey(best),
+				across = across(best, goal),
+				center = Vector3.new(best.x, here.Y, best.z),
+				goal = goal,
+				committed = false,
+				startedAt = now,
+				movedAt = now,
+				from = here,
+			}
+		end
+		assert(s, "siege")
+		siege = s
+		s.goal = goal
+		local target = chasing[p.id]
+		if target then
+			fortified[target] = now + 8
+		end
+
+		local rel = Util.flat(here - s.center)
+		local into = rel:Dot(s.across)
+		local side = (rel - s.across * into).Magnitude
+		if into > 1 + r and into < 10 and side < s.door.width / 2 + 2 then
+			siege = nil -- through the door: go get them
+			return false
+		end
+		if not s.committed then
+			local outside = s.center - s.across * (4 + r)
+			-- Close enough to join the line (zombies already queued there are
+			-- in the way of the exact spot): lean in behind them.
+			local near = Util.flatDistance(outside, here) < 8 + 2 * r
+				or (into > -(5 + r) and into < 1 and side < s.door.width / 2)
+			if near and Combat.clearWide(here, s.center, r * 0.8, true) then
+				s.committed, s.movedAt, s.from = true, now, here
+			else
+				goTo(outside, root, humanoid, true)
+				checkProgress(root, outside, humanoid)
+				if now - s.startedAt > 20 then
+					badDoors[s.key] = now + 10 -- can't get to that door
+					siege = nil
+				end
+				return true
+			end
+		end
+		-- Lined up: lean straight in through the doorway, no sidestepping.
+		local pushers = sieging[s.key] or {}
+		sieging[s.key] = pushers
+		pushers[p.id] = now
+		leaning[p] = now
+		detour = nil
+		humanoid:MoveTo(s.center + s.across * (5 + r))
+		progressAt = now
+		if (here - s.from).Magnitude > 1 then
+			s.from, s.movedAt = here, now
+		end
+		if now - s.movedAt > 8 then
+			badDoors[s.key] = now + 12 -- it won't give: try another way
+			siege = nil
+		end
+		return true
 	end
 
 	local function face(root: BasePart, humanoid: Humanoid, direction: Vector3?)
@@ -404,7 +618,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				wanderUntil = now + random:NextNumber(6, 12)
 			end
 			goTo(wanderGoal :: Vector3, root, humanoid, false)
-			checkProgress(root, wanderGoal)
+			checkProgress(root, wanderGoal, humanoid)
 		end
 
 		if p.team == "Zombie" then
@@ -413,11 +627,14 @@ local function brain(p: Participant, level: Level, seed: number)
 			-- surrounds people instead of queueing behind each other.
 			local best: Seen? = nil
 			local bestScore = math.huge
+			-- A barricaded human pulls the pack together instead (up to 6).
 			for _, entry in seenHumans do
 				local d = Util.flatDistance(entry.position, here)
 				if d <= level.sight and visible(entry, here) then
+					local others = chasers(entry.p, p.id)
+					local rally = (fortified[entry.p] or 0) > now and others < 6
 					local score = d
-						+ 14 * chasers(entry.p, p.id)
+						+ (if rally then -15 - 10 * others else 14 * others)
 						- (if chasing[p.id] == entry.p then 8 else 0)
 					if score < bestScore then
 						best, bestScore = entry, score
@@ -430,15 +647,20 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
-				goTo(goal, root, humanoid, true)
-				checkProgress(root, goal)
+				if not breach(best.position, root, humanoid) then
+					goTo(goal, root, humanoid, true)
+					checkProgress(root, goal, humanoid)
+				end
 			elseif lastSeen and now - lastSeenAt < level.memory then
 				chasing[p.id] = nil
-				goTo(lastSeen, root, humanoid, true)
-				checkProgress(root, lastSeen)
+				if not breach(lastSeen, root, humanoid) then
+					goTo(lastSeen, root, humanoid, true)
+					checkProgress(root, lastSeen, humanoid)
+				end
 			else
 				chasing[p.id] = nil
 				lastSeen = nil
+				siege = nil
 				wander()
 			end
 			if now - progressAt > level.stuck then
@@ -501,7 +723,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			local bush = if hider and not hidden then nearestBush(here, 30) else nil
 			if bush and closest and Util.flatDistance(bush, here) < closestDistance * 0.8 then
 				goTo(bush, root, humanoid, false)
-				checkProgress(root, bush)
+				checkProgress(root, bush, humanoid)
 			else
 				-- Escape: try directions, keep the ones our body fits through,
 				-- and pick the spot farthest from where the zombies are going,
@@ -562,7 +784,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					ItemService.pickUp(p)
 				else
 					goTo(spot, root, humanoid, false)
-					checkProgress(root, spot)
+					checkProgress(root, spot, humanoid)
 				end
 			else
 				wander()

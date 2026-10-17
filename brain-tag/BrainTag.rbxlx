@@ -352,20 +352,34 @@ local STYLES: { [string]: Style } = {
 		k.bar(0, -0.75, 1.4, 0.14, 1.07, "2B2B30") -- visor slit
 		k.pill(0, 0.5, 0.45, 1.4, 1.12, skin.accent or "C0392B") -- plume
 	end,
-	Hotdog = function(k, skin)
-		for i = -2, 2 do
-			k.bar(
-				i * 0.32,
-				-0.1 + (i % 2) * 0.25,
-				0.32,
-				0.12,
-				1.03,
-				skin.accent or "F7DC6F",
-				(i % 2) * 0.8 - 0.4
-			) -- mustard
+	-- The awesome face, drawn on top of the head (its forehead toward the
+	-- front): yellow with a thick black outline, big white eyes looking up
+	-- and a huge open grin with a pink tongue.
+	Awesome = function(k, skin)
+		local black = "141414"
+		k.dot(0, 0, 2.62, 1.0, black)
+		k.dot(0, 0, 2.34, 1.02, skin.hair)
+		-- The grin: a black-rimmed half-moon, its top half hidden under
+		-- yellow so the top edge is nearly flat.
+		k.dot(0, 0.12, 1.8, 1.04, black)
+		k.dot(0, 0.12, 1.58, 1.06, skin.accent or "7A1F45")
+		k.pill(0, 0.6, 0.78, 0.44, 1.08, "F27A9B") -- tongue
+		k.pill(0, -0.33, 2.0, 0.76, 1.1, skin.hair)
+		k.bar(0, 0.1, 1.74, 0.11, 1.12, black)
+		-- Eyes: tall white ovals with the pupils up top.
+		for side = -1, 1, 2 do
+			k.pill(side * 0.4, -0.45, 0.6, 0.84, 1.14, black)
+			k.pill(side * 0.4, -0.45, 0.46, 0.7, 1.16, "FFFFFF")
+			k.dot(side * 0.43, -0.62, 0.3, 1.18, black)
 		end
 	end,
 }
+
+-- A zombie's arms reach this far in front of its body center (studs at
+-- scale 1), this far either side. Infection and furniture pushing both use
+-- this box, in the zombie's own frame.
+CharacterLook.ZOMBIE_ARM_REACH = 2.65
+CharacterLook.ZOMBIE_ARM_SPAN = 1.85
 
 -- Where the right hand holds an item, relative to the root (front is -Z).
 function CharacterLook.grip(scale: number): CFrame
@@ -810,15 +824,18 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
-	-- A little nose poking out past the front of the head, like the original.
+	-- A little nose poking out past the front of the head, like the original
+	-- (not on a face drawn over the whole head).
 	local nose = 0.3 * hd
-	attach(
-		root,
-		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
-		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
-		model
-	)
-	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	if skin.hat ~= "Awesome" then
+		attach(
+			root,
+			disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+			CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+			model
+		)
+		attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	end
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 
@@ -957,9 +974,13 @@ Config.COLORS = {
 -- How hard each weight class is to move. Pushers add their strength (size
 -- squared), and a piece moves at walk speed * (1 - mass / strength), capped
 -- at PUSH_MAX_FRACTION. At size 1 a couch moves at a third of your speed and a
--- piano not at all; at size 2 both move easily. Two players can team up.
-Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 1.15 }
+-- pool table or piano only creeps; at size 2 both move easily. Pushers team
+-- up, and a line of people walking into each other's backs adds up too.
+Config.FURNITURE_MASS = { Light = 0.15, Medium = 0.45, Heavy = 0.68, Massive = 0.9 }
 Config.PUSH_MAX_FRACTION = 0.9
+-- Each person behind the one touching a piece lends this share of their
+-- (already compounded) strength, so five zombies in a queue shove like ~3.7.
+Config.PUSH_CHAIN_SHARE = 0.85
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
@@ -987,6 +1008,13 @@ Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 Config.SHAFT_ZOMBIE_PUSH = 22
 Config.SHAFT_PULSE_SHARE = 0.75 -- share of each push tick a firm weapon pushes; the rest the zombie can steer
 Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
+-- Soft force fields you feel on your own screen (client ForceField): how
+-- fast people / weapons push you apart per stud of overlap, and the caps.
+Config.FIELD_BODY = 10
+Config.FIELD_BODY_MAX = 14
+Config.FIELD_WEAPON = 14
+Config.FIELD_WEAPON_MAX = 24
+Config.FIELD_RECOIL = 6 -- your weapon pressing into someone pushes you back this hard
 
 -- Wizard ------------------------------------------------------------------------------------
 
@@ -1061,7 +1089,7 @@ Config.MONETIZATION = {
 		SkinRobot = 0,
 		SkinAlien = 0,
 		SkinShark = 0,
-		SkinHotdog = 0,
+		SkinAwesome = 0,
 	},
 	VIP_SCORE_BONUS = 0.2,
 	DOUBLE_SCORE_BONUS = 1,
@@ -1150,6 +1178,23 @@ function FurniturePush.itemProbe(
 	local start = Vector3.new(hand.X, root.Position.Y, hand.Z)
 	local center = start + aim * (reach / 2)
 	return CFrame.lookAt(center, center + aim), Vector3.new((guard or 0.5) * 2, root.Size.Y + 1, reach)
+end
+
+-- Box over a zombie's outstretched arms, from the front of its body to its
+-- hands (CharacterLook's arm box). The arms are solid to furniture too.
+function FurniturePush.armsProbe(
+	root: BasePart,
+	scale: number,
+	reach: number,
+	span: number
+): (CFrame, Vector3)
+	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
+	local from = root.Size.Z / 2 - 0.2
+	local to = reach * scale
+	local center = root.Position + look * ((from + to) / 2)
+	return CFrame.lookAt(center, center + look),
+		Vector3.new(span * 2 * scale, root.Size.Y + 1, math.max(0.5, to - from))
 end
 
 -- Held weapons are solid. While you stand still or turn, a piece the shaft
@@ -3779,14 +3824,15 @@ local list: { Skin } = {
 		"F4F4F4",
 		{ hat = "Shark", accent = "4A6378", product = "SkinShark" }
 	),
+	-- A guy with the classic awesome face on top of his head.
 	skin(
-		"Hotdog",
-		"Hot Dog",
+		"Awesome",
+		"Awesome Guy",
 		"Human",
-		"E0A458",
-		"C0532B",
-		"F6C79A",
-		{ hat = "Hotdog", accent = "F7DC6F", product = "SkinHotdog" }
+		"2F80ED",
+		"FFCF1F",
+		"FFCF1F",
+		{ hat = "Awesome", accent = "7A1F45", product = "SkinAwesome" }
 	),
 
 	skin(
@@ -4252,9 +4298,10 @@ return Announcer
 -- when real players join). They count as participants for every rule and
 -- wear random skins. Each has a level from 3 to 6; Mario Robles is a 6 and
 -- most of the roster is 5 or 6:
---   * zombies spread out over different humans, lead their target, shove
---     through barricades, remember where a human hid, and press Z sooner
---     when stuck
+--   * zombies spread out over different humans, lead their target, and
+--     remember where a human hid. A human they can't reach (barricaded in)
+--     draws a crowd: the pack picks one door, lines up outside it and
+--     shoves through together (pushers in a line add their strength)
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
 --     toward open ground away from every zombie, and hide in bushes
@@ -4271,6 +4318,8 @@ local BushService = require(script.Parent.BushService)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
+local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
@@ -4412,6 +4461,49 @@ local function look()
 	end
 end
 
+-- Barricades ---------------------------------------------------------------------------
+-- A human the zombies can't reach is "fortified" for a few seconds: zombies
+-- rally on them instead of spreading out, and break in through one door.
+local fortified: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any -- human -> until
+local sieging: { [string]: { [string]: number } } = {} -- door -> bot id -> last push
+local leaning: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any -- bot -> last shove
+local doorsOf = ""
+local doorList: { MapLayout.Door } = {}
+
+local function doors(): { MapLayout.Door }
+	local layout = MapLayout.current()
+	if doorsOf ~= layout.name then
+		doorsOf = layout.name
+		doorList = MapLayout.doors(layout)
+		table.clear(sieging)
+	end
+	return doorList
+end
+
+local function doorKey(door: MapLayout.Door): string
+	return string.format("%d,%d", math.floor(door.x + 0.5), math.floor(door.z + 0.5))
+end
+
+-- Unit vector across a door, toward the side `toward` is on.
+local function across(door: MapLayout.Door, toward: Vector3): Vector3
+	if door.horizontal then
+		return Vector3.new(0, 0, if toward.Z >= door.z then 1 else -1)
+	end
+	return Vector3.new(if toward.X >= door.x then 1 else -1, 0, 0)
+end
+
+-- Zombies pushing on this door right now.
+local function pushingDoor(key: string, now: number): number
+	local count = 0
+	local pushers: { [string]: number } = sieging[key] or {}
+	for _, seen in pushers do
+		if now - seen < 1 then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function chasers(target: Participant, except: string): number
 	local count = 0
 	for id, p in chasing do
@@ -4510,6 +4602,21 @@ local function brain(p: Participant, level: Level, seed: number)
 	local lastSeenAt = 0
 	local armedRound = -1
 	local hider = random:NextNumber() < level.hide
+	local pathFailed = false -- the last path asked for doesn't reach its goal
+	local leanFrom = 0 -- when we started leaning on furniture that won't give
+	type Siege = {
+		door: MapLayout.Door,
+		key: string,
+		across: Vector3, -- unit, from outside the door toward the human
+		center: Vector3,
+		goal: Vector3,
+		committed: boolean,
+		startedAt: number,
+		movedAt: number,
+		from: Vector3,
+	}
+	local siege: Siege? = nil
+	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -4555,8 +4662,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			if ok and (path :: Path).Status == Enum.PathStatus.Success then
 				waypoints = (path :: Path):GetWaypoints()
 				waypointIndex = math.min(2, #waypoints)
+				pathFailed = false
 			else
 				waypoints = {}
+				pathFailed = true
 			end
 		end
 		-- Skip ahead to the farthest waypoint we can walk straight to.
@@ -4608,19 +4717,170 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 	end
 
-	-- No progress for a moment while trying to move: step aside, then replan.
-	local function checkProgress(root: BasePart, goal: Vector3?)
+	-- Leaning on something that can give: furniture right where we're
+	-- walking (in reach of body or arms), or the back of another zombie
+	-- that is leaning on something (a queue: our strength adds to theirs).
+	local function leaningOn(root: BasePart, humanoid: Humanoid): boolean
+		local dir = Util.flatUnit(humanoid.MoveDirection)
+		if not dir then
+			return false
+		end
+		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
+		if #FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale)) > 0 then
+			return true
+		end
+		local now = os.clock()
+		for _, entry in seenZombies do
+			if entry.p ~= p and now - (leaning[entry.p] or 0) < 1 then
+				local rel = Util.flat(entry.position - root.Position)
+				local along = rel:Dot(dir)
+				if along > 0.5 and along < 4 * p.scale and (rel - dir * along).Magnitude < 2.5 * p.scale then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
+	-- No progress for a moment while trying to move: step aside, then
+	-- replan. A zombie leaning on furniture keeps shoving for a while
+	-- instead (the others are on their way to help).
+	local function checkProgress(root: BasePart, goal: Vector3?, humanoid: Humanoid)
 		local now = os.clock()
 		if (root.Position - progressFrom).Magnitude > 1.2 then
 			progressFrom, progressAt = root.Position, now
+			leanFrom = 0
 			return
 		end
 		if goal and now - progressAt > 0.9 and not (detour and now < detourUntil) then
+			if p.team == "Zombie" and leaningOn(root, humanoid) then
+				if leanFrom == 0 then
+					leanFrom = now
+				end
+				if now - leanFrom < 6 then
+					progressAt = now
+					leaning[p] = now
+					local target = chasing[p.id]
+					if target then
+						fortified[target] = now + 8
+					end
+					return
+				end
+			end
+			leanFrom = 0
 			detour = sidestep(root, goal)
 			detourUntil = now + 0.7
 			pathGoal = nil
 			progressAt = now
 		end
+	end
+
+	-- Breaking in. When no path reaches `goal` and walls stand between us,
+	-- furniture is blocking every way in: walk to just outside the door
+	-- closest to it (the door the other zombies already use, if any), then
+	-- shove straight through. Returns false when there's nothing to break.
+	local function breach(goal: Vector3, root: BasePart, humanoid: Humanoid): boolean
+		local now = os.clock()
+		local here = root.Position
+		local r = radius()
+		local s = siege
+		if s and Util.flatDistance(s.goal, goal) > 15 then
+			s = nil
+		end
+		if not s then
+			local failed = pathFailed
+				and pathGoal ~= nil
+				and Util.flatDistance(pathGoal :: Vector3, goal) < 10
+			if not failed or Combat.clearWide(here, goal, r, true) then
+				siege = nil
+				return false
+			end
+			local best: MapLayout.Door? = nil
+			local bestScore = math.huge
+			for _, door in doors() do
+				local key = doorKey(door)
+				if (badDoors[key] or 0) > now or door.width < r * 2 + 0.6 then
+					continue
+				end
+				local center = Vector3.new(door.x, here.Y, door.z)
+				local d = Util.flatDistance(center, goal)
+				if d > 70 then
+					continue
+				end
+				local n = across(door, goal)
+				if not Combat.clearWide(center + n * 2.5, goal, r * 0.8, true) then
+					continue -- this door doesn't lead to them
+				end
+				local outside = center - n * (4 + r)
+				local score = d + 0.5 * Util.flatDistance(outside, here) - 12 * pushingDoor(key, now)
+				if score < bestScore then
+					best, bestScore = door, score
+				end
+			end
+			if not best then
+				return false
+			end
+			s = {
+				door = best,
+				key = doorKey(best),
+				across = across(best, goal),
+				center = Vector3.new(best.x, here.Y, best.z),
+				goal = goal,
+				committed = false,
+				startedAt = now,
+				movedAt = now,
+				from = here,
+			}
+		end
+		assert(s, "siege")
+		siege = s
+		s.goal = goal
+		local target = chasing[p.id]
+		if target then
+			fortified[target] = now + 8
+		end
+
+		local rel = Util.flat(here - s.center)
+		local into = rel:Dot(s.across)
+		local side = (rel - s.across * into).Magnitude
+		if into > 1 + r and into < 10 and side < s.door.width / 2 + 2 then
+			siege = nil -- through the door: go get them
+			return false
+		end
+		if not s.committed then
+			local outside = s.center - s.across * (4 + r)
+			-- Close enough to join the line (zombies already queued there are
+			-- in the way of the exact spot): lean in behind them.
+			local near = Util.flatDistance(outside, here) < 8 + 2 * r
+				or (into > -(5 + r) and into < 1 and side < s.door.width / 2)
+			if near and Combat.clearWide(here, s.center, r * 0.8, true) then
+				s.committed, s.movedAt, s.from = true, now, here
+			else
+				goTo(outside, root, humanoid, true)
+				checkProgress(root, outside, humanoid)
+				if now - s.startedAt > 20 then
+					badDoors[s.key] = now + 10 -- can't get to that door
+					siege = nil
+				end
+				return true
+			end
+		end
+		-- Lined up: lean straight in through the doorway, no sidestepping.
+		local pushers = sieging[s.key] or {}
+		sieging[s.key] = pushers
+		pushers[p.id] = now
+		leaning[p] = now
+		detour = nil
+		humanoid:MoveTo(s.center + s.across * (5 + r))
+		progressAt = now
+		if (here - s.from).Magnitude > 1 then
+			s.from, s.movedAt = here, now
+		end
+		if now - s.movedAt > 8 then
+			badDoors[s.key] = now + 12 -- it won't give: try another way
+			siege = nil
+		end
+		return true
 	end
 
 	local function face(root: BasePart, humanoid: Humanoid, direction: Vector3?)
@@ -4654,7 +4914,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				wanderUntil = now + random:NextNumber(6, 12)
 			end
 			goTo(wanderGoal :: Vector3, root, humanoid, false)
-			checkProgress(root, wanderGoal)
+			checkProgress(root, wanderGoal, humanoid)
 		end
 
 		if p.team == "Zombie" then
@@ -4663,11 +4923,14 @@ local function brain(p: Participant, level: Level, seed: number)
 			-- surrounds people instead of queueing behind each other.
 			local best: Seen? = nil
 			local bestScore = math.huge
+			-- A barricaded human pulls the pack together instead (up to 6).
 			for _, entry in seenHumans do
 				local d = Util.flatDistance(entry.position, here)
 				if d <= level.sight and visible(entry, here) then
+					local others = chasers(entry.p, p.id)
+					local rally = (fortified[entry.p] or 0) > now and others < 6
 					local score = d
-						+ 14 * chasers(entry.p, p.id)
+						+ (if rally then -15 - 10 * others else 14 * others)
 						- (if chasing[p.id] == entry.p then 8 else 0)
 					if score < bestScore then
 						best, bestScore = entry, score
@@ -4680,15 +4943,20 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
-				goTo(goal, root, humanoid, true)
-				checkProgress(root, goal)
+				if not breach(best.position, root, humanoid) then
+					goTo(goal, root, humanoid, true)
+					checkProgress(root, goal, humanoid)
+				end
 			elseif lastSeen and now - lastSeenAt < level.memory then
 				chasing[p.id] = nil
-				goTo(lastSeen, root, humanoid, true)
-				checkProgress(root, lastSeen)
+				if not breach(lastSeen, root, humanoid) then
+					goTo(lastSeen, root, humanoid, true)
+					checkProgress(root, lastSeen, humanoid)
+				end
 			else
 				chasing[p.id] = nil
 				lastSeen = nil
+				siege = nil
 				wander()
 			end
 			if now - progressAt > level.stuck then
@@ -4751,7 +5019,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			local bush = if hider and not hidden then nearestBush(here, 30) else nil
 			if bush and closest and Util.flatDistance(bush, here) < closestDistance * 0.8 then
 				goTo(bush, root, humanoid, false)
-				checkProgress(root, bush)
+				checkProgress(root, bush, humanoid)
 			else
 				-- Escape: try directions, keep the ones our body fits through,
 				-- and pick the spot farthest from where the zombies are going,
@@ -4812,7 +5080,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					ItemService.pickUp(p)
 				else
 					goTo(spot, root, humanoid, false)
-					checkProgress(root, spot)
+					checkProgress(root, spot, humanoid)
 				end
 			else
 				wander()
@@ -6440,6 +6708,7 @@ export type Mover = {
 	firmness: number?, -- held weapon's Items.firmness
 	guard: number?, -- held weapon's Items.guard
 	reach: number?,
+	zombie: boolean?, -- a zombie's arms push furniture too
 }
 
 local OWNER = FurniturePush.OWNER_ATTRIBUTE
@@ -6617,28 +6886,134 @@ local function onClaim(player: Player, list: unknown)
 	end
 end
 
+-- Pushers in a line add up: someone walking into the back of another mover
+-- heading the same way leans on them and lends them their strength (a
+-- little less per link), so a queue of zombies at a barricade shoves as one.
+type Lean = { dir: Vector3?, own: number, leaners: { number } }
+
+local function leanGraph(movers: { Mover }): { Lean }
+	local shell = Config.CHARACTER.ShellDiameter / 2
+	local leans: { Lean } = {}
+	for i, mover in movers do
+		local move = mover.humanoid.MoveDirection
+		local flat = Vector3.new(move.X, 0, move.Z)
+		local moving = flat.Magnitude > 0.1 and mover.humanoid.WalkSpeed > 0
+		leans[i] = {
+			dir = if moving then flat.Unit else nil,
+			own = RoundRules.pushStrength(mover.scale),
+			leaners = {},
+		}
+	end
+	for i, a in leans do
+		local dir = a.dir
+		if not dir then
+			continue
+		end
+		local ra = shell * movers[i].scale
+		local here = movers[i].root.Position
+		local best, bestAlong = nil, math.huge
+		for j, b in leans do
+			local bDir = b.dir
+			if j == i or not bDir or bDir:Dot(dir) < 0.3 then
+				continue
+			end
+			local rb = shell * movers[j].scale
+			local rel = movers[j].root.Position - here
+			rel = Vector3.new(rel.X, 0, rel.Z)
+			local along = rel:Dot(dir)
+			local side = (rel - dir * along).Magnitude
+			if along > 0.2 and along < ra + rb + 0.8 and side < (ra + rb) * 0.9 and along < bestAlong then
+				best, bestAlong = j, along
+			end
+		end
+		if best then
+			table.insert(leans[best].leaners, i)
+		end
+	end
+	return leans
+end
+
+-- Strength of mover `i` plus everyone leaning on it (and on them...); adds
+-- every helper's id to `helpers`.
+local function chained(
+	movers: { Mover },
+	leans: { Lean },
+	i: number,
+	helpers: { string },
+	seen: { [number]: boolean }
+): number
+	seen[i] = true
+	local total = leans[i].own
+	for _, j in leans[i].leaners do
+		if not seen[j] then
+			table.insert(helpers, movers[j].id)
+			total += chained(movers, leans, j, helpers, seen) * Config.PUSH_CHAIN_SHARE
+		end
+	end
+	return total
+end
+
 local function collectPushes(now: number): FurniturePush.Pushes
 	local pushes: FurniturePush.Pushes = {}
-	for _, mover in getMovers() do
+	local movers = getMovers()
+	local leans = leanGraph(movers)
+	for i, mover in movers do
 		local humanoid, root = mover.humanoid, mover.root
 		local walk = humanoid.WalkSpeed
 		if walk <= 0 then
 			continue
 		end
-		local move = humanoid.MoveDirection
-		local flat = Vector3.new(move.X, 0, move.Z)
-		local moving = flat.Magnitude > 0.1
-		local dir = if moving then flat.Unit else Vector3.zero
-		local strength = RoundRules.pushStrength(mover.scale)
+		local dir = leans[i].dir
+		local moving = dir ~= nil
+		local strength = leans[i].own
+		local helpers: { string } = {}
+		if moving and #leans[i].leaners > 0 then
+			strength = chained(movers, leans, i, helpers, {})
+		end
 		local touched: { [BasePart]: boolean } = {}
-		if moving then
+		local function pushing(piece: Piece)
+			piece.pushers[mover.id] = now
+			for _, id in helpers do
+				piece.pushers[id] = now
+			end
+		end
+		if dir then
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
 					touched[part] = true
-					piece.pushers[mover.id] = now
+					pushing(piece)
 					FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
+				end
+			end
+		end
+		-- A zombie's arms are solid: walking, they push what they touch along
+		-- with the body; standing or turning, they shove it out of the way.
+		if mover.zombie then
+			local probe, size = FurniturePush.armsProbe(
+				root,
+				mover.scale,
+				CharacterLook.ZOMBIE_ARM_REACH,
+				CharacterLook.ZOMBIE_ARM_SPAN
+			)
+			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
+				local piece = byBody[part]
+				if piece and not touched[part] then
+					touched[part] = true
+					if dir then
+						pushing(piece)
+						FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
+					else
+						local exit = FurniturePush.shaftExit(root.Position, probe.LookVector, part)
+						FurniturePush.add(
+							pushes,
+							part,
+							exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+							strength,
+							nil
+						)
+					end
 				end
 			end
 		end
@@ -6649,11 +7024,11 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			local grip = CharacterLook.grip(mover.scale)
 			local hand = (root.CFrame * grip).Position
 			local shaft, shaftSize = FurniturePush.itemProbe(root, grip, mover.aim, mover.reach, mover.guard)
-			local firm = strength * (mover.firmness or 1)
+			local firm = leans[i].own * (mover.firmness or 1)
 			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
 				local piece = byBody[part]
 				if piece and not touched[part] then
-					if moving then
+					if dir then
 						-- Only walking counts as pushing for ownership: someone just
 						-- standing near a piece with a weapon out shouldn't take it
 						-- away from the player driving it.
@@ -6668,6 +7043,25 @@ local function collectPushes(now: number): FurniturePush.Pushes
 							firm,
 							nil
 						)
+					end
+				end
+			end
+		end
+	end
+	-- A pushed piece pushes whatever it runs into, so a shove moves a whole
+	-- barricade (two links deep).
+	for _ = 1, 2 do
+		for body, push in table.clone(pushes) do
+			local velocity = FurniturePush.resolve(body, push)
+			local ahead = Util.flatUnit(velocity)
+			if ahead and velocity.Magnitude > 0.5 then
+				local center = body.Position + ahead * (FurniturePush.extent(body, ahead) + 0.6)
+				local side = Vector3.new(-ahead.Z, 0, ahead.X)
+				local width = FurniturePush.extent(body, side) * 2 * 0.9
+				local probe = CFrame.lookAt(center, center + ahead)
+				for _, other in workspace:GetPartBoundsInBox(probe, Vector3.new(width, 2, 1.2), overlap) do
+					if other ~= body and byBody[other] and not pushes[other] then
+						FurniturePush.add(pushes, other, velocity, push.strength, center)
 					end
 				end
 			end
@@ -6850,6 +7244,7 @@ local function attachHeld(p: Participant)
 	end
 	local model = ItemModels.build(p.heldItem)
 	model.Name = "HeldItem"
+	model:SetAttribute("ItemId", p.heldItem) -- clients read it for weapon force fields
 	local handle = model.PrimaryPart :: BasePart
 	local s = p.scale
 	local grip = CharacterLook.grip(s)
@@ -7290,7 +7685,9 @@ local function shaftStep()
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
 		for _, other in people do
-			local zRoot = if other ~= p then Participants.body(other) else nil
+			-- Players feel weapons through their own client's force field
+			-- (smooth, no lag); the server pushes bots.
+			local zRoot = if other ~= p and not other.player then Participants.body(other) else nil
 			if zRoot then
 				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
 				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
@@ -7466,6 +7863,7 @@ FurnitureService.start(function()
 				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
 				firmness = if melee and item then item.firmness else nil,
 				guard = if melee and item then item.guard else nil,
+				zombie = p.team == "Zombie",
 			})
 		end
 	end
@@ -8829,6 +9227,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -8999,8 +9398,8 @@ end
 -- Does any part of the zombie touch the human? Its body, or the arms
 -- reaching out in front of it (the box they sweep, in the zombie's own
 -- frame), against the human's body circle.
-local ARM_REACH = 2.65 -- studs in front of the body center at scale 1 (CharacterLook arms)
-local ARM_SPAN = 1.85 -- half the width across both arms
+local ARM_REACH = CharacterLook.ZOMBIE_ARM_REACH
+local ARM_SPAN = CharacterLook.ZOMBIE_ARM_SPAN
 
 local function touching(zRoot: BasePart, zScale: number, hRoot: BasePart, hScale: number): boolean
 	local shell = Config.CHARACTER.ShellDiameter / 2
@@ -10921,13 +11320,172 @@ return Effects
         </Item>
         <Item class="ModuleScript" referent="51">
           <Properties>
+            <string name="Name">ForceField</string>
+            <string name="Source"><![CDATA[-- Soft force fields around people and held weapons, felt by YOUR character
+-- (worked out on your machine, so it is smooth and instant):
+--   * people on your team gently push apart before they overlap
+--   * someone else's weapon pushes you off it (firm ones harder)
+--   * pushing into someone with your own weapon pushes you back a little
+--   * two weapons pressed together push their holders apart
+-- So nobody stacks up and there is always a bit of friction, like the
+-- original. Bots get the same push from the server (ItemService.shaftStep).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Items = require(ReplicatedStorage.Shared.Items)
+
+local ForceField = {}
+
+local C = Config.CHARACTER
+local player = Players.LocalPlayer
+
+type Body = { root: BasePart, scale: number, team: any, item: Items.Item? }
+
+local cached: { Model } = {}
+local cachedAt = 0
+
+local function others(): { Model }
+	local now = os.clock()
+	if now - cachedAt > 0.25 then
+		cachedAt = now
+		cached = {}
+		for _, folder in { workspace, workspace:FindFirstChild("Bots") } do
+			if folder then
+				for _, child in folder:GetChildren() do
+					if
+						child:IsA("Model")
+						and child:GetAttribute("ParticipantId")
+						and child ~= player.Character
+					then
+						table.insert(cached, child)
+					end
+				end
+			end
+		end
+	end
+	return cached
+end
+
+local function flat(v: Vector3): Vector3
+	return Vector3.new(v.X, 0, v.Z)
+end
+
+-- Closest point to `p` on the segment a-b (all flat).
+local function closest(a: Vector3, b: Vector3, p: Vector3): Vector3
+	local ab = b - a
+	local length2 = ab:Dot(ab)
+	if length2 < 1e-6 then
+		return a
+	end
+	local t = math.clamp((p - a):Dot(ab) / length2, 0, 1)
+	return a + ab * t
+end
+
+-- A held melee weapon's shaft: from the hand along where the holder faces.
+local function shaft(root: BasePart, scale: number, item: Items.Item, facing: Vector3): (Vector3, Vector3)
+	local hand = flat((root.CFrame * CharacterLook.grip(scale)).Position)
+	local reach = (item.reach or 5) * math.max(1, scale * 0.9)
+	return hand, hand + facing * reach
+end
+
+local function heldMelee(model: Model): Items.Item?
+	local held = model:FindFirstChild("HeldItem")
+	local id = held and held:GetAttribute("ItemId")
+	local item = if typeof(id) == "string" then Items.get(id) else nil
+	return if item and item.kind == "Melee" then item else nil
+end
+
+-- Extra velocity (studs/second, flat) for your character this frame.
+function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, myTeam: any): Vector3
+	local myScale = root.Size.X / C.RootWidth
+	local myRadius = C.ShellDiameter / 2 * myScale
+	local me = flat(root.Position)
+	local myItem = Items.get(myItemId)
+	local myA, myB: Vector3? = nil, nil
+	if myItem and myItem.kind == "Melee" then
+		myA, myB = shaft(root, myScale, myItem, aim)
+	end
+	local push = Vector3.zero
+
+	for _, model in others() do
+		local other = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not other then
+			continue
+		end
+		local them = flat(other.Position)
+		local offset = me - them
+		if offset.Magnitude > 40 then
+			continue
+		end
+		local scale = other.Size.X / C.RootWidth
+		local radius = C.ShellDiameter / 2 * scale
+
+		-- Body to body (same team only: a zombie touching you should infect).
+		if model:GetAttribute("Team") == myTeam then
+			local overlap = myRadius + radius + 0.3 - offset.Magnitude
+			if overlap > 0 then
+				local away = if offset.Magnitude > 0.01 then offset.Unit else Vector3.xAxis
+				push += away * math.min(overlap * Config.FIELD_BODY, Config.FIELD_BODY_MAX)
+			end
+		end
+
+		-- Their weapon against you.
+		local item = heldMelee(model)
+		local facing = flat(other.CFrame.LookVector)
+		if item and facing.Magnitude > 0.1 then
+			local a, b = shaft(other, scale, item, facing.Unit)
+			local point = closest(a, b, me)
+			local away = me - point
+			local overlap = (item.guard or 0.5) + myRadius - away.Magnitude
+			if overlap > 0 then
+				local firm = (item.firmness or 1) * math.clamp(scale / myScale, 0.5, 2)
+				local dir = if away.Magnitude > 0.01 then away.Unit else facing.Unit
+				push += dir * math.min(overlap * Config.FIELD_WEAPON * firm, Config.FIELD_WEAPON_MAX)
+			end
+
+			-- Weapon against weapon: both holders get pushed apart.
+			if myA and myB and myItem then
+				local mine = closest(myA, myB, closest(a, b, (myA + myB) / 2))
+				local theirs = closest(a, b, mine)
+				local gap = mine - theirs
+				local touch = (myItem.guard or 0.5) + (item.guard or 0.5) - gap.Magnitude
+				if touch > 0 then
+					local dir = if gap.Magnitude > 0.01 then gap.Unit else (me - them).Unit
+					push += dir * math.min(touch * Config.FIELD_WEAPON, Config.FIELD_WEAPON_MAX) * 0.6
+				end
+			end
+		end
+
+		-- Your weapon pushing into them pushes you back a little.
+		if myA and myB and myItem then
+			local point = closest(myA, myB, them)
+			local overlap = (myItem.guard or 0.5) + radius - (point - them).Magnitude
+			if overlap > 0 then
+				local back = if offset.Magnitude > 0.01 then offset.Unit else -aim
+				local weight = math.clamp(scale / myScale, 0.5, 2)
+				push += back * math.min(overlap * Config.FIELD_RECOIL * weight, Config.FIELD_WEAPON_MAX * 0.5)
+			end
+		end
+	end
+	return push
+end
+
+return ForceField
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="52">
+          <Properties>
             <string name="Name">FurnitureController</string>
             <string name="Source"><![CDATA[-- Drives the furniture YOU are pushing, on your own machine, so it responds
 -- instantly and stops the moment you stop. The server hands you a piece when
 -- you claim it and takes it back if someone else pushes it too.
 --
--- You move furniture by walking into it, or with a held weapon: its shaft
--- is solid and pushes whatever it touches.
+-- You move furniture by walking into it, with a zombie's arms, or with a
+-- held weapon: its shaft is solid and pushes whatever it touches.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11007,6 +11565,33 @@ local function collect(): FurniturePush.Pushes
 		local probe, size = FurniturePush.moverProbe(root, dir, scale)
 		for _, body in query(probe, size) do
 			FurniturePush.add(pushes, body, dir * walk, strength, probe.Position)
+		end
+	end
+
+	-- A zombie's arms are solid: walking, they push what they touch; standing
+	-- or turning, they shove it out of the way.
+	if ClientState.isZombie() and walk > 0 then
+		local probe, size = FurniturePush.armsProbe(
+			root,
+			scale,
+			CharacterLook.ZOMBIE_ARM_REACH,
+			CharacterLook.ZOMBIE_ARM_SPAN
+		)
+		for _, body in query(probe, size) do
+			if not pushes[body] then
+				if moving then
+					FurniturePush.add(pushes, body, dir * walk, strength, probe.Position)
+				else
+					local exit = FurniturePush.shaftExit(root.Position, probe.LookVector, body)
+					FurniturePush.add(
+						pushes,
+						body,
+						exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+						strength,
+						nil
+					)
+				end
+			end
 		end
 	end
 
@@ -11124,7 +11709,7 @@ return FurnitureController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">InputController</string>
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
@@ -11251,7 +11836,7 @@ return InputController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="53">
+        <Item class="LocalScript" referent="54">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Client entry point.
@@ -11270,7 +11855,7 @@ require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">MovementController</string>
             <string name="Source"><![CDATA[-- Moves the character in SCREEN directions (W = up the screen = world -Z)
@@ -11280,6 +11865,9 @@ require(Client.UI.Hud).start()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+
+local ClientState = require(script.Parent.ClientState)
+local ForceField = require(script.Parent.ForceField)
 
 local MovementController = {}
 
@@ -11364,10 +11952,14 @@ local function step()
 	-- Sharp, like the original: full speed the instant a key goes down, a dead
 	-- stop the instant it comes up (a Humanoid alone eases in and out). Left
 	-- alone while a knockback shove is playing.
+	-- Soft force fields from people and weapons nearby are added on top, so
+	-- nobody stacks and pushing always meets a little resistance.
 	if not root:FindFirstChild("KnockbackForce") then
 		local v = root.AssemblyLinearVelocity
 		local speed = humanoid.WalkSpeed
-		root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+		local field =
+			ForceField.velocity(root, aim, ClientState.my("HeldItem"), character:GetAttribute("Team"))
+		root.AssemblyLinearVelocity = Vector3.new(move.X * speed + field.X, v.Y, move.Z * speed + field.Z)
 	end
 
 	local camera = workspace.CurrentCamera
@@ -11455,7 +12047,7 @@ return MovementController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">SoundBank</string>
             <string name="Source"><![CDATA[-- Every sound in the game, built from the few sound files that ship inside
@@ -11582,7 +12174,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">SoundController</string>
             <string name="Source"><![CDATA[-- Sounds that follow what's going on rather than one-off events: countdown
@@ -11743,7 +12335,7 @@ return SoundController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[-- Plays the game's sounds (recipes in SoundBank), quieter the farther they
@@ -11932,11 +12524,11 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="58">
+        <Item class="Folder" referent="59">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="60">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[-- The admin panel (F2, or the ADMIN button on the left). Only shown to
@@ -12290,7 +12882,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -12348,7 +12940,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the inventory
@@ -12579,7 +13171,7 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">BottomLeft</string>
               <string name="Source"><![CDATA[-- Bottom-left: your points, the speed boost and size they give you, and
@@ -12664,7 +13256,7 @@ return BottomLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -12778,7 +13370,7 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
@@ -12983,7 +13575,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="66">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -13064,7 +13656,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -13162,7 +13754,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -13693,7 +14285,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="68">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -13921,7 +14513,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="70">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Left side bar: five big square icon buttons stacked down the left edge
@@ -13977,7 +14569,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="71">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -14157,7 +14749,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="72">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -14396,7 +14988,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="72">
+      <Item class="LocalScript" referent="73">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -14406,13 +14998,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="73">
+  <Item class="TextChatService" referent="74">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="74">
+  <Item class="Workspace" referent="75">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

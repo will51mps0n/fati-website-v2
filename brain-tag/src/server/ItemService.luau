@@ -52,6 +52,7 @@ local function attachHeld(p: Participant)
 	end
 	local model = ItemModels.build(p.heldItem)
 	model.Name = "HeldItem"
+	model:SetAttribute("ItemId", p.heldItem) -- clients read it for weapon force fields
 	local handle = model.PrimaryPart :: BasePart
 	local s = p.scale
 	local grip = CharacterLook.grip(s)
@@ -492,7 +493,9 @@ local function shaftStep()
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
 		for _, other in people do
-			local zRoot = if other ~= p then Participants.body(other) else nil
+			-- Players feel weapons through their own client's force field
+			-- (smooth, no lag); the server pushes bots.
+			local zRoot = if other ~= p and not other.player then Participants.body(other) else nil
 			if zRoot then
 				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
 				local along = math.clamp((z - start):Dot(p.aim), 0, reach)

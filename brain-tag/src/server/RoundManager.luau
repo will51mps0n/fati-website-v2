@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local CharacterService = require(script.Parent.CharacterService)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -179,8 +180,8 @@ end
 -- Does any part of the zombie touch the human? Its body, or the arms
 -- reaching out in front of it (the box they sweep, in the zombie's own
 -- frame), against the human's body circle.
-local ARM_REACH = 2.65 -- studs in front of the body center at scale 1 (CharacterLook arms)
-local ARM_SPAN = 1.85 -- half the width across both arms
+local ARM_REACH = CharacterLook.ZOMBIE_ARM_REACH
+local ARM_SPAN = CharacterLook.ZOMBIE_ARM_SPAN
 
 local function touching(zRoot: BasePart, zScale: number, hRoot: BasePart, hScale: number): boolean
 	local shell = Config.CHARACTER.ShellDiameter / 2

@@ -51,6 +51,23 @@ function FurniturePush.itemProbe(
 	return CFrame.lookAt(center, center + aim), Vector3.new((guard or 0.5) * 2, root.Size.Y + 1, reach)
 end
 
+-- Box over a zombie's outstretched arms, from the front of its body to its
+-- hands (CharacterLook's arm box). The arms are solid to furniture too.
+function FurniturePush.armsProbe(
+	root: BasePart,
+	scale: number,
+	reach: number,
+	span: number
+): (CFrame, Vector3)
+	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
+	local from = root.Size.Z / 2 - 0.2
+	local to = reach * scale
+	local center = root.Position + look * ((from + to) / 2)
+	return CFrame.lookAt(center, center + look),
+		Vector3.new(span * 2 * scale, root.Size.Y + 1, math.max(0.5, to - from))
+end
+
 -- Held weapons are solid. While you stand still or turn, a piece the shaft
 -- overlaps is pushed out of its way: toward whichever side of the shaft its
 -- center is on (so a sweep shoves it along), and a little forward. Returns

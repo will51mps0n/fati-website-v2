@@ -187,14 +187,15 @@ local list: { Skin } = {
 		"F4F4F4",
 		{ hat = "Shark", accent = "4A6378", product = "SkinShark" }
 	),
+	-- A guy with the classic awesome face on top of his head.
 	skin(
-		"Hotdog",
-		"Hot Dog",
+		"Awesome",
+		"Awesome Guy",
 		"Human",
-		"E0A458",
-		"C0532B",
-		"F6C79A",
-		{ hat = "Hotdog", accent = "F7DC6F", product = "SkinHotdog" }
+		"2F80ED",
+		"FFCF1F",
+		"FFCF1F",
+		{ hat = "Awesome", accent = "7A1F45", product = "SkinAwesome" }
 	),
 
 	skin(

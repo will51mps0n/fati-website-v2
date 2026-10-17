@@ -222,7 +222,7 @@ chance 5% to 15%).
 
 **3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
 Donkey, Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
-Shark, Hotdog, Duck, Astronaut. VIP: Royal. Zombies all look the same (the
+Shark, Awesome Guy, Duck, Astronaut. VIP: Royal. Zombies all look the same (the
 round's first zombies get the alpha look), so there are no zombie skins. Score
 skins give non-paying players something to grind for; Robux skins are pure
 cosmetics, the safest thing to sell.
@@ -267,7 +267,7 @@ game with the Command Bar line never wipes them.
 | `Product_SkinShark` | Shark skin | Product | 79 |
 | `Product_SkinRobot` | Robot skin | Product | 79 |
 | `Product_SkinAlien` | Alien skin | Product | 79 |
-| `Product_SkinHotdog` | Hotdog skin | Product | 99 |
+| `Product_SkinAwesome` | Awesome Guy skin | Product | 99 |
 | `Product_SkinAstronaut` | Astronaut skin | Product | 99 |
 
 Anything without an id is hidden from the Robux tab in live servers; in Studio

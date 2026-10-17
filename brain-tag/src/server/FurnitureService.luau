@@ -48,6 +48,7 @@ export type Mover = {
 	firmness: number?, -- held weapon's Items.firmness
 	guard: number?, -- held weapon's Items.guard
 	reach: number?,
+	zombie: boolean?, -- a zombie's arms push furniture too
 }
 
 local OWNER = FurniturePush.OWNER_ATTRIBUTE
@@ -225,28 +226,134 @@ local function onClaim(player: Player, list: unknown)
 	end
 end
 
+-- Pushers in a line add up: someone walking into the back of another mover
+-- heading the same way leans on them and lends them their strength (a
+-- little less per link), so a queue of zombies at a barricade shoves as one.
+type Lean = { dir: Vector3?, own: number, leaners: { number } }
+
+local function leanGraph(movers: { Mover }): { Lean }
+	local shell = Config.CHARACTER.ShellDiameter / 2
+	local leans: { Lean } = {}
+	for i, mover in movers do
+		local move = mover.humanoid.MoveDirection
+		local flat = Vector3.new(move.X, 0, move.Z)
+		local moving = flat.Magnitude > 0.1 and mover.humanoid.WalkSpeed > 0
+		leans[i] = {
+			dir = if moving then flat.Unit else nil,
+			own = RoundRules.pushStrength(mover.scale),
+			leaners = {},
+		}
+	end
+	for i, a in leans do
+		local dir = a.dir
+		if not dir then
+			continue
+		end
+		local ra = shell * movers[i].scale
+		local here = movers[i].root.Position
+		local best, bestAlong = nil, math.huge
+		for j, b in leans do
+			local bDir = b.dir
+			if j == i or not bDir or bDir:Dot(dir) < 0.3 then
+				continue
+			end
+			local rb = shell * movers[j].scale
+			local rel = movers[j].root.Position - here
+			rel = Vector3.new(rel.X, 0, rel.Z)
+			local along = rel:Dot(dir)
+			local side = (rel - dir * along).Magnitude
+			if along > 0.2 and along < ra + rb + 0.8 and side < (ra + rb) * 0.9 and along < bestAlong then
+				best, bestAlong = j, along
+			end
+		end
+		if best then
+			table.insert(leans[best].leaners, i)
+		end
+	end
+	return leans
+end
+
+-- Strength of mover `i` plus everyone leaning on it (and on them...); adds
+-- every helper's id to `helpers`.
+local function chained(
+	movers: { Mover },
+	leans: { Lean },
+	i: number,
+	helpers: { string },
+	seen: { [number]: boolean }
+): number
+	seen[i] = true
+	local total = leans[i].own
+	for _, j in leans[i].leaners do
+		if not seen[j] then
+			table.insert(helpers, movers[j].id)
+			total += chained(movers, leans, j, helpers, seen) * Config.PUSH_CHAIN_SHARE
+		end
+	end
+	return total
+end
+
 local function collectPushes(now: number): FurniturePush.Pushes
 	local pushes: FurniturePush.Pushes = {}
-	for _, mover in getMovers() do
+	local movers = getMovers()
+	local leans = leanGraph(movers)
+	for i, mover in movers do
 		local humanoid, root = mover.humanoid, mover.root
 		local walk = humanoid.WalkSpeed
 		if walk <= 0 then
 			continue
 		end
-		local move = humanoid.MoveDirection
-		local flat = Vector3.new(move.X, 0, move.Z)
-		local moving = flat.Magnitude > 0.1
-		local dir = if moving then flat.Unit else Vector3.zero
-		local strength = RoundRules.pushStrength(mover.scale)
+		local dir = leans[i].dir
+		local moving = dir ~= nil
+		local strength = leans[i].own
+		local helpers: { string } = {}
+		if moving and #leans[i].leaners > 0 then
+			strength = chained(movers, leans, i, helpers, {})
+		end
 		local touched: { [BasePart]: boolean } = {}
-		if moving then
+		local function pushing(piece: Piece)
+			piece.pushers[mover.id] = now
+			for _, id in helpers do
+				piece.pushers[id] = now
+			end
+		end
+		if dir then
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
 					touched[part] = true
-					piece.pushers[mover.id] = now
+					pushing(piece)
 					FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
+				end
+			end
+		end
+		-- A zombie's arms are solid: walking, they push what they touch along
+		-- with the body; standing or turning, they shove it out of the way.
+		if mover.zombie then
+			local probe, size = FurniturePush.armsProbe(
+				root,
+				mover.scale,
+				CharacterLook.ZOMBIE_ARM_REACH,
+				CharacterLook.ZOMBIE_ARM_SPAN
+			)
+			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
+				local piece = byBody[part]
+				if piece and not touched[part] then
+					touched[part] = true
+					if dir then
+						pushing(piece)
+						FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
+					else
+						local exit = FurniturePush.shaftExit(root.Position, probe.LookVector, part)
+						FurniturePush.add(
+							pushes,
+							part,
+							exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+							strength,
+							nil
+						)
+					end
 				end
 			end
 		end
@@ -257,11 +364,11 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			local grip = CharacterLook.grip(mover.scale)
 			local hand = (root.CFrame * grip).Position
 			local shaft, shaftSize = FurniturePush.itemProbe(root, grip, mover.aim, mover.reach, mover.guard)
-			local firm = strength * (mover.firmness or 1)
+			local firm = leans[i].own * (mover.firmness or 1)
 			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
 				local piece = byBody[part]
 				if piece and not touched[part] then
-					if moving then
+					if dir then
 						-- Only walking counts as pushing for ownership: someone just
 						-- standing near a piece with a weapon out shouldn't take it
 						-- away from the player driving it.
@@ -276,6 +383,25 @@ local function collectPushes(now: number): FurniturePush.Pushes
 							firm,
 							nil
 						)
+					end
+				end
+			end
+		end
+	end
+	-- A pushed piece pushes whatever it runs into, so a shove moves a whole
+	-- barricade (two links deep).
+	for _ = 1, 2 do
+		for body, push in table.clone(pushes) do
+			local velocity = FurniturePush.resolve(body, push)
+			local ahead = Util.flatUnit(velocity)
+			if ahead and velocity.Magnitude > 0.5 then
+				local center = body.Position + ahead * (FurniturePush.extent(body, ahead) + 0.6)
+				local side = Vector3.new(-ahead.Z, 0, ahead.X)
+				local width = FurniturePush.extent(body, side) * 2 * 0.9
+				local probe = CFrame.lookAt(center, center + ahead)
+				for _, other in workspace:GetPartBoundsInBox(probe, Vector3.new(width, 2, 1.2), overlap) do
+					if other ~= body and byBody[other] and not pushes[other] then
+						FurniturePush.add(pushes, other, velocity, push.strength, center)
 					end
 				end
 			end
