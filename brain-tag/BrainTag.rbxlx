@@ -816,7 +816,7 @@ Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 -- Held melee weapons are solid: zombies touching the shaft are shoved off it
 -- (this fast, in short pulses), and furniture it overlaps is pushed aside.
 Config.SHAFT_ZOMBIE_PUSH = 22
-Config.SHAFT_ZOMBIE_SECONDS = 0.15
+Config.SHAFT_PULSE_SHARE = 0.75 -- share of each push tick a firm weapon pushes; the rest the zombie can steer
 Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
 
 -- Wizard ------------------------------------------------------------------------------------
@@ -966,8 +966,8 @@ end
 -- overlaps is pushed out of its way: toward whichever side of the shaft its
 -- center is on (so a sweep shoves it along), and a little forward. Returns
 -- a flat unit direction.
-function FurniturePush.shaftExit(root: BasePart, aim: Vector3, body: BasePart): Vector3
-	local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+function FurniturePush.shaftExit(hand: Vector3, aim: Vector3, body: BasePart): Vector3
+	local rel = Vector3.new(body.Position.X - hand.X, 0, body.Position.Z - hand.Z)
 	local side = rel - aim * rel:Dot(aim)
 	if side.Magnitude < 0.3 then
 		return aim
@@ -3789,6 +3789,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
+local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local RoundManager = require(script.Parent.RoundManager)
@@ -3799,6 +3800,13 @@ type Participant = Participants.Participant
 local AdminService = {}
 
 local MAX_SPEED_FACTOR = 5
+local C = Config.CHARACTER
+
+-- Where to stand someone of `scale` at a spot, feet on the floor (like spawns).
+local function standAt(position: Vector3, scale: number): CFrame
+	local y = MapLayout.HEIGHTS.Floor + C.HipHeight + C.RootHeight / 2 * scale + 0.3
+	return CFrame.new(position.X, y, position.Z)
+end
 local MAX_POINTS = 10_000_000
 
 function AdminService.isAdmin(player: Player): boolean
@@ -3939,7 +3947,7 @@ function ACTIONS.bring(admin, data)
 		if p ~= admin then
 			local angle = i / math.max(1, #list) * math.pi * 2
 			local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * 6
-			CharacterService.place(p, CFrame.new(root.Position + offset))
+			CharacterService.place(p, standAt(root.Position + offset * math.max(1, p.scale), p.scale))
 		end
 	end
 	return #list > 0, "Brought " .. names(list)
@@ -3952,7 +3960,10 @@ function ACTIONS.goTo(admin, data)
 	if not target or target == admin or not root then
 		return false, "Pick one other player"
 	end
-	CharacterService.place(admin, CFrame.new(root.Position + Vector3.new(6, 0, 0)))
+	CharacterService.place(
+		admin,
+		standAt(root.Position + Vector3.new(6 * math.max(1, target.scale), 0, 0), admin.scale)
+	)
 	return true, "Went to " .. target.name
 end
 
@@ -3967,7 +3978,10 @@ end
 -- Round ---------------------------------------------------------------------------------
 
 function ACTIONS.skip()
-	return RoundManager.skipPhase(), "Skipped to the next phase"
+	if RoundManager.skipPhase() then
+		return true, "Skipped to the next phase"
+	end
+	return false, "Nothing to skip right now"
 end
 
 function ACTIONS.time(_admin, data)
@@ -3975,13 +3989,17 @@ function ACTIONS.time(_admin, data)
 	if not seconds then
 		return false, "Bad time"
 	end
-	RoundManager.addTime(seconds)
-	return true, string.format("%+d seconds", seconds)
+	if RoundManager.addTime(seconds) then
+		return true, string.format("%+d seconds", seconds)
+	end
+	return false, "No timer to change right now"
 end
 
 function ACTIONS.nextMap()
-	RoundManager.queueNextMap()
-	return true, "Next round loads the next map"
+	if RoundManager.queueNextMap() then
+		return true, "Next round loads the next map"
+	end
+	return false, "Only one map is in the rotation"
 end
 
 function ACTIONS.resetFurniture()
@@ -4356,6 +4374,10 @@ type Participant = Participants.Participant
 -- sets this so it can choose the right spawn for the current phase.
 CharacterService.onNeedRespawn = function(_p: Participant) end
 
+-- Called after a participant's size changed, so the held item can be
+-- re-attached at the new grip. ItemService sets this.
+CharacterService.onResized = function(_p: Participant) end
+
 local template: Model
 
 function CharacterService.buildTemplate()
@@ -4518,6 +4540,7 @@ function CharacterService.refreshSize(p: Participant)
 	p.scale = scale
 	p.state:SetAttribute("Scale", scale)
 	CharacterService.applyLook(p)
+	CharacterService.onResized(p)
 end
 
 function CharacterService.refreshSpeed(p: Participant)
@@ -5976,22 +5999,21 @@ local function collectPushes(now: number): FurniturePush.Pushes
 		-- what it touches along your path, or out of its way when you stand
 		-- still or turn. While hooking a piece (held click) the drag does the work.
 		if mover.reach and not mover.dragging then
-			local shaft, shaftSize = FurniturePush.itemProbe(
-				root,
-				CharacterLook.grip(mover.scale),
-				mover.aim,
-				mover.reach,
-				mover.guard
-			)
+			local grip = CharacterLook.grip(mover.scale)
+			local hand = (root.CFrame * grip).Position
+			local shaft, shaftSize = FurniturePush.itemProbe(root, grip, mover.aim, mover.reach, mover.guard)
 			local firm = strength * (mover.firmness or 1)
 			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
 				local piece = byBody[part]
 				if piece and not touched[part] then
-					piece.pushers[mover.id] = now
 					if moving then
+						-- Only walking counts as pushing for ownership: someone just
+						-- standing near a piece with a weapon out shouldn't take it
+						-- away from the player driving it.
+						piece.pushers[mover.id] = now
 						FurniturePush.add(pushes, part, dir * walk, firm, part.Position + mover.aim * 0.5)
 					else
-						local exit = FurniturePush.shaftExit(root, mover.aim, part)
+						local exit = FurniturePush.shaftExit(hand, mover.aim, part)
 						FurniturePush.add(
 							pushes,
 							part,
@@ -6535,8 +6557,9 @@ local function shaftStep()
 				then
 					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
 					local away = Util.flatUnit(offset) or p.aim
-					-- Short pulses from soft weapons leave gaps the zombie walks through.
-					local seconds = Config.SHAFT_ZOMBIE_SECONDS * math.min(1, firmness ^ 1.5)
+					-- Each pulse covers part of the tick: soft weapons leave long gaps
+					-- the zombie walks through, firm ones short gaps to steer around.
+					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
 					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
 					Combat.knockback(zombie, away * speed, 0, seconds, true)
 				end
@@ -6628,6 +6651,7 @@ end
 
 function ItemService.init()
 	groundFolder = workspace:WaitForChild("GroundItems") :: Folder
+	CharacterService.onResized = attachHeld -- the grip moves with your size
 
 	Remotes.event("UseItem").OnServerEvent:Connect(onUse)
 	Remotes.unreliable("Aim").OnServerEvent:Connect(function(player, aim)
@@ -8165,6 +8189,9 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 	p.team = team
 	p.state:SetAttribute("Team", team)
 	p.boostUntil, p.slowUntil = 0, 0 -- drinks and freezes don't carry across teams
+	if team == "Human" then
+		p.alpha = false
+	end
 	if team == "Zombie" then
 		ItemService.onInfected(p)
 	end
@@ -8540,23 +8567,29 @@ end
 
 -- Ends the current phase now (prep -> outbreak, infection -> survivors win).
 function RoundManager.skipPhase(): boolean
-	if phase == "Waiting" then
+	if phase == "Waiting" or phase == "End" then
 		return false
 	end
 	state:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow())
 	return true
 end
 
-function RoundManager.addTime(seconds: number)
+function RoundManager.addTime(seconds: number): boolean
 	local endsAt = state:GetAttribute("PhaseEndsAt")
-	if typeof(endsAt) == "number" and phase ~= "Waiting" then
-		state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	if typeof(endsAt) ~= "number" or phase == "Waiting" or phase == "End" then
+		return false
 	end
+	state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	return true
 end
 
 -- The next round starts on the next map in the rotation.
-function RoundManager.queueNextMap()
+function RoundManager.queueNextMap(): boolean
+	if #Config.MAP_ROTATION < 2 then
+		return false
+	end
 	roundsOnMap = Config.ROUNDS_PER_MAP
+	return true
 end
 
 function RoundManager.respawn(p: Participant)
@@ -9346,11 +9379,13 @@ return CameraController
         <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">ChatSetup</string>
-            <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-left with channel tabs,
+            <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-right (bottom-left and
+-- hidden until opened on phones) with channel tabs,
 -- yellow system announcements from the server, and a gold [VIP] tag.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
+local UserInputService = game:GetService("UserInputService")
 
 local ClientState = require(script.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -9379,11 +9414,20 @@ function ChatSetup.isVisible(): boolean
 end
 
 function ChatSetup.start()
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	task.spawn(function()
 		local window = TextChatService:WaitForChild("ChatWindowConfiguration", 10) :: ChatWindowConfiguration?
 		if window then
-			window.HorizontalAlignment = Enum.HorizontalAlignment.Right -- points sit bottom-left
+			-- Desktop: bottom-right (points sit bottom-left). Phones keep the
+			-- touch buttons bottom-right, so chat stays left and starts hidden
+			-- (the chat button top-left shows it).
+			window.HorizontalAlignment = if touch
+				then Enum.HorizontalAlignment.Left
+				else Enum.HorizontalAlignment.Right
 			window.VerticalAlignment = Enum.VerticalAlignment.Bottom
+			if touch then
+				ChatSetup.setVisible(false)
+			end
 		end
 		local tabs = TextChatService:FindFirstChildOfClass("ChannelTabsConfiguration")
 		if tabs then
@@ -10221,11 +10265,13 @@ local function collect(): FurniturePush.Pushes
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
 		local reach = (item.reach or 5) * math.max(1, scale * 0.9)
-		local probe, size = FurniturePush.itemProbe(root, CharacterLook.grip(scale), aim, reach, item.guard)
+		local grip = CharacterLook.grip(scale)
+		local hand = (root.CFrame * grip).Position
+		local probe, size = FurniturePush.itemProbe(root, grip, aim, reach, item.guard)
 		local touched = query(probe, size)
 		local firm = strength * (item.firmness or 1) -- a stiff bat shoves harder than a noodle
-		local hooked: BasePart? = nil
-		if InputController.isUsing() and walk > 0 then
+		local using = InputController.isUsing()
+		if using and walk > 0 then
 			local nearest: BasePart? = nil
 			local best = math.huge
 			for _, body in touched do
@@ -10238,7 +10284,6 @@ local function collect(): FurniturePush.Pushes
 				local toward = Util.flatUnit(root.Position - nearest.Position)
 				local gap = FurniturePush.extent(nearest, toward or aim) + root.Size.X / 2 + 0.6
 				if toward and best > gap then
-					hooked = nearest
 					local hook = if item.dragsFurniture then 1.5 else 1
 					FurniturePush.add(
 						pushes,
@@ -10250,14 +10295,15 @@ local function collect(): FurniturePush.Pushes
 				end
 			end
 		end
-		-- The shaft is solid: what it overlaps moves out of the way.
-		if walk > 0 then
+		-- The shaft is solid: what it overlaps moves out of the way (not while
+		-- hooking with held click, where the drag does the work, like the server).
+		if walk > 0 and not using then
 			for _, body in touched do
-				if not pushes[body] and body ~= hooked then
+				if not pushes[body] then
 					if moving then
 						FurniturePush.add(pushes, body, dir * walk, firm, body.Position + aim * 0.5)
 					else
-						local exit = FurniturePush.shaftExit(root, aim, body)
+						local exit = FurniturePush.shaftExit(hand, aim, body)
 						FurniturePush.add(
 							pushes,
 							body,
@@ -11736,7 +11782,7 @@ return Hud
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
--- and RETURN for zombies. Placed above the score box on the right.
+-- and RETURN for zombies. Placed bottom-right.
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local InputController = require(script.Parent.Parent.InputController)

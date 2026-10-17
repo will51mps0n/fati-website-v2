@@ -1,8 +1,10 @@
--- TextChatService setup: chat window at the bottom-left with channel tabs,
+-- TextChatService setup: chat window at the bottom-right (bottom-left and
+-- hidden until opened on phones) with channel tabs,
 -- yellow system announcements from the server, and a gold [VIP] tag.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
+local UserInputService = game:GetService("UserInputService")
 
 local ClientState = require(script.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -31,11 +33,20 @@ function ChatSetup.isVisible(): boolean
 end
 
 function ChatSetup.start()
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	task.spawn(function()
 		local window = TextChatService:WaitForChild("ChatWindowConfiguration", 10) :: ChatWindowConfiguration?
 		if window then
-			window.HorizontalAlignment = Enum.HorizontalAlignment.Right -- points sit bottom-left
+			-- Desktop: bottom-right (points sit bottom-left). Phones keep the
+			-- touch buttons bottom-right, so chat stays left and starts hidden
+			-- (the chat button top-left shows it).
+			window.HorizontalAlignment = if touch
+				then Enum.HorizontalAlignment.Left
+				else Enum.HorizontalAlignment.Right
 			window.VerticalAlignment = Enum.VerticalAlignment.Bottom
+			if touch then
+				ChatSetup.setVisible(false)
+			end
 		end
 		local tabs = TextChatService:FindFirstChildOfClass("ChannelTabsConfiguration")
 		if tabs then

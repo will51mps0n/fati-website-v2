@@ -23,6 +23,10 @@ type Participant = Participants.Participant
 -- sets this so it can choose the right spawn for the current phase.
 CharacterService.onNeedRespawn = function(_p: Participant) end
 
+-- Called after a participant's size changed, so the held item can be
+-- re-attached at the new grip. ItemService sets this.
+CharacterService.onResized = function(_p: Participant) end
+
 local template: Model
 
 function CharacterService.buildTemplate()
@@ -185,6 +189,7 @@ function CharacterService.refreshSize(p: Participant)
 	p.scale = scale
 	p.state:SetAttribute("Scale", scale)
 	CharacterService.applyLook(p)
+	CharacterService.onResized(p)
 end
 
 function CharacterService.refreshSpeed(p: Participant)

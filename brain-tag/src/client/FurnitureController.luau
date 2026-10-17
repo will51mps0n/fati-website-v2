@@ -93,11 +93,13 @@ local function collect(): FurniturePush.Pushes
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
 		local reach = (item.reach or 5) * math.max(1, scale * 0.9)
-		local probe, size = FurniturePush.itemProbe(root, CharacterLook.grip(scale), aim, reach, item.guard)
+		local grip = CharacterLook.grip(scale)
+		local hand = (root.CFrame * grip).Position
+		local probe, size = FurniturePush.itemProbe(root, grip, aim, reach, item.guard)
 		local touched = query(probe, size)
 		local firm = strength * (item.firmness or 1) -- a stiff bat shoves harder than a noodle
-		local hooked: BasePart? = nil
-		if InputController.isUsing() and walk > 0 then
+		local using = InputController.isUsing()
+		if using and walk > 0 then
 			local nearest: BasePart? = nil
 			local best = math.huge
 			for _, body in touched do
@@ -110,7 +112,6 @@ local function collect(): FurniturePush.Pushes
 				local toward = Util.flatUnit(root.Position - nearest.Position)
 				local gap = FurniturePush.extent(nearest, toward or aim) + root.Size.X / 2 + 0.6
 				if toward and best > gap then
-					hooked = nearest
 					local hook = if item.dragsFurniture then 1.5 else 1
 					FurniturePush.add(
 						pushes,
@@ -122,14 +123,15 @@ local function collect(): FurniturePush.Pushes
 				end
 			end
 		end
-		-- The shaft is solid: what it overlaps moves out of the way.
-		if walk > 0 then
+		-- The shaft is solid: what it overlaps moves out of the way (not while
+		-- hooking with held click, where the drag does the work, like the server).
+		if walk > 0 and not using then
 			for _, body in touched do
-				if not pushes[body] and body ~= hooked then
+				if not pushes[body] then
 					if moving then
 						FurniturePush.add(pushes, body, dir * walk, firm, body.Position + aim * 0.5)
 					else
-						local exit = FurniturePush.shaftExit(root, aim, body)
+						local exit = FurniturePush.shaftExit(hand, aim, body)
 						FurniturePush.add(
 							pushes,
 							body,

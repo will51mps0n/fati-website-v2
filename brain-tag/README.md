@@ -263,7 +263,7 @@ Everything lives in `src/shared/Config.luau`:
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
 - **Collisions:** `PLAYERS_COLLIDE` (characters bump into each other), `CHARACTER.ShellDiameter`.
-- **Held weapons:** `SHAFT_ZOMBIE_PUSH`, `SHAFT_ZOMBIE_SECONDS`, `SHAFT_FURNITURE_FACTOR`, and per item `SOLIDITY` in `Items.luau`.
+- **Held weapons:** `SHAFT_ZOMBIE_PUSH`, `SHAFT_PULSE_SHARE`, `SHAFT_FURNITURE_FACTOR`, and per item `SOLIDITY` in `Items.luau`.
 - **Furniture size:** `FurnitureSpecs.SIZE_SCALE` (and `KEEP_SIZE` for pieces that sit against walls).
 - **Points:** `INFECT_STEAL_FRACTION`, `GROUND_ITEMS_MIN` / `GROUND_ITEMS_MAX`.
 - **Bushes:** `BUSH_HEIGHT`, `BUSH_REVEAL_DISTANCE` (how close a bot must get to spot you), `BUSH_SEE_THROUGH`.

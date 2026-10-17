@@ -123,7 +123,7 @@ Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
 -- Held melee weapons are solid: zombies touching the shaft are shoved off it
 -- (this fast, in short pulses), and furniture it overlaps is pushed aside.
 Config.SHAFT_ZOMBIE_PUSH = 22
-Config.SHAFT_ZOMBIE_SECONDS = 0.15
+Config.SHAFT_PULSE_SHARE = 0.75 -- share of each push tick a firm weapon pushes; the rest the zombie can steer
 Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
 
 -- Wizard ------------------------------------------------------------------------------------

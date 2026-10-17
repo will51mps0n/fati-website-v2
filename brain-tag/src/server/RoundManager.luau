@@ -79,6 +79,9 @@ function RoundManager.setTeam(p: Participant, team: Participants.Team)
 	p.team = team
 	p.state:SetAttribute("Team", team)
 	p.boostUntil, p.slowUntil = 0, 0 -- drinks and freezes don't carry across teams
+	if team == "Human" then
+		p.alpha = false
+	end
 	if team == "Zombie" then
 		ItemService.onInfected(p)
 	end
@@ -454,23 +457,29 @@ end
 
 -- Ends the current phase now (prep -> outbreak, infection -> survivors win).
 function RoundManager.skipPhase(): boolean
-	if phase == "Waiting" then
+	if phase == "Waiting" or phase == "End" then
 		return false
 	end
 	state:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow())
 	return true
 end
 
-function RoundManager.addTime(seconds: number)
+function RoundManager.addTime(seconds: number): boolean
 	local endsAt = state:GetAttribute("PhaseEndsAt")
-	if typeof(endsAt) == "number" and phase ~= "Waiting" then
-		state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	if typeof(endsAt) ~= "number" or phase == "Waiting" or phase == "End" then
+		return false
 	end
+	state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	return true
 end
 
 -- The next round starts on the next map in the rotation.
-function RoundManager.queueNextMap()
+function RoundManager.queueNextMap(): boolean
+	if #Config.MAP_ROTATION < 2 then
+		return false
+	end
 	roundsOnMap = Config.ROUNDS_PER_MAP
+	return true
 end
 
 function RoundManager.respawn(p: Participant)

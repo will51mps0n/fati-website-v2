@@ -1,5 +1,5 @@
 -- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
--- and RETURN for zombies. Placed above the score box on the right.
+-- and RETURN for zombies. Placed bottom-right.
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local InputController = require(script.Parent.Parent.InputController)

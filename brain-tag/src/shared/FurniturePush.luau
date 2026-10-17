@@ -55,8 +55,8 @@ end
 -- overlaps is pushed out of its way: toward whichever side of the shaft its
 -- center is on (so a sweep shoves it along), and a little forward. Returns
 -- a flat unit direction.
-function FurniturePush.shaftExit(root: BasePart, aim: Vector3, body: BasePart): Vector3
-	local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+function FurniturePush.shaftExit(hand: Vector3, aim: Vector3, body: BasePart): Vector3
+	local rel = Vector3.new(body.Position.X - hand.X, 0, body.Position.Z - hand.Z)
 	local side = rel - aim * rel:Dot(aim)
 	if side.Magnitude < 0.3 then
 		return aim

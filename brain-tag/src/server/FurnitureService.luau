@@ -264,22 +264,21 @@ local function collectPushes(now: number): FurniturePush.Pushes
 		-- what it touches along your path, or out of its way when you stand
 		-- still or turn. While hooking a piece (held click) the drag does the work.
 		if mover.reach and not mover.dragging then
-			local shaft, shaftSize = FurniturePush.itemProbe(
-				root,
-				CharacterLook.grip(mover.scale),
-				mover.aim,
-				mover.reach,
-				mover.guard
-			)
+			local grip = CharacterLook.grip(mover.scale)
+			local hand = (root.CFrame * grip).Position
+			local shaft, shaftSize = FurniturePush.itemProbe(root, grip, mover.aim, mover.reach, mover.guard)
 			local firm = strength * (mover.firmness or 1)
 			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
 				local piece = byBody[part]
 				if piece and not touched[part] then
-					piece.pushers[mover.id] = now
 					if moving then
+						-- Only walking counts as pushing for ownership: someone just
+						-- standing near a piece with a weapon out shouldn't take it
+						-- away from the player driving it.
+						piece.pushers[mover.id] = now
 						FurniturePush.add(pushes, part, dir * walk, firm, part.Position + mover.aim * 0.5)
 					else
-						local exit = FurniturePush.shaftExit(root, mover.aim, part)
+						local exit = FurniturePush.shaftExit(hand, mover.aim, part)
 						FurniturePush.add(
 							pushes,
 							part,

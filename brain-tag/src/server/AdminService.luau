@@ -10,6 +10,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureService = require(script.Parent.FurnitureService)
 local ItemService = require(script.Parent.ItemService)
 local Items = require(ReplicatedStorage.Shared.Items)
+local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local Participants = require(script.Parent.Participants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local RoundManager = require(script.Parent.RoundManager)
@@ -20,6 +21,13 @@ type Participant = Participants.Participant
 local AdminService = {}
 
 local MAX_SPEED_FACTOR = 5
+local C = Config.CHARACTER
+
+-- Where to stand someone of `scale` at a spot, feet on the floor (like spawns).
+local function standAt(position: Vector3, scale: number): CFrame
+	local y = MapLayout.HEIGHTS.Floor + C.HipHeight + C.RootHeight / 2 * scale + 0.3
+	return CFrame.new(position.X, y, position.Z)
+end
 local MAX_POINTS = 10_000_000
 
 function AdminService.isAdmin(player: Player): boolean
@@ -160,7 +168,7 @@ function ACTIONS.bring(admin, data)
 		if p ~= admin then
 			local angle = i / math.max(1, #list) * math.pi * 2
 			local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * 6
-			CharacterService.place(p, CFrame.new(root.Position + offset))
+			CharacterService.place(p, standAt(root.Position + offset * math.max(1, p.scale), p.scale))
 		end
 	end
 	return #list > 0, "Brought " .. names(list)
@@ -173,7 +181,10 @@ function ACTIONS.goTo(admin, data)
 	if not target or target == admin or not root then
 		return false, "Pick one other player"
 	end
-	CharacterService.place(admin, CFrame.new(root.Position + Vector3.new(6, 0, 0)))
+	CharacterService.place(
+		admin,
+		standAt(root.Position + Vector3.new(6 * math.max(1, target.scale), 0, 0), admin.scale)
+	)
 	return true, "Went to " .. target.name
 end
 
@@ -188,7 +199,10 @@ end
 -- Round ---------------------------------------------------------------------------------
 
 function ACTIONS.skip()
-	return RoundManager.skipPhase(), "Skipped to the next phase"
+	if RoundManager.skipPhase() then
+		return true, "Skipped to the next phase"
+	end
+	return false, "Nothing to skip right now"
 end
 
 function ACTIONS.time(_admin, data)
@@ -196,13 +210,17 @@ function ACTIONS.time(_admin, data)
 	if not seconds then
 		return false, "Bad time"
 	end
-	RoundManager.addTime(seconds)
-	return true, string.format("%+d seconds", seconds)
+	if RoundManager.addTime(seconds) then
+		return true, string.format("%+d seconds", seconds)
+	end
+	return false, "No timer to change right now"
 end
 
 function ACTIONS.nextMap()
-	RoundManager.queueNextMap()
-	return true, "Next round loads the next map"
+	if RoundManager.queueNextMap() then
+		return true, "Next round loads the next map"
+	end
+	return false, "Only one map is in the rotation"
 end
 
 function ACTIONS.resetFurniture()

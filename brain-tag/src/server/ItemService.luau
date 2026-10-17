@@ -406,8 +406,9 @@ local function shaftStep()
 				then
 					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
 					local away = Util.flatUnit(offset) or p.aim
-					-- Short pulses from soft weapons leave gaps the zombie walks through.
-					local seconds = Config.SHAFT_ZOMBIE_SECONDS * math.min(1, firmness ^ 1.5)
+					-- Each pulse covers part of the tick: soft weapons leave long gaps
+					-- the zombie walks through, firm ones short gaps to steer around.
+					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
 					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
 					Combat.knockback(zombie, away * speed, 0, seconds, true)
 				end
@@ -499,6 +500,7 @@ end
 
 function ItemService.init()
 	groundFolder = workspace:WaitForChild("GroundItems") :: Folder
+	CharacterService.onResized = attachHeld -- the grip moves with your size
 
 	Remotes.event("UseItem").OnServerEvent:Connect(onUse)
 	Remotes.unreliable("Aim").OnServerEvent:Connect(function(player, aim)
