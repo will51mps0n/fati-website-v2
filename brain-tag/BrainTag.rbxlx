@@ -258,6 +258,7 @@ type Kit = {
 		yaw: number?
 	) -> Part,
 	pill: (x: number, z: number, w: number, d: number, top: number, color: string | Color3) -> (),
+	box: (x: number, z: number, w: number, d: number, r: number, top: number, color: string | Color3) -> (),
 	ball: (x: number, y: number, z: number, d: number, color: string | Color3) -> Part,
 }
 
@@ -288,6 +289,9 @@ local function kit(model: Model, root: BasePart, s: number): Kit
 			0.05 * s,
 			color
 		)
+	end
+	function k.box(x, z, w, d, r, top, color)
+		roundedRect(model, root, "Costume", x * s, z * s, w * s, d * s, r * s, top * s, 0.05 * s, color)
 	end
 	function k.ball(x, y, z, d, color)
 		local part = ball("Costume", d * s, if typeof(color) == "string" then color else "FFFFFF")
@@ -503,9 +507,15 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
 	local back = bodyZ + L / 2 -- rear end of the torso
 	local function torso()
-		k.pill(0, bodyZ, W + 0.24, L + 0.24, 0.47, edge)
-		k.pill(0, bodyZ, W, L, 0.5, main)
-		k.pill(-W * 0.12, bodyZ - L * 0.1, W * 0.42, L * 0.55, 0.51, lighter(main, 0.14)) -- soft sheen
+		local r = W * (if a.body == "Quadruped" then 0.28 else 0.42)
+		k.box(0, bodyZ, W + 0.24, L + 0.24, r + 0.12, 0.47, edge)
+		k.box(0, bodyZ, W, L, r, 0.5, main)
+		if a.body == "Quadruped" then
+			-- Shoulders and hips a touch wider than the waist.
+			k.box(0, bodyZ - L * 0.3, W * 1.07, L * 0.3, r, 0.502, main)
+			k.box(0, bodyZ + L * 0.3, W * 1.09, L * 0.32, r, 0.502, main)
+		end
+		k.box(-W * 0.14, bodyZ - L * 0.08, W * 0.36, L * 0.5, W * 0.15, 0.51, lighter(main, 0.14)) -- sheen
 	end
 	local function eyes(spread: number, z: number, size: number)
 		for side = -1, 1, 2 do
@@ -515,9 +525,21 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 	end
 
 	if a.body == "Quadruped" then
+		-- Legs splay out from shoulders and hips (front ones forward, back
+		-- ones back), with a paw or hoof at the end.
+		local spread, legLength = 0.45, 1.0
+		local sx, cz = math.sin(spread), math.cos(spread)
 		for side = -1, 1, 2 do
-			for _, z in { bodyZ - L * 0.3, bodyZ + L * 0.32 } do
-				k.pill(side * (W / 2 - 0.02), z, 0.6, 0.8, 0.36, dark) -- paws
+			for _, leg in
+				{
+					{ z = bodyZ - L * 0.3, dz = -1, yaw = -side * spread },
+					{ z = bodyZ + L * 0.3, dz = 1, yaw = side * spread },
+				}
+			do
+				local dx, dz = side * sx, leg.dz * cz
+				local cx, lz = side * W / 2 + dx * 0.3, leg.z + dz * 0.3
+				k.bar(cx, lz, 0.42, legLength, 0.36, if a.patches then dark else main, leg.yaw) -- pandas: black legs
+				k.box(cx + dx * legLength * 0.5, lz + dz * legLength * 0.5, 0.52, 0.44, 0.14, 0.37, dark)
 			end
 		end
 		local tail = a.tail
@@ -581,32 +603,48 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 		end
 	end
 
-	-- Head, with an outline ring.
+	-- Head, with an outline. Four-legged animals get a squarer skull (with a
+	-- neck); the "Head" part (name tags hang off it) sits hidden under it.
 	local fish = a.body == "Fish"
 	local headSize = if fish then W else a.head
-	k.dot(0, headZ, headSize + 0.22, if fish then 0.49 else 0.86, if fish then edge else darker(head, 0.7))
-	placeHead(
-		model,
-		root,
-		headSize * s,
-		0.3 * s,
-		if fish then main else head,
-		CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
-	)
+	if a.body == "Quadruped" then
+		local neckFrom, neckTo = bodyZ - L / 2 + 0.3, headZ
+		k.box(0, (neckFrom + neckTo) / 2, W * 0.55, neckFrom - neckTo, W * 0.2, 0.6, main) -- neck
+		local hw, hd = a.head * 0.9, a.head * 0.95
+		k.box(0, headZ, hw + 0.2, hd + 0.2, hw * 0.32 + 0.1, 0.86, darker(head, 0.7))
+		k.box(0, headZ, hw, hd, hw * 0.32, 0.88, head)
+		placeHead(model, root, a.head * 0.75 * s, 0.3 * s, head, CFrame.new(0, 0.7 * s, headZ * s))
+	else
+		k.dot(
+			0,
+			headZ,
+			headSize + 0.22,
+			if fish then 0.49 else 0.86,
+			if fish then edge else darker(head, 0.7)
+		)
+		placeHead(
+			model,
+			root,
+			headSize * s,
+			0.3 * s,
+			if fish then main else head,
+			CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
+		)
+	end
 
 	if a.body == "Quadruped" then
 		local ears = a.ears
 		local hr = a.head / 2
 		for side = -1, 1, 2 do
 			if ears == "Floppy" then
-				k.pill(side * (hr - 0.02), headZ + 0.15, 0.55, 1.25, 0.8, dark)
+				k.box(side * (hr - 0.02), headZ + 0.2, 0.55, 1.2, 0.2, 0.84, dark)
 			elseif ears == "Pointy" then
 				k.bar(side * hr * 0.78, headZ + hr * 0.5, 0.72, 0.72, 0.84, dark, math.rad(45))
 			elseif ears == "Round" then
 				k.dot(side * hr * 0.8, headZ + hr * 0.45, 0.72, 0.84, dark)
 			elseif ears == "Tall" then
-				k.pill(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.9, head)
-				k.pill(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.91, skin.accent or "FFB3C7")
+				k.box(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.22, 0.9, head)
+				k.box(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.1, 0.91, skin.accent or "FFB3C7")
 			elseif ears == "Long" then
 				-- Donkey ears stick out to the sides, swept a little back.
 				k.bar(side * (hr + 0.45), headZ + 0.35, 0.42, 1.35, 0.84, dark, side * math.rad(68))
@@ -627,11 +665,14 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 			end
 		end
 		local snout = a.snout
-		local front = headZ - hr
+		local front = headZ - a.head * 0.95 / 2
 		if snout then
+			-- A squarish muzzle sticking out past the skull, nose at its tip.
 			local sw, sl = snout[1], snout[2]
-			k.pill(0, front + 0.25 - sl / 2 + sl * 0.35, sw, sl, 0.92, light) -- muzzle
-			k.dot(0, front + 0.25 - sl + sl * 0.35 + 0.15, math.min(0.36, sw * 0.5), 0.95, "2B2B2B") -- nose
+			local muzzleZ = front - sl / 2 + 0.3
+			k.box(0, muzzleZ, sw + 0.14, sl + 0.14, sw * 0.3 + 0.07, 0.9, darker(light, 0.75))
+			k.box(0, muzzleZ, sw, sl, sw * 0.3, 0.92, light)
+			k.box(0, muzzleZ - sl / 2 + 0.16, math.min(0.42, sw * 0.55), 0.24, 0.1, 0.95, "2B2B2B") -- nose
 		end
 		if a.whiskers then
 			for side = -1, 1, 2 do
@@ -1034,21 +1075,20 @@ Config.MONETIZATION = {
 -- Product_InstantBat = 1234567890). Updates to the game's code never touch
 -- them. See README "Setting up Robux items".
 do
-	local ok, storage = pcall(function()
-		return game:GetService("ReplicatedStorage")
-	end)
-	if ok and storage then
-		local function load(prefix: string, ids: { [string]: number })
-			for key in ids do
-				local saved = storage:GetAttribute(prefix .. key)
-				if typeof(saved) == "number" and saved > 0 then
-					ids[key] = saved
-				end
+	local function load(storage: Instance, prefix: string, ids: { [string]: number })
+		for key in ids do
+			local saved = storage:GetAttribute(prefix .. key)
+			if typeof(saved) == "number" and saved > 0 then
+				ids[key] = saved
 			end
 		end
-		load("Pass_", Config.MONETIZATION.GamePasses :: any)
-		load("Product_", Config.MONETIZATION.Products :: any)
 	end
+	-- Outside Roblox (tests, tools) there is no place to read, so skip quietly.
+	pcall(function()
+		local storage = game:GetService("ReplicatedStorage")
+		load(storage, "Pass_", Config.MONETIZATION.GamePasses :: any)
+		load(storage, "Product_", Config.MONETIZATION.Products :: any)
+	end)
 end
 
 return Config
@@ -1696,7 +1736,6 @@ add({
 	kind = "Melee",
 	description = "Cheap and short. Hold it out to keep zombies back and push furniture.",
 	price = 100,
-	groundWeight = 40,
 	reach = 5,
 	arc = 110,
 	knockback = 40,
@@ -1706,12 +1745,12 @@ add({
 
 add({
 	id = "Bat",
+	groundWeight = 2, -- the only items found lying around
 	name = "Bat",
 	kind = "Melee",
 	description = "The classic. Short, thick and firm: zombies can't get past it.",
 	price = 750,
 	robuxProduct = "InstantBat",
-	groundWeight = 25,
 	reach = 6,
 	arc = 100,
 	knockback = 60,
@@ -1721,11 +1760,11 @@ add({
 
 add({
 	id = "Swordfish",
+	groundWeight = 1, -- the only items found lying around
 	name = "Swordfish",
 	kind = "Melee",
 	description = "Long reach. A long, solid fish for keeping zombies at a distance.",
 	price = 2500,
-	groundWeight = 4,
 	reach = 8,
 	arc = 60,
 	knockback = 80,
@@ -1770,7 +1809,6 @@ add({
 	description = "Fires potatoes that knock zombies back.",
 	price = 1500,
 	rare = "RarePotatoGun",
-	groundWeight = 10,
 	knockback = 55,
 	stun = 0.3,
 	cooldown = 1.0,
@@ -1817,7 +1855,6 @@ add({
 	kind = "Consumable",
 	description = "Click to swallow: +25 immunity, so you are less likely to start as a zombie.",
 	price = 300,
-	groundWeight = 15,
 	immunity = 25,
 	cooldown = 0.5,
 })
@@ -1829,7 +1866,6 @@ add({
 	description = "Hold it when the round ends for +40% score.",
 	price = 1000,
 	rare = "GoldenDrumstick",
-	groundWeight = 6,
 	rewardBonus = 0.4,
 })
 
@@ -1851,7 +1887,6 @@ add({
 	kind = "Melee",
 	description = "SQUEAK. Soft and floppy: zombies can squeeze past it.",
 	price = 400,
-	groundWeight = 12,
 	reach = 5,
 	arc = 120,
 	knockback = 30,
@@ -1867,7 +1902,6 @@ add({
 	kind = "Melee",
 	description = "Long and fat but soft: it slows zombies more than it stops them.",
 	price = 600,
-	groundWeight = 10,
 	reach = 7,
 	arc = 160,
 	knockback = 35,
@@ -1882,7 +1916,6 @@ add({
 	kind = "Melee",
 	description = "Long, crusty, surprisingly firm. Keeps zombies at bay.",
 	price = 900,
-	groundWeight = 10,
 	reach = 6.5,
 	arc = 90,
 	knockback = 55,
@@ -1898,7 +1931,6 @@ add({
 	description = "Wide and heavy: a firm shield of a pan. Egg included.",
 	price = 1200,
 	rare = "GoldenPan",
-	groundWeight = 6,
 	reach = 5,
 	arc = 110,
 	knockback = 75,
@@ -2002,7 +2034,6 @@ add({
 	kind = "Projectile",
 	description = "Fast little pebbles. Quick to reload.",
 	price = 800,
-	groundWeight = 6,
 	knockback = 40,
 	stun = 0.25,
 	cooldown = 0.6,
@@ -2019,7 +2050,6 @@ add({
 	kind = "Stream",
 	description = "Hold to spray. Keeps zombies pushed back while you have water (about 6 seconds).",
 	price = 1200,
-	groundWeight = 5,
 	reach = 16,
 	arc = 24,
 	knockback = 16,
@@ -2119,7 +2149,6 @@ add({
 	kind = "Trap",
 	description = "Click to drop a peel. Zombies that step on it slip and spin out. 3 peels.",
 	price = 700,
-	groundWeight = 6,
 	cooldown = 0.6,
 	charges = 3,
 	knockback = 45,
@@ -2133,7 +2162,6 @@ add({
 	kind = "Consumable",
 	description = "Click to chug: 35% faster for 8 seconds.",
 	price = 500,
-	groundWeight = 8,
 	cooldown = 0.5,
 	speedBoost = 1.35,
 	boostSeconds = 8,
@@ -12084,11 +12112,11 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	-- Open button (admins only) ----------------------------------------------------------------
 	local openButton = UIKit.button({
 		Name = "AdminButton",
-		Text = "ADMIN (F2)",
-		TextSize = 15,
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(104, 34),
+		Text = "ADMIN\n(F2)",
+		TextSize = 13,
+		-- Under the left side bar's buttons.
+		Position = UDim2.fromOffset(12, 10 + 5 * (66 + 8)),
+		Size = UDim2.fromOffset(66, 46),
 		BackgroundColor3 = ADMIN_RED,
 		Visible = false,
 		Parent = parent,
@@ -12594,7 +12622,7 @@ return Center
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
---   top-left: buttons        top-center: countdown      top-right: counts + leaderboard
+--   left side: buttons       top-center: countdown      top-right: counts + leaderboard
 --   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
 
@@ -13228,7 +13256,8 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 			Parent = frame,
 		}, { UIKit.corner(8) })
 		if spec.preview then
-			UIKit.viewport(previewBox, spec.preview, { ZIndex = 23 })
+			-- Skins (CharacterLook previews) are shown from above, like in game.
+			UIKit.viewport(previewBox, spec.preview, { ZIndex = 23 }, spec.preview.Name == "Preview")
 		end
 		UIKit.label({
 			Position = UDim2.fromOffset(10, 98),
@@ -13735,11 +13764,15 @@ return SidePanels
           <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">TopLeft</string>
-              <string name="Source"><![CDATA[-- Top-left: five square icon buttons (menu, shop, settings, trophy, chat).
+              <string name="Source"><![CDATA[-- Left side bar: five big square icon buttons stacked down the left edge
+-- (menu, shop, settings, trophy, chat).
 
 local UIKit = require(script.Parent.UIKit)
 
 local TopLeft = {}
+
+TopLeft.BUTTON = 66 -- button size (pixels before UI scaling)
+TopLeft.GAP = 8
 
 export type Actions = {
 	menu: () -> (),
@@ -13751,12 +13784,12 @@ export type Actions = {
 
 function TopLeft.build(parent: Instance, actions: Actions)
 	local bar = UIKit.new("Frame", {
-		Name = "TopLeft",
+		Name = "SideBar",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 8),
-		Size = UDim2.fromOffset(5 * 50, 46),
+		Position = UDim2.fromOffset(12, 10),
+		Size = UDim2.fromOffset(TopLeft.BUTTON, 5 * (TopLeft.BUTTON + TopLeft.GAP)),
 		Parent = parent,
-	}, { UIKit.list(Enum.FillDirection.Horizontal, 6) })
+	}, { UIKit.list(Enum.FillDirection.Vertical, TopLeft.GAP) })
 
 	local buttons: { { icon: string, action: () -> (), accent: boolean?, name: string } } = {
 		{ icon = "☰", action = actions.menu, accent = true, name = "Menu" },
@@ -13769,10 +13802,10 @@ function TopLeft.build(parent: Instance, actions: Actions)
 		UIKit.button({
 			Name = b.name,
 			Text = b.icon,
-			TextSize = 22,
+			TextSize = 34,
 			Font = UIKit.BOLD,
 			LayoutOrder = i,
-			Size = UDim2.fromOffset(44, 44),
+			Size = UDim2.fromOffset(TopLeft.BUTTON, TopLeft.BUTTON),
 			BackgroundColor3 = if b.accent then UIKit.ACCENT else UIKit.PANEL,
 			BackgroundTransparency = if b.accent then 0 else UIKit.PANEL_TRANSPARENCY,
 			Parent = bar,
@@ -14165,7 +14198,8 @@ function UIKit.modal(
 end
 
 -- Renders a 3D model inside a ViewportFrame, framed from above at an angle.
-function UIKit.viewport(parent: Instance, model: Model, props: Props?): ViewportFrame
+-- `fromAbove` looks straight down with the front up, like the game camera.
+function UIKit.viewport(parent: Instance, model: Model, props: Props?, fromAbove: boolean?): ViewportFrame
 	local merged: Props = {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
@@ -14186,8 +14220,12 @@ function UIKit.viewport(parent: Instance, model: Model, props: Props?): Viewport
 	local cf, size = model:GetBoundingBox()
 	local radius = math.max(size.Magnitude / 2, 0.5)
 	local distance = radius / math.tan(math.rad(camera.FieldOfView / 2)) * 1.08
-	local from = cf.Position + Vector3.new(0.45, 1, 0.75).Unit * distance
-	camera.CFrame = CFrame.lookAt(from, cf.Position)
+	if fromAbove then
+		camera.CFrame = CFrame.lookAt(cf.Position + Vector3.yAxis * distance, cf.Position, -Vector3.zAxis)
+	else
+		local from = cf.Position + Vector3.new(0.45, 1, 0.75).Unit * distance
+		camera.CFrame = CFrame.lookAt(from, cf.Position)
+	end
 	frame.Parent = parent
 	return frame
 end

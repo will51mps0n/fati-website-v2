@@ -1,5 +1,5 @@
 -- Builds the whole HUD in code and keeps it up to date.
---   top-left: buttons        top-center: countdown      top-right: counts + leaderboard
+--   left side: buttons       top-center: countdown      top-right: counts + leaderboard
 --   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
 

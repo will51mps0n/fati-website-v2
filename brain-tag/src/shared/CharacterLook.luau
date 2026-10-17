@@ -158,6 +158,7 @@ type Kit = {
 		yaw: number?
 	) -> Part,
 	pill: (x: number, z: number, w: number, d: number, top: number, color: string | Color3) -> (),
+	box: (x: number, z: number, w: number, d: number, r: number, top: number, color: string | Color3) -> (),
 	ball: (x: number, y: number, z: number, d: number, color: string | Color3) -> Part,
 }
 
@@ -188,6 +189,9 @@ local function kit(model: Model, root: BasePart, s: number): Kit
 			0.05 * s,
 			color
 		)
+	end
+	function k.box(x, z, w, d, r, top, color)
+		roundedRect(model, root, "Costume", x * s, z * s, w * s, d * s, r * s, top * s, 0.05 * s, color)
 	end
 	function k.ball(x, y, z, d, color)
 		local part = ball("Costume", d * s, if typeof(color) == "string" then color else "FFFFFF")
@@ -403,9 +407,15 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
 	local back = bodyZ + L / 2 -- rear end of the torso
 	local function torso()
-		k.pill(0, bodyZ, W + 0.24, L + 0.24, 0.47, edge)
-		k.pill(0, bodyZ, W, L, 0.5, main)
-		k.pill(-W * 0.12, bodyZ - L * 0.1, W * 0.42, L * 0.55, 0.51, lighter(main, 0.14)) -- soft sheen
+		local r = W * (if a.body == "Quadruped" then 0.28 else 0.42)
+		k.box(0, bodyZ, W + 0.24, L + 0.24, r + 0.12, 0.47, edge)
+		k.box(0, bodyZ, W, L, r, 0.5, main)
+		if a.body == "Quadruped" then
+			-- Shoulders and hips a touch wider than the waist.
+			k.box(0, bodyZ - L * 0.3, W * 1.07, L * 0.3, r, 0.502, main)
+			k.box(0, bodyZ + L * 0.3, W * 1.09, L * 0.32, r, 0.502, main)
+		end
+		k.box(-W * 0.14, bodyZ - L * 0.08, W * 0.36, L * 0.5, W * 0.15, 0.51, lighter(main, 0.14)) -- sheen
 	end
 	local function eyes(spread: number, z: number, size: number)
 		for side = -1, 1, 2 do
@@ -415,9 +425,21 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 	end
 
 	if a.body == "Quadruped" then
+		-- Legs splay out from shoulders and hips (front ones forward, back
+		-- ones back), with a paw or hoof at the end.
+		local spread, legLength = 0.45, 1.0
+		local sx, cz = math.sin(spread), math.cos(spread)
 		for side = -1, 1, 2 do
-			for _, z in { bodyZ - L * 0.3, bodyZ + L * 0.32 } do
-				k.pill(side * (W / 2 - 0.02), z, 0.6, 0.8, 0.36, dark) -- paws
+			for _, leg in
+				{
+					{ z = bodyZ - L * 0.3, dz = -1, yaw = -side * spread },
+					{ z = bodyZ + L * 0.3, dz = 1, yaw = side * spread },
+				}
+			do
+				local dx, dz = side * sx, leg.dz * cz
+				local cx, lz = side * W / 2 + dx * 0.3, leg.z + dz * 0.3
+				k.bar(cx, lz, 0.42, legLength, 0.36, if a.patches then dark else main, leg.yaw) -- pandas: black legs
+				k.box(cx + dx * legLength * 0.5, lz + dz * legLength * 0.5, 0.52, 0.44, 0.14, 0.37, dark)
 			end
 		end
 		local tail = a.tail
@@ -481,32 +503,48 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 		end
 	end
 
-	-- Head, with an outline ring.
+	-- Head, with an outline. Four-legged animals get a squarer skull (with a
+	-- neck); the "Head" part (name tags hang off it) sits hidden under it.
 	local fish = a.body == "Fish"
 	local headSize = if fish then W else a.head
-	k.dot(0, headZ, headSize + 0.22, if fish then 0.49 else 0.86, if fish then edge else darker(head, 0.7))
-	placeHead(
-		model,
-		root,
-		headSize * s,
-		0.3 * s,
-		if fish then main else head,
-		CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
-	)
+	if a.body == "Quadruped" then
+		local neckFrom, neckTo = bodyZ - L / 2 + 0.3, headZ
+		k.box(0, (neckFrom + neckTo) / 2, W * 0.55, neckFrom - neckTo, W * 0.2, 0.6, main) -- neck
+		local hw, hd = a.head * 0.9, a.head * 0.95
+		k.box(0, headZ, hw + 0.2, hd + 0.2, hw * 0.32 + 0.1, 0.86, darker(head, 0.7))
+		k.box(0, headZ, hw, hd, hw * 0.32, 0.88, head)
+		placeHead(model, root, a.head * 0.75 * s, 0.3 * s, head, CFrame.new(0, 0.7 * s, headZ * s))
+	else
+		k.dot(
+			0,
+			headZ,
+			headSize + 0.22,
+			if fish then 0.49 else 0.86,
+			if fish then edge else darker(head, 0.7)
+		)
+		placeHead(
+			model,
+			root,
+			headSize * s,
+			0.3 * s,
+			if fish then main else head,
+			CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
+		)
+	end
 
 	if a.body == "Quadruped" then
 		local ears = a.ears
 		local hr = a.head / 2
 		for side = -1, 1, 2 do
 			if ears == "Floppy" then
-				k.pill(side * (hr - 0.02), headZ + 0.15, 0.55, 1.25, 0.8, dark)
+				k.box(side * (hr - 0.02), headZ + 0.2, 0.55, 1.2, 0.2, 0.84, dark)
 			elseif ears == "Pointy" then
 				k.bar(side * hr * 0.78, headZ + hr * 0.5, 0.72, 0.72, 0.84, dark, math.rad(45))
 			elseif ears == "Round" then
 				k.dot(side * hr * 0.8, headZ + hr * 0.45, 0.72, 0.84, dark)
 			elseif ears == "Tall" then
-				k.pill(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.9, head)
-				k.pill(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.91, skin.accent or "FFB3C7")
+				k.box(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.22, 0.9, head)
+				k.box(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.1, 0.91, skin.accent or "FFB3C7")
 			elseif ears == "Long" then
 				-- Donkey ears stick out to the sides, swept a little back.
 				k.bar(side * (hr + 0.45), headZ + 0.35, 0.42, 1.35, 0.84, dark, side * math.rad(68))
@@ -527,11 +565,14 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 			end
 		end
 		local snout = a.snout
-		local front = headZ - hr
+		local front = headZ - a.head * 0.95 / 2
 		if snout then
+			-- A squarish muzzle sticking out past the skull, nose at its tip.
 			local sw, sl = snout[1], snout[2]
-			k.pill(0, front + 0.25 - sl / 2 + sl * 0.35, sw, sl, 0.92, light) -- muzzle
-			k.dot(0, front + 0.25 - sl + sl * 0.35 + 0.15, math.min(0.36, sw * 0.5), 0.95, "2B2B2B") -- nose
+			local muzzleZ = front - sl / 2 + 0.3
+			k.box(0, muzzleZ, sw + 0.14, sl + 0.14, sw * 0.3 + 0.07, 0.9, darker(light, 0.75))
+			k.box(0, muzzleZ, sw, sl, sw * 0.3, 0.92, light)
+			k.box(0, muzzleZ - sl / 2 + 0.16, math.min(0.42, sw * 0.55), 0.24, 0.1, 0.95, "2B2B2B") -- nose
 		end
 		if a.whiskers then
 			for side = -1, 1, 2 do

@@ -285,11 +285,11 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	-- Open button (admins only) ----------------------------------------------------------------
 	local openButton = UIKit.button({
 		Name = "AdminButton",
-		Text = "ADMIN (F2)",
-		TextSize = 15,
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(104, 34),
+		Text = "ADMIN\n(F2)",
+		TextSize = 13,
+		-- Under the left side bar's buttons.
+		Position = UDim2.fromOffset(12, 10 + 5 * (66 + 8)),
+		Size = UDim2.fromOffset(66, 46),
 		BackgroundColor3 = ADMIN_RED,
 		Visible = false,
 		Parent = parent,

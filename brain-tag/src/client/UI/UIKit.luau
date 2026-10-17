@@ -196,7 +196,8 @@ function UIKit.modal(
 end
 
 -- Renders a 3D model inside a ViewportFrame, framed from above at an angle.
-function UIKit.viewport(parent: Instance, model: Model, props: Props?): ViewportFrame
+-- `fromAbove` looks straight down with the front up, like the game camera.
+function UIKit.viewport(parent: Instance, model: Model, props: Props?, fromAbove: boolean?): ViewportFrame
 	local merged: Props = {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
@@ -217,8 +218,12 @@ function UIKit.viewport(parent: Instance, model: Model, props: Props?): Viewport
 	local cf, size = model:GetBoundingBox()
 	local radius = math.max(size.Magnitude / 2, 0.5)
 	local distance = radius / math.tan(math.rad(camera.FieldOfView / 2)) * 1.08
-	local from = cf.Position + Vector3.new(0.45, 1, 0.75).Unit * distance
-	camera.CFrame = CFrame.lookAt(from, cf.Position)
+	if fromAbove then
+		camera.CFrame = CFrame.lookAt(cf.Position + Vector3.yAxis * distance, cf.Position, -Vector3.zAxis)
+	else
+		local from = cf.Position + Vector3.new(0.45, 1, 0.75).Unit * distance
+		camera.CFrame = CFrame.lookAt(from, cf.Position)
+	end
 	frame.Parent = parent
 	return frame
 end

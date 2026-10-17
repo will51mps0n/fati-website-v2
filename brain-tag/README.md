@@ -159,8 +159,8 @@ settles the tug of war.
 Melee weapons can't hit: they only keep people away while you hold them out.
 The one exception is the super rare, Robux-only Ancient Spear, which can also
 strike and send zombies flying (`HITTERS` in `Items.luau`).
-Items are rare on the ground (1 to 2 a round, and an eaten human's item is
-lost), so you mostly buy them; each bot has a 20% chance to start with one
+Items are rare on the ground (1 to 2 a round, only Bats and Swordfish, and an
+eaten human's item is lost), so you mostly buy them; each bot has a 20% chance to start with one
 (`BOT_WEAPON_CHANCE`). A held weapon is solid: furniture it touches is pushed out of the way, and anyone who walks
 into it, zombie or human, is shoved back, so a weapon held across a doorway keeps them out.
 Each weapon has its own firmness and thickness (`SOLIDITY` in `Items.luau`):
@@ -176,15 +176,15 @@ harder.
 | Energy Drink | 500 | 35% faster for 8 seconds |
 | Pool Noodle | 600 | Huge, floppy, fast, wide swat |
 | Banana Peels | 700 | Drop 3 peels; zombies that step on one slip and spin out |
-| Bat | 750 | Short swing, solid knockback |
+| Bat | 750 | Short, thick and firm: zombies can't get past it |
 | Slingshot | 800 | Fast little pebbles |
 | Baguette | 900 | Long and crusty, leaves crumbs |
 | Drumstick | 1,000 | Hold it at round end: +40% score (5% roll: Golden, +80%) |
-| Frying Pan | 1,200 | CLANG: big knockback, long daze (5% roll: Golden Frying Pan) |
+| Frying Pan | 1,200 | Wide, heavy shield of a pan (5% roll: Golden Frying Pan) |
 | Water Gun | 1,200 | Hold to spray zombies back (about 6 s of water) |
 | Potato Gun | 1,500 | Potato projectiles (5% roll: Rare Potato Gun) |
 | Crowbar | 1,600 | Heavy and stiff: shoves furniture and zombies hard |
-| Plunger | 1,800 | Sticks to a zombie's face and pins them |
+| Plunger | 1,800 | Long handle, sticky cup: keeps zombies at arm's length |
 | Giant Lollipop | 2,000 | Wide, heavy swing |
 | Swordfish | 2,500 | Long reach, strong furniture hook |
 | Snowball Launcher | 3,000 | Frozen zombies crawl for a few seconds |

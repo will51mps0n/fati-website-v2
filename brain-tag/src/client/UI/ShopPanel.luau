@@ -249,7 +249,8 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 			Parent = frame,
 		}, { UIKit.corner(8) })
 		if spec.preview then
-			UIKit.viewport(previewBox, spec.preview, { ZIndex = 23 })
+			-- Skins (CharacterLook previews) are shown from above, like in game.
+			UIKit.viewport(previewBox, spec.preview, { ZIndex = 23 }, spec.preview.Name == "Preview")
 		end
 		UIKit.label({
 			Position = UDim2.fromOffset(10, 98),

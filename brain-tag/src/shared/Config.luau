@@ -209,21 +209,20 @@ Config.MONETIZATION = {
 -- Product_InstantBat = 1234567890). Updates to the game's code never touch
 -- them. See README "Setting up Robux items".
 do
-	local ok, storage = pcall(function()
-		return game:GetService("ReplicatedStorage")
-	end)
-	if ok and storage then
-		local function load(prefix: string, ids: { [string]: number })
-			for key in ids do
-				local saved = storage:GetAttribute(prefix .. key)
-				if typeof(saved) == "number" and saved > 0 then
-					ids[key] = saved
-				end
+	local function load(storage: Instance, prefix: string, ids: { [string]: number })
+		for key in ids do
+			local saved = storage:GetAttribute(prefix .. key)
+			if typeof(saved) == "number" and saved > 0 then
+				ids[key] = saved
 			end
 		end
-		load("Pass_", Config.MONETIZATION.GamePasses :: any)
-		load("Product_", Config.MONETIZATION.Products :: any)
 	end
+	-- Outside Roblox (tests, tools) there is no place to read, so skip quietly.
+	pcall(function()
+		local storage = game:GetService("ReplicatedStorage")
+		load(storage, "Pass_", Config.MONETIZATION.GamePasses :: any)
+		load(storage, "Product_", Config.MONETIZATION.Products :: any)
+	end)
 end
 
 return Config
