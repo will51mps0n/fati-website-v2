@@ -140,30 +140,6 @@ local HATS: { [string]: HatBuilder } = {
 			)
 		end
 	end,
-	Spots = function(model, root, s)
-		for _, spot in { { -0.35, 0.1, 0.4 }, { 0.35, 0.35, 0.3 }, { 0, 0.55, 0.25 } } do
-			local part = disc("Hat", spot[3] * s, 0.04 * s, "3E7F12")
-			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
-		end
-	end,
-	Frost = function(model, root, s)
-		for _, spot in { { -0.4, 0.05, 0.38 }, { 0.3, 0.4, 0.3 }, { 0.25, -0.25, 0.25 } } do
-			local part = disc("Hat", spot[3] * s, 0.04 * s, "FFFFFF")
-			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
-		end
-	end,
-	Bandage = function(model, root, s)
-		for i, angle in { -0.5, 0.15, 0.8 } do
-			local strip = block("Hat", Vector3.new(1.5, 0.04, 0.24) * s, "F7F2E4")
-			attach(
-				root,
-				strip,
-				CFrame.new(0, (0.97 + i * 0.01) * s, (i - 2) * 0.35 * s + 0.1 * s)
-					* CFrame.Angles(0, angle, 0),
-				model
-			)
-		end
-	end,
 }
 
 -- Costume pieces for the animal and character skins, drawn in real studs at
@@ -284,36 +260,6 @@ local STYLES: { [string]: Style } = {
 				(i % 2) * 0.8 - 0.4
 			) -- mustard
 		end
-	end,
-	Skeleton = function(k, skin)
-		for i = -1, 2 do
-			k.bar(0, i * 0.35 + 0.1, 2.4, 0.13, 0.53, "F4F4F4") -- ribs
-		end
-		k.bar(0, 0.1, 0.18, 1.6, 0.54, "F4F4F4") -- spine
-		for side = -1, 1, 2 do
-			k.dot(side * 0.4, -0.5, 0.45, 1.02, "1C1C1C") -- eye sockets
-		end
-	end,
-	Ghost = function(k, skin)
-		for side = -1, 1, 2 do
-			k.pill(side * 0.38, -0.55, 0.35, 0.55, 1.02, "1C1C1C")
-		end
-		k.dot(0, -0.95, 0.4, 1.03, "1C1C1C") -- "oooo" mouth
-		k.pill(0, 1.6, 1.6, 1.0, 0.45, skin.shirt) -- wispy tail
-	end,
-	Vampire = function(k, skin)
-		k.pill(0, 0.55, 4.1, 1.8, 0.48, skin.accent or "8E1B1B") -- cape lining
-		k.bar(0, -0.75, 0.9, 0.5, 1.0, skin.hair, 0) -- widow's peak
-		for side = -1, 1, 2 do
-			k.bar(side * 0.15, -1.12, 0.1, 0.18, 1.06, "FFFFFF") -- fangs
-		end
-	end,
-	Clown = function(k, skin)
-		for i, color in { "E5484D", "F1C40F", "3498DB" } do
-			k.ball(-1.0, 0.95, (i - 2) * 0.45, 0.6, color)
-			k.ball(1.0, 0.95, (i - 2) * 0.45, 0.6, color)
-		end
-		k.ball(0, 1.05, -1.1, 0.4, skin.accent or "E5484D") -- red nose
 	end,
 }
 
@@ -442,12 +388,17 @@ local ANIMALS: { [string]: Animal } = {
 	Shark = { body = "Fish", width = 1.9, length = 4.6, head = 1.9 },
 }
 
-local function buildAnimal(model: Model, root: BasePart, s: number, skin: Skins.Skin, a: Animal)
+-- Animals are drawn smaller than people (and a bit slimmer still).
+local ANIMAL_SCALE = 0.8
+local ANIMAL_SLIM = 0.9
+
+local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Skins.Skin, a: Animal)
+	local s = scale * ANIMAL_SCALE
 	local k = kit(model, root, s)
 	local main, head, light = skin.shirt, skin.hair, skin.skin
 	local dark = skin.accent or darker(main)
 	local edge = darker(main, 0.7)
-	local W, L = a.width, a.length
+	local W, L = a.width * ANIMAL_SLIM, a.length
 	local headZ = if a.body == "Frog" then -0.85 elseif a.body == "Fish" then -1.35 else -1.5
 	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
 	local back = bodyZ + L / 2 -- rear end of the torso

@@ -11,6 +11,7 @@ local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 local Participants = require(script.Parent.Participants)
 
 local C = Config.CHARACTER
@@ -115,10 +116,11 @@ local function updateNameTag(p: Participant)
 end
 
 function CharacterService.skinFor(p: Participant): string
-	if p.team == "Zombie" and p.alpha then
-		return "Alpha"
+	-- Every zombie looks the same, except the round's alpha.
+	if p.team == "Zombie" then
+		return if p.alpha or p.zombieSkin == "Alpha" then "Alpha" else Skins.DEFAULT_ZOMBIE
 	end
-	return if p.team == "Zombie" then p.zombieSkin else p.humanSkin
+	return p.humanSkin
 end
 
 -- An invisible cylinder the size of the drawn body. Only other characters'

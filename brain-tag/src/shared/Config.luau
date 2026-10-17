@@ -46,10 +46,6 @@ Config.ZOMBIE_WIN_REWARD = 250
 -- ate you gets them (so zombies grow as they feed).
 Config.INFECT_STEAL_FRACTION = 0.75 -- getting eaten costs most of your points
 
--- Infection ----------------------------------------------------------------------
-
-Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size); must stay above ShellDiameter
-
 -- Immunity (pills) ----------------------------------------------------------------
 
 Config.IMMUNITY_MAX = 100
@@ -191,16 +187,12 @@ Config.MONETIZATION = {
 		ScoreBoost30 = 0, -- 2x score for 30 minutes (stacks time)
 		SkinDuck = 0,
 		SkinAstronaut = 0,
-		SkinFrost = 0,
-		SkinMummy = 0,
 		SkinDog = 0,
 		SkinPanda = 0,
 		SkinRobot = 0,
 		SkinAlien = 0,
 		SkinShark = 0,
 		SkinHotdog = 0,
-		SkinGhost = 0,
-		SkinVampire = 0,
 	},
 	VIP_SCORE_BONUS = 0.2,
 	DOUBLE_SCORE_BONUS = 1,

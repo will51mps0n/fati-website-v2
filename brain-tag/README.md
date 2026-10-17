@@ -136,7 +136,7 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 75% of their points; the human's item is lost. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
@@ -161,8 +161,8 @@ them out. Only the Bat, Frying Pan, Golden Frying Pan, Inflatable Hammer and
 Plunger can also swing to knock zombies back (`HITTERS` in `Items.luau`).
 Items are rare on the ground (1 to 2 a round, and an eaten human's item is
 lost), so you mostly buy them; each bot has a 20% chance to start with one
-(`BOT_WEAPON_CHANCE`). A held weapon is solid: furniture it touches is pushed out of the way, and zombies that walk
-into it are shoved back, so a weapon held across a doorway keeps them out.
+(`BOT_WEAPON_CHANCE`). A held weapon is solid: furniture it touches is pushed out of the way, and anyone who walks
+into it, zombie or human, is shoved back, so a weapon held across a doorway keeps them out.
 Each weapon has its own firmness and thickness (`SOLIDITY` in `Items.luau`):
 the bat is short but holds zombies firmly, the pool noodle is long and fat but
 soft, so zombies squeeze past it, spears are thin. A bigger holder holds
@@ -218,9 +218,8 @@ chance 5% to 15%).
 
 **3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
 Donkey, Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
-Shark, Hotdog, Duck, Astronaut. Zombie, for score: Toxic, Zombie Dog, Skeleton,
-Zombie Clown. Zombie, for Robux: Ghost, Vampire, Frost, Mummy. VIP: Royal and
-Golden. Score skins give non-paying players something to grind for; Robux
+Shark, Hotdog, Duck, Astronaut. VIP: Royal. Zombies all look the same (the
+round's first zombies get the alpha look), so there are no zombie skins. Score skins give non-paying players something to grind for; Robux
 skins are pure cosmetics, the safest thing to sell.
 
 Suggested starting prices (in Robux):
@@ -232,7 +231,7 @@ Suggested starting prices (in Robux):
 | Product | Instant Spear | 35 |
 | Product | 2x Score, 30 min | 49 |
 | Product | Instant Shotgun | 75 |
-| Product | Any Robux skin (Dog, Panda, Robot, Ghost...) | 49 to 99 each |
+| Product | Any Robux skin (Dog, Panda, Robot, Shark...) | 49 to 99 each |
 | Pass | Starter Kit | 99 |
 | Pass | Lucky | 79 |
 | Pass | Double Score | 149 |

@@ -169,8 +169,31 @@ local function infect(zombie: Participant, human: Participant)
 	Announcer.chat(string.format("%s infected %s!", zombie.name, human.name), "9BE22D")
 end
 
--- Every frame of the infection phase: any zombie close enough to a human,
--- with no wall between them, converts that human.
+-- Does any part of the zombie touch the human? Its body, or the arms
+-- reaching out in front of it (the box they sweep, in the zombie's own
+-- frame), against the human's body circle.
+local ARM_REACH = 2.65 -- studs in front of the body center at scale 1 (CharacterLook arms)
+local ARM_SPAN = 1.85 -- half the width across both arms
+
+local function touching(zRoot: BasePart, zScale: number, hRoot: BasePart, hScale: number): boolean
+	local shell = Config.CHARACTER.ShellDiameter / 2
+	local hr = shell * hScale + 0.25
+	local offset = Util.flat(hRoot.Position - zRoot.Position)
+	if offset.Magnitude <= hr + shell * zScale then
+		return true
+	end
+	if offset.Magnitude > hr + (ARM_REACH + ARM_SPAN) * zScale then
+		return false
+	end
+	local rel = zRoot.CFrame:VectorToObjectSpace(offset)
+	local x = math.clamp(rel.X, -ARM_SPAN * zScale, ARM_SPAN * zScale)
+	local z = math.clamp(rel.Z, -ARM_REACH * zScale, 0)
+	local dx, dz = rel.X - x, rel.Z - z
+	return dx * dx + dz * dz <= hr * hr
+end
+
+-- Every frame of the infection phase: a single touch from any part of a
+-- zombie (with no wall or furniture between them) converts the human.
 local function infectionStep()
 	if phase ~= "Infection" then
 		return
@@ -183,9 +206,8 @@ local function infectionStep()
 			for _, zombie in zombies do
 				local zRoot = Participants.body(zombie)
 				if zRoot and zombie.team == "Zombie" then
-					local reach = RoundRules.infectDistance(zombie.scale, human.scale)
 					if
-						Util.flatDistance(zRoot.Position, hRoot.Position) < reach
+						touching(zRoot, zombie.scale, hRoot, human.scale)
 						and Combat.clearPath(zRoot.Position, hRoot.Position)
 					then
 						infect(zombie, human)

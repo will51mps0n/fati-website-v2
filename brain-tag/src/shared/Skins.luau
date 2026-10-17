@@ -207,57 +207,8 @@ local list: { Skin } = {
 		{ hat = "Donkey", accent = "3F3631", scorePrice = 9500 }
 	),
 
-	-- Zombies
+	-- Zombies: everyone looks the same, except the alpha.
 	skin("ClassicZombie", "Classic", "Zombie", "6B8F5A", "4C6B33", "9CCB5A", { default = true }),
-	skin("Toxic", "Toxic", "Zombie", "4C7A1F", "6FCF1F", "B6FF3B", { hat = "Spots", scorePrice = 5000 }),
-	skin("Frost", "Frost", "Zombie", "3D6F86", "DFF7FF", "8FE3D6", { hat = "Frost", product = "SkinFrost" }),
-	skin(
-		"Mummy",
-		"Mummy",
-		"Zombie",
-		"CDBF96",
-		"E6DCC0",
-		"D9CBA3",
-		{ hat = "Bandage", product = "SkinMummy" }
-	),
-	skin("GoldenZombie", "Golden", "Zombie", "8A7A20", "C9A227", "C9D94A", { hat = "Crown", pass = "VIP" }),
-	skin(
-		"ZombieDog",
-		"Zombie Dog",
-		"Zombie",
-		"6B7D52",
-		"5A6B3E",
-		"9CCB5A",
-		{ hat = "Dog", accent = "3E4A2A", scorePrice = 8000 }
-	),
-	skin(
-		"Skeleton",
-		"Skeleton",
-		"Zombie",
-		"2B2B2B",
-		"F4F4F4",
-		"F4F4F4",
-		{ hat = "Skeleton", scorePrice = 12000 }
-	),
-	skin("Ghost", "Ghost", "Zombie", "EEF2FF", "FFFFFF", "FFFFFF", { hat = "Ghost", product = "SkinGhost" }),
-	skin(
-		"Vampire",
-		"Vampire",
-		"Zombie",
-		"1C1C1C",
-		"111111",
-		"E8E8F0",
-		{ hat = "Vampire", accent = "8E1B1B", product = "SkinVampire" }
-	),
-	skin(
-		"ZombieClown",
-		"Clown",
-		"Zombie",
-		"8E44AD",
-		"F4F4F4",
-		"F4F4F4",
-		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
-	),
 	-- The first zombies of each round: orange with red blotches, a gray head
 	-- and red arms.
 	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "5E5E63", "8A8A90", {

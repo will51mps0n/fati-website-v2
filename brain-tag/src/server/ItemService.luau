@@ -251,7 +251,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	local kind = item.kind
 	if kind == "Melee" or kind == "Blast" then
 		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
-		for _, hit in Combat.zombiesInCone(p, aim, reach, item.arc or 90) do
+		for _, hit in Combat.peopleInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
 			local zRoot = Participants.body(hit.target)
@@ -290,7 +290,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
 	elseif kind == "Trap" then
-		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item)
+		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
 		p.heldCharges = (p.heldCharges or 1) - 1
 		p.state:SetAttribute("HeldCharges", p.heldCharges)
@@ -395,11 +395,12 @@ function ItemService.botUse(p: Participant, aim: Vector3)
 	use(p, item, direction)
 end
 
--- Held melee weapons are solid to zombies too: a zombie touching the shaft
--- (within the item's `guard`) is shoved off it in short pulses, so a stick
--- held across a doorway keeps zombies out. Firm weapons (bat, pan) hold
--- them completely; soft ones (pool noodle) give, so zombies squeeze past.
--- A bigger holder holds harder, a bigger zombie pushes through easier.
+-- Held melee weapons are solid to people too: anyone else (zombie or human)
+-- touching the shaft (within the item's `guard`) is shoved off it in short
+-- pulses, so a stick held across a doorway keeps zombies out. Firm weapons
+-- (bat, pan) hold people completely; soft ones (pool noodle) give, so they
+-- squeeze past. A bigger holder holds harder, a bigger person pushes
+-- through easier.
 local SHAFT_INTERVAL = 1 / 15
 local nextShaftStep = 0
 
@@ -409,10 +410,7 @@ local function shaftStep()
 		return
 	end
 	nextShaftStep = now + SHAFT_INTERVAL
-	local zombies = Participants.onTeam("Zombie")
-	if #zombies == 0 then
-		return
-	end
+	local people = Participants.all()
 	for _, p in Participants.onTeam("Human") do
 		local item = Items.get(p.heldItem)
 		local root = Participants.body(p)
@@ -423,30 +421,30 @@ local function shaftStep()
 		local guard = item.guard or 0.5
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
-		for _, zombie in zombies do
-			local zRoot = Participants.body(zombie)
+		for _, other in people do
+			local zRoot = if other ~= p then Participants.body(other) else nil
 			if zRoot then
 				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
 				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
 				local offset = z - (start + p.aim * along)
-				local radius = Config.CHARACTER.ShellDiameter / 2 * zombie.scale
+				local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
 				if
 					offset.Magnitude < radius + guard and Combat.lineOfSight(root.Position, zRoot.Position)
 				then
-					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
+					local firmness = (item.firmness or 1) * math.clamp(p.scale / other.scale, 0.5, 2)
 					local away = Util.flatUnit(offset) or p.aim
 					-- Each pulse covers part of the tick: soft weapons leave long gaps
 					-- the zombie walks through, firm ones short gaps to steer around.
 					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
 					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
-					Combat.knockback(zombie, away * speed, 0, seconds, true)
+					Combat.knockback(other, away * speed, 0, seconds, true)
 				end
 			end
 		end
 	end
 end
 
--- Water gun and leaf blower: while held, push every zombie in the cone a
+-- Water gun and leaf blower: while held, push everyone in the cone a
 -- little, many times a second. The leaf blower also blows light furniture.
 local function streamStep()
 	local now = os.clock()
@@ -472,7 +470,7 @@ local function streamStep()
 			end
 		end
 		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
-		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
+		for _, hit in Combat.peopleInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)
 			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)
 		end

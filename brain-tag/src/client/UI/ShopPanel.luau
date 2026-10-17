@@ -139,7 +139,6 @@ end
 
 function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	local mode: Mode = "Items"
-	local skinTeam: Skins.Team = "Human"
 	local render: () -> ()
 
 	local window, content, heading = UIKit.modal(parent, "Shop", 780, 520, function()
@@ -200,14 +199,6 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 			render()
 		end)
 	end
-	local teamHuman = tab("Human", 10, function()
-		skinTeam = "Human"
-		render()
-	end)
-	local teamZombie = tab("Zombie", 11, function()
-		skinTeam = "Zombie"
-		render()
-	end)
 
 	local function clearBody()
 		for _, child in body:GetChildren() do
@@ -354,9 +345,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	end
 
 	local function renderSkins()
-		local equipped = ClientState.my(if skinTeam == "Zombie" then "ZombieSkin" else "HumanSkin")
+		local equipped = ClientState.my("HumanSkin")
 		local score = ClientState.my("Score") or 0
-		for i, skin in Skins.forTeam(skinTeam) do
+		for i, skin in Skins.forTeam("Human") do
 			local owned = ClientState.owns("OwnedSkins", skin.id)
 				or skin.default == true
 				or (skin.pass ~= nil and ClientState.owns("Passes", skin.pass))
@@ -470,11 +461,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		body.Position = UDim2.fromOffset(0, if wizard then 0 else 42)
 		body.Size = UDim2.new(1, 0, 1, if wizard then 0 else -42)
 		for name, button in tabButtons do
-			local selected = name == mode or (mode == "Skins" and name == skinTeam)
+			local selected = name == mode
 			button.BackgroundColor3 = if selected then UIKit.ACCENT else Color3.fromRGB(70, 72, 78)
 		end
-		teamHuman.Visible = mode == "Skins"
-		teamZombie.Visible = mode == "Skins"
 		if mode == "Items" then
 			renderItems(false)
 		elseif mode == "Wizard" then

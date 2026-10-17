@@ -99,8 +99,8 @@ function Combat.knockback(
 	end
 end
 
--- Area blast (duck launcher): shoves every zombie within `radius` away from
--- the center, with a classic (harmless) Roblox explosion for show.
+-- Area blast (duck launcher): shoves everyone within `radius` away from the
+-- center, with a classic (harmless) Roblox explosion for show.
 function Combat.explode(at: Vector3, radius: number, knockback: number, stun: number)
 	local boom = Instance.new("Explosion")
 	boom.Position = at
@@ -109,14 +109,14 @@ function Combat.explode(at: Vector3, radius: number, knockback: number, stun: nu
 	boom.DestroyJointRadiusPercent = 0
 	boom.ExplosionType = Enum.ExplosionType.NoCraters
 	boom.Parent = workspace
-	for _, zombie in Participants.onTeam("Zombie") do
-		local root = Participants.body(zombie)
+	for _, person in Participants.all() do
+		local root = Participants.body(person)
 		if root then
 			local offset = Util.flat(root.Position - at)
 			if offset.Magnitude <= radius and Combat.lineOfSight(at, root.Position) then
 				local away = if offset.Magnitude > 0.1 then offset.Unit else Vector3.xAxis
 				local falloff = 1 - offset.Magnitude / radius * 0.5
-				Combat.knockback(zombie, away * knockback * falloff, stun)
+				Combat.knockback(person, away * knockback * falloff, stun)
 			end
 		end
 	end
@@ -124,8 +124,9 @@ end
 
 export type Hit = { target: Participant, direction: Vector3, distance: number }
 
--- Zombies inside a cone in front of `attacker`, not behind walls.
-function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number, arcDegrees: number): { Hit }
+-- Everyone else (zombies and humans) inside a cone in front of `attacker`,
+-- not behind walls: weapons push people on both teams.
+function Combat.peopleInCone(attacker: Participant, aim: Vector3, reach: number, arcDegrees: number): { Hit }
 	local root = Participants.body(attacker)
 	local hits = {}
 	if not root then
@@ -133,8 +134,8 @@ function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number
 	end
 	local cosHalf = math.cos(math.rad(arcDegrees / 2))
 	local myRadius = root.Size.X / 2
-	for _, zombie in Participants.onTeam("Zombie") do
-		local zRoot = Participants.body(zombie)
+	for _, other in Participants.all() do
+		local zRoot = if other ~= attacker then Participants.body(other) else nil
 		if zRoot then
 			local offset = Util.flat(zRoot.Position - root.Position)
 			local distance = offset.Magnitude
@@ -146,7 +147,7 @@ function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number
 					(touching or direction:Dot(aim) >= cosHalf)
 					and Combat.lineOfSight(root.Position, zRoot.Position)
 				then
-					table.insert(hits, { target = zombie, direction = direction, distance = distance })
+					table.insert(hits, { target = other, direction = direction, distance = distance })
 				end
 			end
 		end

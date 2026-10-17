@@ -1,8 +1,8 @@
 -- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
 -- ducks. Simulated on the server with sphere casts so hits are decided in
--- one place. Shots pass through humans and bushes and stop at the first
--- zombie, wall or piece of furniture, then apply their effect (shove,
--- freeze, bubble trap or explosion).
+-- one place. Shots pass through bushes and stop at the first person (zombie
+-- or human, never the shooter), wall or piece of furniture, then apply their
+-- effect (shove, freeze, bubble trap or explosion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -100,7 +100,7 @@ local function impact(shot: Shot, at: Vector3, target: Participant?, hitPart: In
 		Announcer.fx("Boom", { position = at })
 		return
 	end
-	if target and target.team == "Zombie" then
+	if target then
 		if item.knockback and item.knockback > 0 then
 			Combat.knockback(target, dir * item.knockback, item.stun or 0.3)
 		else
@@ -148,12 +148,6 @@ local function step(dt: number)
 				break
 			end
 			local target = Participants.fromPart(result.Instance)
-			if target and target.team == "Human" and target.character then
-				-- Fly through teammates.
-				table.insert(shot.ignored, target.character)
-				shot.params.FilterDescendantsInstances = shot.ignored
-				continue
-			end
 			impact(shot, result.Position, target, result.Instance)
 			finish(shot)
 			done = true

@@ -123,9 +123,4 @@ function RoundRules.walkSpeed(score: number, isZombie: boolean): number
 	return speed
 end
 
--- Infection reach between two bodies of the given scales.
-function RoundRules.infectDistance(scaleA: number, scaleB: number): number
-	return Config.INFECT_DISTANCE * (scaleA + scaleB) / 2
-end
-
 return RoundRules

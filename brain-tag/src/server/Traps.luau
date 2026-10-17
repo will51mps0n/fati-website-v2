@@ -1,5 +1,6 @@
--- Banana peels: dropped by humans, slippery for zombies. A zombie that steps
--- on one slips: a shove in the way they were walking and a long daze.
+-- Banana peels: dropped by humans, slippery for everyone (the dropper gets
+-- a moment to walk off it). Whoever steps on one slips: a shove in the way
+-- they were walking and a long daze.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,7 +15,8 @@ local Util = require(ReplicatedStorage.Shared.Util)
 
 local Traps = {}
 
-type Trap = { model: Model, position: Vector3, item: Items.Item }
+type Trap = { model: Model, position: Vector3, item: Items.Item, owner: Participant?, safeUntil: number }
+type Participant = Participants.Participant
 
 local traps: { Trap } = {}
 local folder: Folder
@@ -51,7 +53,7 @@ local function buildPeel(at: Vector3, spin: number): Model
 	return model
 end
 
-function Traps.place(position: Vector3, item: Items.Item)
+function Traps.place(position: Vector3, item: Items.Item, owner: Participant?)
 	if #traps >= MAX_TRAPS then
 		local oldest = table.remove(traps, 1)
 		if oldest then
@@ -60,7 +62,13 @@ function Traps.place(position: Vector3, item: Items.Item)
 	end
 	local model = buildPeel(position, math.random() * math.pi * 2)
 	model.Parent = folder
-	table.insert(traps, { model = model, position = Vector3.new(position.X, 0, position.Z), item = item })
+	table.insert(traps, {
+		model = model,
+		position = Vector3.new(position.X, 0, position.Z),
+		item = item,
+		owner = owner,
+		safeUntil = os.clock() + 1.5,
+	})
 end
 
 function Traps.clear()
@@ -74,17 +82,19 @@ local function step()
 	if #traps == 0 then
 		return
 	end
-	for _, zombie in Participants.onTeam("Zombie") do
-		local root, humanoid = Participants.body(zombie)
+	local now = os.clock()
+	for _, person in Participants.all() do
+		local root, humanoid = Participants.body(person)
 		if root and humanoid then
 			for i = #traps, 1, -1 do
 				local trap = traps[i]
-				if Util.flatDistance(root.Position, trap.position) <= 1.4 + root.Size.X / 2 then
+				local safe = person == trap.owner and now < trap.safeUntil
+				if not safe and Util.flatDistance(root.Position, trap.position) <= 1.4 + root.Size.X / 2 then
 					local move = Util.flatUnit(humanoid.MoveDirection)
 						or Util.flatUnit(root.CFrame.LookVector)
 						or Vector3.xAxis
-					Combat.knockback(zombie, move * (trap.item.knockback or 45), trap.item.stun or 1.2)
-					Announcer.fx("Slip", { position = trap.position, character = zombie.character })
+					Combat.knockback(person, move * (trap.item.knockback or 45), trap.item.stun or 1.2)
+					Announcer.fx("Slip", { position = trap.position, character = person.character })
 					trap.model:Destroy()
 					table.remove(traps, i)
 				end

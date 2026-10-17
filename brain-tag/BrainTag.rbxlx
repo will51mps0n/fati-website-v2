@@ -240,30 +240,6 @@ local HATS: { [string]: HatBuilder } = {
 			)
 		end
 	end,
-	Spots = function(model, root, s)
-		for _, spot in { { -0.35, 0.1, 0.4 }, { 0.35, 0.35, 0.3 }, { 0, 0.55, 0.25 } } do
-			local part = disc("Hat", spot[3] * s, 0.04 * s, "3E7F12")
-			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
-		end
-	end,
-	Frost = function(model, root, s)
-		for _, spot in { { -0.4, 0.05, 0.38 }, { 0.3, 0.4, 0.3 }, { 0.25, -0.25, 0.25 } } do
-			local part = disc("Hat", spot[3] * s, 0.04 * s, "FFFFFF")
-			attach(root, part, CFrame.new(spot[1] * s, 0.97 * s, spot[2] * s) * UP, model)
-		end
-	end,
-	Bandage = function(model, root, s)
-		for i, angle in { -0.5, 0.15, 0.8 } do
-			local strip = block("Hat", Vector3.new(1.5, 0.04, 0.24) * s, "F7F2E4")
-			attach(
-				root,
-				strip,
-				CFrame.new(0, (0.97 + i * 0.01) * s, (i - 2) * 0.35 * s + 0.1 * s)
-					* CFrame.Angles(0, angle, 0),
-				model
-			)
-		end
-	end,
 }
 
 -- Costume pieces for the animal and character skins, drawn in real studs at
@@ -384,36 +360,6 @@ local STYLES: { [string]: Style } = {
 				(i % 2) * 0.8 - 0.4
 			) -- mustard
 		end
-	end,
-	Skeleton = function(k, skin)
-		for i = -1, 2 do
-			k.bar(0, i * 0.35 + 0.1, 2.4, 0.13, 0.53, "F4F4F4") -- ribs
-		end
-		k.bar(0, 0.1, 0.18, 1.6, 0.54, "F4F4F4") -- spine
-		for side = -1, 1, 2 do
-			k.dot(side * 0.4, -0.5, 0.45, 1.02, "1C1C1C") -- eye sockets
-		end
-	end,
-	Ghost = function(k, skin)
-		for side = -1, 1, 2 do
-			k.pill(side * 0.38, -0.55, 0.35, 0.55, 1.02, "1C1C1C")
-		end
-		k.dot(0, -0.95, 0.4, 1.03, "1C1C1C") -- "oooo" mouth
-		k.pill(0, 1.6, 1.6, 1.0, 0.45, skin.shirt) -- wispy tail
-	end,
-	Vampire = function(k, skin)
-		k.pill(0, 0.55, 4.1, 1.8, 0.48, skin.accent or "8E1B1B") -- cape lining
-		k.bar(0, -0.75, 0.9, 0.5, 1.0, skin.hair, 0) -- widow's peak
-		for side = -1, 1, 2 do
-			k.bar(side * 0.15, -1.12, 0.1, 0.18, 1.06, "FFFFFF") -- fangs
-		end
-	end,
-	Clown = function(k, skin)
-		for i, color in { "E5484D", "F1C40F", "3498DB" } do
-			k.ball(-1.0, 0.95, (i - 2) * 0.45, 0.6, color)
-			k.ball(1.0, 0.95, (i - 2) * 0.45, 0.6, color)
-		end
-		k.ball(0, 1.05, -1.1, 0.4, skin.accent or "E5484D") -- red nose
 	end,
 }
 
@@ -542,12 +488,17 @@ local ANIMALS: { [string]: Animal } = {
 	Shark = { body = "Fish", width = 1.9, length = 4.6, head = 1.9 },
 }
 
-local function buildAnimal(model: Model, root: BasePart, s: number, skin: Skins.Skin, a: Animal)
+-- Animals are drawn smaller than people (and a bit slimmer still).
+local ANIMAL_SCALE = 0.8
+local ANIMAL_SLIM = 0.9
+
+local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Skins.Skin, a: Animal)
+	local s = scale * ANIMAL_SCALE
 	local k = kit(model, root, s)
 	local main, head, light = skin.shirt, skin.hair, skin.skin
 	local dark = skin.accent or darker(main)
 	local edge = darker(main, 0.7)
-	local W, L = a.width, a.length
+	local W, L = a.width * ANIMAL_SLIM, a.length
 	local headZ = if a.body == "Frog" then -0.85 elseif a.body == "Fish" then -1.35 else -1.5
 	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
 	local back = bodyZ + L / 2 -- rear end of the torso
@@ -920,10 +871,6 @@ Config.ZOMBIE_WIN_REWARD = 250
 -- ate you gets them (so zombies grow as they feed).
 Config.INFECT_STEAL_FRACTION = 0.75 -- getting eaten costs most of your points
 
--- Infection ----------------------------------------------------------------------
-
-Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size); must stay above ShellDiameter
-
 -- Immunity (pills) ----------------------------------------------------------------
 
 Config.IMMUNITY_MAX = 100
@@ -1065,16 +1012,12 @@ Config.MONETIZATION = {
 		ScoreBoost30 = 0, -- 2x score for 30 minutes (stacks time)
 		SkinDuck = 0,
 		SkinAstronaut = 0,
-		SkinFrost = 0,
-		SkinMummy = 0,
 		SkinDog = 0,
 		SkinPanda = 0,
 		SkinRobot = 0,
 		SkinAlien = 0,
 		SkinShark = 0,
 		SkinHotdog = 0,
-		SkinGhost = 0,
-		SkinVampire = 0,
 	},
 	VIP_SCORE_BONUS = 0.2,
 	DOUBLE_SCORE_BONUS = 1,
@@ -3587,11 +3530,6 @@ function RoundRules.walkSpeed(score: number, isZombie: boolean): number
 	return speed
 end
 
--- Infection reach between two bodies of the given scales.
-function RoundRules.infectDistance(scaleA: number, scaleB: number): number
-	return Config.INFECT_DISTANCE * (scaleA + scaleB) / 2
-end
-
 return RoundRules
 ]]></string>
         </Properties>
@@ -3808,57 +3746,8 @@ local list: { Skin } = {
 		{ hat = "Donkey", accent = "3F3631", scorePrice = 9500 }
 	),
 
-	-- Zombies
+	-- Zombies: everyone looks the same, except the alpha.
 	skin("ClassicZombie", "Classic", "Zombie", "6B8F5A", "4C6B33", "9CCB5A", { default = true }),
-	skin("Toxic", "Toxic", "Zombie", "4C7A1F", "6FCF1F", "B6FF3B", { hat = "Spots", scorePrice = 5000 }),
-	skin("Frost", "Frost", "Zombie", "3D6F86", "DFF7FF", "8FE3D6", { hat = "Frost", product = "SkinFrost" }),
-	skin(
-		"Mummy",
-		"Mummy",
-		"Zombie",
-		"CDBF96",
-		"E6DCC0",
-		"D9CBA3",
-		{ hat = "Bandage", product = "SkinMummy" }
-	),
-	skin("GoldenZombie", "Golden", "Zombie", "8A7A20", "C9A227", "C9D94A", { hat = "Crown", pass = "VIP" }),
-	skin(
-		"ZombieDog",
-		"Zombie Dog",
-		"Zombie",
-		"6B7D52",
-		"5A6B3E",
-		"9CCB5A",
-		{ hat = "Dog", accent = "3E4A2A", scorePrice = 8000 }
-	),
-	skin(
-		"Skeleton",
-		"Skeleton",
-		"Zombie",
-		"2B2B2B",
-		"F4F4F4",
-		"F4F4F4",
-		{ hat = "Skeleton", scorePrice = 12000 }
-	),
-	skin("Ghost", "Ghost", "Zombie", "EEF2FF", "FFFFFF", "FFFFFF", { hat = "Ghost", product = "SkinGhost" }),
-	skin(
-		"Vampire",
-		"Vampire",
-		"Zombie",
-		"1C1C1C",
-		"111111",
-		"E8E8F0",
-		{ hat = "Vampire", accent = "8E1B1B", product = "SkinVampire" }
-	),
-	skin(
-		"ZombieClown",
-		"Clown",
-		"Zombie",
-		"8E44AD",
-		"F4F4F4",
-		"F4F4F4",
-		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
-	),
 	-- The first zombies of each round: orange with red blotches, a gray head
 	-- and red arms.
 	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "5E5E63", "8A8A90", {
@@ -4912,7 +4801,6 @@ local function addBot(index: number)
 		repeat
 			p.humanSkin = randomSkin("Human")
 		until p.humanSkin ~= Skins.DEFAULT_HUMAN
-		p.zombieSkin = randomSkin("Zombie")
 	end
 	p.adminSpeed = level.speed
 	p.state:SetAttribute("BotLevel", entry.level)
@@ -5058,6 +4946,7 @@ local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Parts = require(ReplicatedStorage.Shared.Parts)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 local Participants = require(script.Parent.Participants)
 
 local C = Config.CHARACTER
@@ -5162,10 +5051,11 @@ local function updateNameTag(p: Participant)
 end
 
 function CharacterService.skinFor(p: Participant): string
-	if p.team == "Zombie" and p.alpha then
-		return "Alpha"
+	-- Every zombie looks the same, except the round's alpha.
+	if p.team == "Zombie" then
+		return if p.alpha or p.zombieSkin == "Alpha" then "Alpha" else Skins.DEFAULT_ZOMBIE
 	end
-	return if p.team == "Zombie" then p.zombieSkin else p.humanSkin
+	return p.humanSkin
 end
 
 -- An invisible cylinder the size of the drawn body. Only other characters'
@@ -5473,8 +5363,8 @@ function Combat.knockback(
 	end
 end
 
--- Area blast (duck launcher): shoves every zombie within `radius` away from
--- the center, with a classic (harmless) Roblox explosion for show.
+-- Area blast (duck launcher): shoves everyone within `radius` away from the
+-- center, with a classic (harmless) Roblox explosion for show.
 function Combat.explode(at: Vector3, radius: number, knockback: number, stun: number)
 	local boom = Instance.new("Explosion")
 	boom.Position = at
@@ -5483,14 +5373,14 @@ function Combat.explode(at: Vector3, radius: number, knockback: number, stun: nu
 	boom.DestroyJointRadiusPercent = 0
 	boom.ExplosionType = Enum.ExplosionType.NoCraters
 	boom.Parent = workspace
-	for _, zombie in Participants.onTeam("Zombie") do
-		local root = Participants.body(zombie)
+	for _, person in Participants.all() do
+		local root = Participants.body(person)
 		if root then
 			local offset = Util.flat(root.Position - at)
 			if offset.Magnitude <= radius and Combat.lineOfSight(at, root.Position) then
 				local away = if offset.Magnitude > 0.1 then offset.Unit else Vector3.xAxis
 				local falloff = 1 - offset.Magnitude / radius * 0.5
-				Combat.knockback(zombie, away * knockback * falloff, stun)
+				Combat.knockback(person, away * knockback * falloff, stun)
 			end
 		end
 	end
@@ -5498,8 +5388,9 @@ end
 
 export type Hit = { target: Participant, direction: Vector3, distance: number }
 
--- Zombies inside a cone in front of `attacker`, not behind walls.
-function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number, arcDegrees: number): { Hit }
+-- Everyone else (zombies and humans) inside a cone in front of `attacker`,
+-- not behind walls: weapons push people on both teams.
+function Combat.peopleInCone(attacker: Participant, aim: Vector3, reach: number, arcDegrees: number): { Hit }
 	local root = Participants.body(attacker)
 	local hits = {}
 	if not root then
@@ -5507,8 +5398,8 @@ function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number
 	end
 	local cosHalf = math.cos(math.rad(arcDegrees / 2))
 	local myRadius = root.Size.X / 2
-	for _, zombie in Participants.onTeam("Zombie") do
-		local zRoot = Participants.body(zombie)
+	for _, other in Participants.all() do
+		local zRoot = if other ~= attacker then Participants.body(other) else nil
 		if zRoot then
 			local offset = Util.flat(zRoot.Position - root.Position)
 			local distance = offset.Magnitude
@@ -5520,7 +5411,7 @@ function Combat.zombiesInCone(attacker: Participant, aim: Vector3, reach: number
 					(touching or direction:Dot(aim) >= cosHalf)
 					and Combat.lineOfSight(root.Position, zRoot.Position)
 				then
-					table.insert(hits, { target = zombie, direction = direction, distance = distance })
+					table.insert(hits, { target = other, direction = direction, distance = distance })
 				end
 			end
 		end
@@ -7101,7 +6992,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	local kind = item.kind
 	if kind == "Melee" or kind == "Blast" then
 		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
-		for _, hit in Combat.zombiesInCone(p, aim, reach, item.arc or 90) do
+		for _, hit in Combat.peopleInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
 			local zRoot = Participants.body(hit.target)
@@ -7140,7 +7031,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
 	elseif kind == "Trap" then
-		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item)
+		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
 		p.heldCharges = (p.heldCharges or 1) - 1
 		p.state:SetAttribute("HeldCharges", p.heldCharges)
@@ -7245,11 +7136,12 @@ function ItemService.botUse(p: Participant, aim: Vector3)
 	use(p, item, direction)
 end
 
--- Held melee weapons are solid to zombies too: a zombie touching the shaft
--- (within the item's `guard`) is shoved off it in short pulses, so a stick
--- held across a doorway keeps zombies out. Firm weapons (bat, pan) hold
--- them completely; soft ones (pool noodle) give, so zombies squeeze past.
--- A bigger holder holds harder, a bigger zombie pushes through easier.
+-- Held melee weapons are solid to people too: anyone else (zombie or human)
+-- touching the shaft (within the item's `guard`) is shoved off it in short
+-- pulses, so a stick held across a doorway keeps zombies out. Firm weapons
+-- (bat, pan) hold people completely; soft ones (pool noodle) give, so they
+-- squeeze past. A bigger holder holds harder, a bigger person pushes
+-- through easier.
 local SHAFT_INTERVAL = 1 / 15
 local nextShaftStep = 0
 
@@ -7259,10 +7151,7 @@ local function shaftStep()
 		return
 	end
 	nextShaftStep = now + SHAFT_INTERVAL
-	local zombies = Participants.onTeam("Zombie")
-	if #zombies == 0 then
-		return
-	end
+	local people = Participants.all()
 	for _, p in Participants.onTeam("Human") do
 		local item = Items.get(p.heldItem)
 		local root = Participants.body(p)
@@ -7273,30 +7162,30 @@ local function shaftStep()
 		local guard = item.guard or 0.5
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
-		for _, zombie in zombies do
-			local zRoot = Participants.body(zombie)
+		for _, other in people do
+			local zRoot = if other ~= p then Participants.body(other) else nil
 			if zRoot then
 				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
 				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
 				local offset = z - (start + p.aim * along)
-				local radius = Config.CHARACTER.ShellDiameter / 2 * zombie.scale
+				local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
 				if
 					offset.Magnitude < radius + guard and Combat.lineOfSight(root.Position, zRoot.Position)
 				then
-					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
+					local firmness = (item.firmness or 1) * math.clamp(p.scale / other.scale, 0.5, 2)
 					local away = Util.flatUnit(offset) or p.aim
 					-- Each pulse covers part of the tick: soft weapons leave long gaps
 					-- the zombie walks through, firm ones short gaps to steer around.
 					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
 					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
-					Combat.knockback(zombie, away * speed, 0, seconds, true)
+					Combat.knockback(other, away * speed, 0, seconds, true)
 				end
 			end
 		end
 	end
 end
 
--- Water gun and leaf blower: while held, push every zombie in the cone a
+-- Water gun and leaf blower: while held, push everyone in the cone a
 -- little, many times a second. The leaf blower also blows light furniture.
 local function streamStep()
 	local now = os.clock()
@@ -7322,7 +7211,7 @@ local function streamStep()
 			end
 		end
 		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
-		for _, hit in Combat.zombiesInCone(p, p.aim, reach, item.arc or 30) do
+		for _, hit in Combat.peopleInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)
 			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)
 		end
@@ -8562,9 +8451,9 @@ return Participants
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
 -- ducks. Simulated on the server with sphere casts so hits are decided in
--- one place. Shots pass through humans and bushes and stop at the first
--- zombie, wall or piece of furniture, then apply their effect (shove,
--- freeze, bubble trap or explosion).
+-- one place. Shots pass through bushes and stop at the first person (zombie
+-- or human, never the shooter), wall or piece of furniture, then apply their
+-- effect (shove, freeze, bubble trap or explosion).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -8662,7 +8551,7 @@ local function impact(shot: Shot, at: Vector3, target: Participant?, hitPart: In
 		Announcer.fx("Boom", { position = at })
 		return
 	end
-	if target and target.team == "Zombie" then
+	if target then
 		if item.knockback and item.knockback > 0 then
 			Combat.knockback(target, dir * item.knockback, item.stun or 0.3)
 		else
@@ -8710,12 +8599,6 @@ local function step(dt: number)
 				break
 			end
 			local target = Participants.fromPart(result.Instance)
-			if target and target.team == "Human" and target.character then
-				-- Fly through teammates.
-				table.insert(shot.ignored, target.character)
-				shot.params.FilterDescendantsInstances = shot.ignored
-				continue
-			end
 			impact(shot, result.Position, target, result.Instance)
 			finish(shot)
 			done = true
@@ -8965,8 +8848,31 @@ local function infect(zombie: Participant, human: Participant)
 	Announcer.chat(string.format("%s infected %s!", zombie.name, human.name), "9BE22D")
 end
 
--- Every frame of the infection phase: any zombie close enough to a human,
--- with no wall between them, converts that human.
+-- Does any part of the zombie touch the human? Its body, or the arms
+-- reaching out in front of it (the box they sweep, in the zombie's own
+-- frame), against the human's body circle.
+local ARM_REACH = 2.65 -- studs in front of the body center at scale 1 (CharacterLook arms)
+local ARM_SPAN = 1.85 -- half the width across both arms
+
+local function touching(zRoot: BasePart, zScale: number, hRoot: BasePart, hScale: number): boolean
+	local shell = Config.CHARACTER.ShellDiameter / 2
+	local hr = shell * hScale + 0.25
+	local offset = Util.flat(hRoot.Position - zRoot.Position)
+	if offset.Magnitude <= hr + shell * zScale then
+		return true
+	end
+	if offset.Magnitude > hr + (ARM_REACH + ARM_SPAN) * zScale then
+		return false
+	end
+	local rel = zRoot.CFrame:VectorToObjectSpace(offset)
+	local x = math.clamp(rel.X, -ARM_SPAN * zScale, ARM_SPAN * zScale)
+	local z = math.clamp(rel.Z, -ARM_REACH * zScale, 0)
+	local dx, dz = rel.X - x, rel.Z - z
+	return dx * dx + dz * dz <= hr * hr
+end
+
+-- Every frame of the infection phase: a single touch from any part of a
+-- zombie (with no wall or furniture between them) converts the human.
 local function infectionStep()
 	if phase ~= "Infection" then
 		return
@@ -8979,9 +8885,8 @@ local function infectionStep()
 			for _, zombie in zombies do
 				local zRoot = Participants.body(zombie)
 				if zRoot and zombie.team == "Zombie" then
-					local reach = RoundRules.infectDistance(zombie.scale, human.scale)
 					if
-						Util.flatDistance(zRoot.Position, hRoot.Position) < reach
+						touching(zRoot, zombie.scale, hRoot, human.scale)
 						and Combat.clearPath(zRoot.Position, hRoot.Position)
 					then
 						infect(zombie, human)
@@ -9577,8 +9482,9 @@ return TopScores
       <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">Traps</string>
-          <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for zombies. A zombie that steps
--- on one slips: a shove in the way they were walking and a long daze.
+          <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for everyone (the dropper gets
+-- a moment to walk off it). Whoever steps on one slips: a shove in the way
+-- they were walking and a long daze.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -9593,7 +9499,8 @@ local Util = require(ReplicatedStorage.Shared.Util)
 
 local Traps = {}
 
-type Trap = { model: Model, position: Vector3, item: Items.Item }
+type Trap = { model: Model, position: Vector3, item: Items.Item, owner: Participant?, safeUntil: number }
+type Participant = Participants.Participant
 
 local traps: { Trap } = {}
 local folder: Folder
@@ -9630,7 +9537,7 @@ local function buildPeel(at: Vector3, spin: number): Model
 	return model
 end
 
-function Traps.place(position: Vector3, item: Items.Item)
+function Traps.place(position: Vector3, item: Items.Item, owner: Participant?)
 	if #traps >= MAX_TRAPS then
 		local oldest = table.remove(traps, 1)
 		if oldest then
@@ -9639,7 +9546,13 @@ function Traps.place(position: Vector3, item: Items.Item)
 	end
 	local model = buildPeel(position, math.random() * math.pi * 2)
 	model.Parent = folder
-	table.insert(traps, { model = model, position = Vector3.new(position.X, 0, position.Z), item = item })
+	table.insert(traps, {
+		model = model,
+		position = Vector3.new(position.X, 0, position.Z),
+		item = item,
+		owner = owner,
+		safeUntil = os.clock() + 1.5,
+	})
 end
 
 function Traps.clear()
@@ -9653,17 +9566,19 @@ local function step()
 	if #traps == 0 then
 		return
 	end
-	for _, zombie in Participants.onTeam("Zombie") do
-		local root, humanoid = Participants.body(zombie)
+	local now = os.clock()
+	for _, person in Participants.all() do
+		local root, humanoid = Participants.body(person)
 		if root and humanoid then
 			for i = #traps, 1, -1 do
 				local trap = traps[i]
-				if Util.flatDistance(root.Position, trap.position) <= 1.4 + root.Size.X / 2 then
+				local safe = person == trap.owner and now < trap.safeUntil
+				if not safe and Util.flatDistance(root.Position, trap.position) <= 1.4 + root.Size.X / 2 then
 					local move = Util.flatUnit(humanoid.MoveDirection)
 						or Util.flatUnit(root.CFrame.LookVector)
 						or Vector3.xAxis
-					Combat.knockback(zombie, move * (trap.item.knockback or 45), trap.item.stun or 1.2)
-					Announcer.fx("Slip", { position = trap.position, character = zombie.character })
+					Combat.knockback(person, move * (trap.item.knockback or 45), trap.item.stun or 1.2)
+					Announcer.fx("Slip", { position = trap.position, character = person.character })
 					trap.model:Destroy()
 					table.remove(traps, i)
 				end
@@ -13173,7 +13088,6 @@ end
 
 function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	local mode: Mode = "Items"
-	local skinTeam: Skins.Team = "Human"
 	local render: () -> ()
 
 	local window, content, heading = UIKit.modal(parent, "Shop", 780, 520, function()
@@ -13234,14 +13148,6 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 			render()
 		end)
 	end
-	local teamHuman = tab("Human", 10, function()
-		skinTeam = "Human"
-		render()
-	end)
-	local teamZombie = tab("Zombie", 11, function()
-		skinTeam = "Zombie"
-		render()
-	end)
 
 	local function clearBody()
 		for _, child in body:GetChildren() do
@@ -13388,9 +13294,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	end
 
 	local function renderSkins()
-		local equipped = ClientState.my(if skinTeam == "Zombie" then "ZombieSkin" else "HumanSkin")
+		local equipped = ClientState.my("HumanSkin")
 		local score = ClientState.my("Score") or 0
-		for i, skin in Skins.forTeam(skinTeam) do
+		for i, skin in Skins.forTeam("Human") do
 			local owned = ClientState.owns("OwnedSkins", skin.id)
 				or skin.default == true
 				or (skin.pass ~= nil and ClientState.owns("Passes", skin.pass))
@@ -13504,11 +13410,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		body.Position = UDim2.fromOffset(0, if wizard then 0 else 42)
 		body.Size = UDim2.new(1, 0, 1, if wizard then 0 else -42)
 		for name, button in tabButtons do
-			local selected = name == mode or (mode == "Skins" and name == skinTeam)
+			local selected = name == mode
 			button.BackgroundColor3 = if selected then UIKit.ACCENT else Color3.fromRGB(70, 72, 78)
 		end
-		teamHuman.Visible = mode == "Skins"
-		teamZombie.Visible = mode == "Skins"
 		if mode == "Items" then
 			renderItems(false)
 		elseif mode == "Wizard" then

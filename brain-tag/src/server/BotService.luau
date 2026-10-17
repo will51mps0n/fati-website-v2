@@ -604,7 +604,6 @@ local function addBot(index: number)
 		repeat
 			p.humanSkin = randomSkin("Human")
 		until p.humanSkin ~= Skins.DEFAULT_HUMAN
-		p.zombieSkin = randomSkin("Zombie")
 	end
 	p.adminSpeed = level.speed
 	p.state:SetAttribute("BotLevel", entry.level)
