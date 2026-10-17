@@ -5,7 +5,28 @@
 
 local HttpService = game:GetService("HttpService")
 
-local BUNDLE_URL = "https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/studio/bundle.json"
+local REPO = "will51mps0n/fati-website-v2"
+local BRANCH = "claude/pensive-mccarthy-jls1ep"
+local BUNDLE_PATH = "brain-tag/studio/bundle.json"
+
+-- GitHub's file server caches a branch's files for a few minutes after a
+-- push, so ask the API for the branch's newest commit and download the
+-- bundle from that exact commit (those URLs never go stale).
+local function newestCommit(): string?
+	local ok, sha = pcall(function()
+		return HttpService:GetAsync(
+			"https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH,
+			true,
+			{ Accept = "application/vnd.github.sha" }
+		)
+	end)
+	local clean = if ok and typeof(sha) == "string" then string.match(sha, "^%s*(%x+)%s*$") else nil
+	if clean and #clean == 40 then
+		return clean
+	end
+	warn("[Brain Tag] couldn't ask GitHub for the newest version, using its cached copy: " .. tostring(sha))
+	return nil
+end
 
 local function container(path)
 	local names = string.split(path, "/")
@@ -32,7 +53,10 @@ end
 
 return function()
 	print("[Brain Tag] downloading...")
-	local bundle = HttpService:JSONDecode(HttpService:GetAsync(BUNDLE_URL, true))
+	local commit = newestCommit()
+	local ref = commit or ("refs/heads/" .. BRANCH)
+	local url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. ref .. "/" .. BUNDLE_PATH
+	local bundle = HttpService:JSONDecode(HttpService:GetAsync(url, true))
 
 	local made = {}
 	local count = 0
@@ -83,5 +107,11 @@ return function()
 	pcall(function()
 		game:GetService("ChangeHistoryService"):SetWaypoint("Install Brain Tag")
 	end)
-	print(("[Brain Tag] installed build %s (%d scripts). Press Play to test."):format(bundle.build, count))
+	print(
+		("[Brain Tag] installed build %s%s (%d scripts). Press Play to test."):format(
+			bundle.build,
+			if commit then ", commit " .. string.sub(commit, 1, 7) else "",
+			count
+		)
+	)
 end
