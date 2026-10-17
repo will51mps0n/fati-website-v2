@@ -252,7 +252,7 @@ src/shared   Config, items, skins, map layout, character and item models
 src/server   map + furniture builders, rounds, items, shop, data, monetization, bots
 src/client   camera, movement, input, effects, chat, UI/ (HUD built in code)
 tests/       logic tests (round rules, items, skins, map geometry)
-studio/      install.luau, the generated Command Bar installer
+studio/      the Command Bar installer (install.luau) and the scripts it installs (bundle.json), both generated
 tools/       test runner, map preview renderer, installer generator
 ```
 
@@ -262,6 +262,6 @@ Developer checks (need the standalone `luau` binary from
 ```
 python3 tools/run_tests.py path/to/luau      # 31 logic tests, incl. "every room is reachable"
 python3 tools/render_map.py path/to/luau     # writes tools/out/map.png
-python3 tools/build_installer.py path/to/rojo   # regenerates studio/install.luau (the Command Bar installer)
+python3 tools/build_installer.py path/to/rojo   # regenerates studio/ (the Command Bar installer)
 rojo sourcemap -o sourcemap.json && luau-lsp analyze --sourcemap sourcemap.json --definitions <roblox defs> src
 ```
