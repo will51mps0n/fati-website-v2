@@ -97,6 +97,9 @@ local HANDLERS: { [string]: Handler } = {
 	InstantShotgun = function(p)
 		giveOrQueue(p, "Shotgun")
 	end,
+	InstantAncientSpear = function(p)
+		giveOrQueue(p, "AncientSpear")
+	end,
 	ImmunityShot = function(p)
 		Participants.setImmunity(p, p.immunity + money.IMMUNITY_SHOT_AMOUNT)
 		if p.player then

@@ -75,7 +75,7 @@ add({
 	id = "Bat",
 	name = "Bat",
 	kind = "Melee",
-	description = "The classic. A short swing with solid knockback.",
+	description = "The classic. Short, thick and firm: zombies can't get past it.",
 	price = 750,
 	robuxProduct = "InstantBat",
 	groundWeight = 25,
@@ -107,7 +107,6 @@ add({
 	description = "Longest reach. Hold it out to keep zombies far away.",
 	price = 3500,
 	robuxProduct = "InstantSpear",
-	rare = "AncientSpear",
 	reach = 10,
 	arc = 30,
 	knockback = 90,
@@ -118,10 +117,10 @@ add({
 
 add({
 	id = "AncientSpear",
-	name = "Rare Ancient Spear",
+	name = "Ancient Spear",
 	kind = "Melee",
-	description = "A golden spear: even longer and firmer.",
-	wizardPrice = 7000,
+	description = "Super rare, Robux only. The longest, firmest weapon, and the only one that strikes: click to send zombies flying.",
+	robuxProduct = "InstantAncientSpear",
 	isRare = true,
 	reach = 11,
 	arc = 32,
@@ -263,7 +262,7 @@ add({
 	id = "FryingPan",
 	name = "Frying Pan",
 	kind = "Melee",
-	description = "CLANG! Big knockback and a good long daze. Egg included.",
+	description = "Wide and heavy: a firm shield of a pan. Egg included.",
 	price = 1200,
 	rare = "GoldenPan",
 	groundWeight = 6,
@@ -280,7 +279,7 @@ add({
 	id = "GoldenPan",
 	name = "Golden Frying Pan",
 	kind = "Melee",
-	description = "The legendary pan. CLANG, but louder.",
+	description = "The legendary pan: even wider and firmer.",
 	wizardPrice = 5000,
 	isRare = true,
 	reach = 5.5,
@@ -309,7 +308,7 @@ add({
 	id = "Plunger",
 	name = "Plunger",
 	kind = "Melee",
-	description = "Thwop! Sticks to a zombie's face and freezes them in place.",
+	description = "A long handle with a sticky cup: keeps zombies at arm's length.",
 	price = 1800,
 	reach = 7,
 	arc = 45,
@@ -352,7 +351,7 @@ add({
 	id = "InflatableHammer",
 	name = "Inflatable Hammer",
 	kind = "Melee",
-	description = "BOING! Sends zombies flying across the room.",
+	description = "Huge and squishy: blocks a lot, but zombies can push through.",
 	wizardPrice = 6000,
 	isRare = true,
 	reach = 7,
@@ -529,9 +528,9 @@ local SOLIDITY: { [string]: { number } } = {
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
 }
--- Most melee weapons only keep zombies away while you hold them out. These
--- few can also swing and knock zombies back.
-local HITTERS = { "Bat", "FryingPan", "GoldenPan", "InflatableHammer", "Plunger" }
+-- Melee weapons only keep people away while you hold them out. The one
+-- exception is the super rare, Robux-only Ancient Spear, which can strike.
+local HITTERS = { "AncientSpear" }
 for _, id in HITTERS do
 	local item = Items[id]
 	if item then
@@ -573,7 +572,7 @@ local SHOP_ORDER = {
 	"DuckLauncher",
 	"Shotgun",
 }
-local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "AncientSpear", "InflatableHammer" }
+local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "InflatableHammer" }
 
 local module = {
 	all = Items,

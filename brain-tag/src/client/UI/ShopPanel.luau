@@ -61,11 +61,17 @@ local PASSES = {
 		key = "Lucky",
 		name = "Lucky",
 		description = "Rare roll chance 5% -> 15% on every purchase.",
-		preview = "item:AncientSpear",
+		preview = "item:RarePotatoGun",
 	},
 }
 
 local PRODUCTS = {
+	{
+		key = "InstantAncientSpear",
+		name = "Ancient Spear",
+		description = "Super rare. The only weapon that strikes.",
+		preview = "item:AncientSpear",
+	},
 	{
 		key = "InstantBat",
 		name = "Instant Bat",
@@ -425,7 +431,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				priceColor = if owned then UIKit.LIME else UIKit.GOLD,
 				description = entry.description .. (if kind == "GamePass" then "  (permanent)" else ""),
 				preview = buildPreview(entry.preview),
-				button = if owned then "Owned" elseif id == 0 then "Set id in Config" else "Buy",
+				button = if owned then "Owned" elseif id == 0 then "Needs an id (README)" else "Buy",
 				buttonColor = UIKit.ACCENT,
 				enabled = not owned and id ~= 0,
 				onClick = function()

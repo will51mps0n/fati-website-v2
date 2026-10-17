@@ -156,9 +156,9 @@ settles the tug of war.
 
 ### Items (score prices)
 
-Most melee weapons can't hit: they only keep zombies away while you hold
-them out. Only the Bat, Frying Pan, Golden Frying Pan, Inflatable Hammer and
-Plunger can also swing to knock zombies back (`HITTERS` in `Items.luau`).
+Melee weapons can't hit: they only keep people away while you hold them out.
+The one exception is the super rare, Robux-only Ancient Spear, which can also
+strike and send zombies flying (`HITTERS` in `Items.luau`).
 Items are rare on the ground (1 to 2 a round, and an eaten human's item is
 lost), so you mostly buy them; each bot has a 20% chance to start with one
 (`BOT_WEAPON_CHANCE`). A held weapon is solid: furniture it touches is pushed out of the way, and anyone who walks
@@ -188,7 +188,7 @@ harder.
 | Giant Lollipop | 2,000 | Wide, heavy swing |
 | Swordfish | 2,500 | Long reach, strong furniture hook |
 | Snowball Launcher | 3,000 | Frozen zombies crawl for a few seconds |
-| Spear | 3,500 | Longest reach, straight push (5% roll: Rare Ancient Spear) |
+| Spear | 3,500 | Longest reach; hold it out to keep zombies far away |
 | Katana | 4,000 | Fast swings, long reach |
 | Confetti Cannon | 4,500 | Cone blast in a shower of confetti |
 | Bubble Gun | 5,000 | Traps a zombie in a bubble until it pops |
@@ -197,8 +197,8 @@ harder.
 | Shotgun | 10,000 | Cone blast; also blows a hole in the wall in front of you until the round resets |
 
 The wizard sells rare items outright: Golden Drumstick 3,000, Rare Potato Gun
-4,000, Golden Frying Pan 5,000, Inflatable Hammer 6,000 (BOING: sends zombies
-flying), Rare Ancient Spear 7,000.
+4,000, Golden Frying Pan 5,000, Inflatable Hammer 6,000. The Ancient Spear is
+not sold for score at all: it is Robux only.
 
 Only the Bat, Swordfish, Spear and Shotgun prices are known from the original.
 The rest, and the 3-minute timer, are placeholders in `Config.luau` / `Items.luau`.
@@ -206,11 +206,13 @@ The rest, and the 3-minute timer, are placeholders in `Config.luau` / `Items.lua
 ## Monetization
 
 Three layers, from smallest to biggest commitment. All are wired up and only
-need ids from the Creator Dashboard.
+need ids from the Creator Dashboard (see "Setting up Robux items" below).
 
 **1. Small one-off purchases (developer products).** Instant Bat, Instant Spear,
-Instant Shotgun (delivered straight to your hand, or saved for next round if
-you are a zombie), Immunity Shot (+50), and a 2x Score boost for 30 minutes.
+Instant Shotgun, the super rare **Ancient Spear** (Robux only, and the only
+weapon that can strike), all delivered straight to your hand (or saved for next
+round if you are a zombie), Immunity Shot (+50), and a 2x Score boost for 30
+minutes.
 
 **2. Passive buffs (game passes).** VIP (gold name, [VIP] chat tag, +20% score,
 VIP-only skins), Double Score, Starter Kit (a Bat every round), Lucky (rare roll
@@ -219,40 +221,65 @@ chance 5% to 15%).
 **3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
 Donkey, Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
 Shark, Hotdog, Duck, Astronaut. VIP: Royal. Zombies all look the same (the
-round's first zombies get the alpha look), so there are no zombie skins. Score skins give non-paying players something to grind for; Robux
-skins are pure cosmetics, the safest thing to sell.
+round's first zombies get the alpha look), so there are no zombie skins. Score
+skins give non-paying players something to grind for; Robux skins are pure
+cosmetics, the safest thing to sell.
 
-Suggested starting prices (in Robux):
+### Setting up Robux items
 
-| Kind | Item | Price |
-| --- | --- | --- |
-| Product | Instant Bat | 15 |
-| Product | Immunity Shot | 10 |
-| Product | Instant Spear | 35 |
-| Product | 2x Score, 30 min | 49 |
-| Product | Instant Shotgun | 75 |
-| Product | Any Robux skin (Dog, Panda, Robot, Shark...) | 49 to 99 each |
-| Pass | Starter Kit | 99 |
-| Pass | Lucky | 79 |
-| Pass | Double Score | 149 |
-| Pass | VIP | 199 |
+Do this once. The ids are saved in your place (as attributes), so updating the
+game with the Command Bar line never wipes them.
 
-### Setting the ids
+1. **Publish the place:** File > Publish to Roblox.
+2. Open [create.roblox.com/dashboard/creations](https://create.roblox.com/dashboard/creations),
+   click your experience, then **Monetization**.
+3. **Passes:** Monetization > Passes > **Create a Pass**. Give it a name and an
+   image, save, then open it, turn on **Item for Sale**, set the price, save.
+   Copy its id (the number in the page address, or "Copy Asset ID" in the
+   pass's `...` menu).
+4. **Developer products:** Monetization > Developer Products > **Create a
+   Developer Product**. Name, price, save, copy its id.
+5. **Save each id in the place:** in Studio, click **ReplicatedStorage** in the
+   Explorer, then in Properties scroll to **Attributes** and click **+**. Add a
+   **Number** attribute named exactly as in the table below (for example
+   `Product_InstantBat`) with the id as its value. Repeat for each one, then
+   **File > Publish to Roblox** again.
+   (Or send all the ids to whoever maintains the code and they can give you one
+   Command Bar line that sets them all.)
 
-1. Publish the place (File > Publish to Roblox).
-2. Open [create.roblox.com](https://create.roblox.com/) > your experience > **Monetization**.
-3. Under **Passes**, create VIP, Double Score, Starter Kit and Lucky. Under
-   **Developer Products**, create the products above. Set each price.
-4. Copy each id into `Config.MONETIZATION` in `src/shared/Config.luau`, rebuild.
+| Attribute name | What it is | Kind | Suggested price |
+| --- | --- | --- | --- |
+| `Pass_VIP` | VIP | Pass | 199 |
+| `Pass_DoubleScore` | Double Score | Pass | 149 |
+| `Pass_StarterKit` | Starter Kit (Bat every round) | Pass | 99 |
+| `Pass_Lucky` | Lucky (rare rolls 15%) | Pass | 79 |
+| `Product_InstantAncientSpear` | Ancient Spear (super rare, strikes) | Product | 99 |
+| `Product_InstantShotgun` | Instant Shotgun | Product | 75 |
+| `Product_InstantSpear` | Instant Spear | Product | 35 |
+| `Product_InstantBat` | Instant Bat | Product | 15 |
+| `Product_ImmunityShot` | Immunity Shot (+50) | Product | 10 |
+| `Product_ScoreBoost30` | 2x Score for 30 min | Product | 49 |
+| `Product_SkinDog` | Dog skin | Product | 49 |
+| `Product_SkinPanda` | Panda skin | Product | 49 |
+| `Product_SkinDuck` | Duck skin | Product | 49 |
+| `Product_SkinShark` | Shark skin | Product | 79 |
+| `Product_SkinRobot` | Robot skin | Product | 79 |
+| `Product_SkinAlien` | Alien skin | Product | 79 |
+| `Product_SkinHotdog` | Hotdog skin | Product | 99 |
+| `Product_SkinAstronaut` | Astronaut skin | Product | 99 |
 
-Any id left at `0` is hidden from the Robux tab in live servers. In Studio it
-shows as "Set id in Config" so you can see the layout. Studio purchases are
-test purchases and cost nothing.
+Anything without an id is hidden from the Robux tab in live servers; in Studio
+it shows "Needs an id (README)" so you can see the layout. Studio purchases are
+test purchases and cost nothing. (The ids can also go straight into
+`Config.MONETIZATION` in `src/shared/Config.luau`, but the attributes win and
+survive updates.)
 
 Purchases are granted once and recorded by purchase id in the buyer's saved
 data before Roblox is told they succeeded, so a server crash or retry can't
 double-grant or lose a purchase. Robux never buys a random roll (rare rolls only
 happen on score purchases), which keeps you clear of paid-random-item rules.
+Bots never get rare or expensive items: they only start with (or pick up)
+cheap common ones (`BOT_MAX_ITEM_PRICE`).
 
 Two zero-code options worth turning on: **Premium Payouts** (Roblox pays you for
 time Premium members spend in the game) and paid **Private Servers** (in the

@@ -974,7 +974,8 @@ Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
-Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a weapon
+Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a (cheap) weapon
+Config.BOT_MAX_ITEM_PRICE = 1000 -- bots only pick up common items up to this score price
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
@@ -1008,6 +1009,7 @@ Config.MONETIZATION = {
 		InstantBat = 0,
 		InstantSpear = 0,
 		InstantShotgun = 0,
+		InstantAncientSpear = 0, -- the super rare spear: Robux only, the one weapon that strikes
 		ImmunityShot = 0, -- +50 immunity right now
 		ScoreBoost30 = 0, -- 2x score for 30 minutes (stacks time)
 		SkinDuck = 0,
@@ -1026,6 +1028,28 @@ Config.MONETIZATION = {
 	LUCKY_RARE_CHANCE = 0.15,
 	IMMUNITY_SHOT_AMOUNT = 50,
 }
+
+-- Ids saved in the place itself win over the zeros above: attributes on
+-- ReplicatedStorage named "Pass_<key>" or "Product_<key>" (for example
+-- Product_InstantBat = 1234567890). Updates to the game's code never touch
+-- them. See README "Setting up Robux items".
+do
+	local ok, storage = pcall(function()
+		return game:GetService("ReplicatedStorage")
+	end)
+	if ok and storage then
+		local function load(prefix: string, ids: { [string]: number })
+			for key in ids do
+				local saved = storage:GetAttribute(prefix .. key)
+				if typeof(saved) == "number" and saved > 0 then
+					ids[key] = saved
+				end
+			end
+		end
+		load("Pass_", Config.MONETIZATION.GamePasses :: any)
+		load("Product_", Config.MONETIZATION.Products :: any)
+	end
+end
 
 return Config
 ]]></string>
@@ -1684,7 +1708,7 @@ add({
 	id = "Bat",
 	name = "Bat",
 	kind = "Melee",
-	description = "The classic. A short swing with solid knockback.",
+	description = "The classic. Short, thick and firm: zombies can't get past it.",
 	price = 750,
 	robuxProduct = "InstantBat",
 	groundWeight = 25,
@@ -1716,7 +1740,6 @@ add({
 	description = "Longest reach. Hold it out to keep zombies far away.",
 	price = 3500,
 	robuxProduct = "InstantSpear",
-	rare = "AncientSpear",
 	reach = 10,
 	arc = 30,
 	knockback = 90,
@@ -1727,10 +1750,10 @@ add({
 
 add({
 	id = "AncientSpear",
-	name = "Rare Ancient Spear",
+	name = "Ancient Spear",
 	kind = "Melee",
-	description = "A golden spear: even longer and firmer.",
-	wizardPrice = 7000,
+	description = "Super rare, Robux only. The longest, firmest weapon, and the only one that strikes: click to send zombies flying.",
+	robuxProduct = "InstantAncientSpear",
 	isRare = true,
 	reach = 11,
 	arc = 32,
@@ -1872,7 +1895,7 @@ add({
 	id = "FryingPan",
 	name = "Frying Pan",
 	kind = "Melee",
-	description = "CLANG! Big knockback and a good long daze. Egg included.",
+	description = "Wide and heavy: a firm shield of a pan. Egg included.",
 	price = 1200,
 	rare = "GoldenPan",
 	groundWeight = 6,
@@ -1889,7 +1912,7 @@ add({
 	id = "GoldenPan",
 	name = "Golden Frying Pan",
 	kind = "Melee",
-	description = "The legendary pan. CLANG, but louder.",
+	description = "The legendary pan: even wider and firmer.",
 	wizardPrice = 5000,
 	isRare = true,
 	reach = 5.5,
@@ -1918,7 +1941,7 @@ add({
 	id = "Plunger",
 	name = "Plunger",
 	kind = "Melee",
-	description = "Thwop! Sticks to a zombie's face and freezes them in place.",
+	description = "A long handle with a sticky cup: keeps zombies at arm's length.",
 	price = 1800,
 	reach = 7,
 	arc = 45,
@@ -1961,7 +1984,7 @@ add({
 	id = "InflatableHammer",
 	name = "Inflatable Hammer",
 	kind = "Melee",
-	description = "BOING! Sends zombies flying across the room.",
+	description = "Huge and squishy: blocks a lot, but zombies can push through.",
 	wizardPrice = 6000,
 	isRare = true,
 	reach = 7,
@@ -2138,9 +2161,9 @@ local SOLIDITY: { [string]: { number } } = {
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
 }
--- Most melee weapons only keep zombies away while you hold them out. These
--- few can also swing and knock zombies back.
-local HITTERS = { "Bat", "FryingPan", "GoldenPan", "InflatableHammer", "Plunger" }
+-- Melee weapons only keep people away while you hold them out. The one
+-- exception is the super rare, Robux-only Ancient Spear, which can strike.
+local HITTERS = { "AncientSpear" }
 for _, id in HITTERS do
 	local item = Items[id]
 	if item then
@@ -2182,7 +2205,7 @@ local SHOP_ORDER = {
 	"DuckLauncher",
 	"Shotgun",
 }
-local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "AncientSpear", "InflatableHammer" }
+local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "InflatableHammer" }
 
 local module = {
 	all = Items,
@@ -4323,9 +4346,8 @@ local ROSTER: { { name: string, level: number } } = {
 	{ name = "Stinkerbell", level = 5 },
 }
 
--- Weapons the bots "buy" at the start of a round.
-local STARTER_WEAPONS =
-	{ "Bat", "Spear", "Swordfish", "FryingPan", "Katana", "Lollipop", "Crowbar", "Baguette" }
+-- Cheap, common weapons a bot may start a round with (never rare ones).
+local STARTER_WEAPONS = { "Stick", "RubberChicken", "PoolNoodle", "Bat", "Baguette" }
 
 local rng = Random.new()
 
@@ -4417,7 +4439,12 @@ local function nearestItem(from: Vector3, range: number): Vector3?
 	local bestDistance = range
 	for _, model in folder:GetChildren() do
 		local x, z = model:GetAttribute("SpotX"), model:GetAttribute("SpotZ")
-		if typeof(x) == "number" and typeof(z) == "number" then
+		local item = Items.get(model:GetAttribute("ItemId") :: string?)
+		-- Bots leave the good stuff for players: only cheap, common items.
+		local common = item ~= nil
+			and not item.isRare
+			and (item.price or math.huge) <= Config.BOT_MAX_ITEM_PRICE
+		if common and typeof(x) == "number" and typeof(z) == "number" then
 			local spot = Vector3.new(x, from.Y, z)
 			local d = Util.flatDistance(spot, from)
 			if d < bestDistance then
@@ -8064,6 +8091,9 @@ local HANDLERS: { [string]: Handler } = {
 	end,
 	InstantShotgun = function(p)
 		giveOrQueue(p, "Shotgun")
+	end,
+	InstantAncientSpear = function(p)
+		giveOrQueue(p, "AncientSpear")
 	end,
 	ImmunityShot = function(p)
 		Participants.setImmunity(p, p.immunity + money.IMMUNITY_SHOT_AMOUNT)
@@ -13010,11 +13040,17 @@ local PASSES = {
 		key = "Lucky",
 		name = "Lucky",
 		description = "Rare roll chance 5% -> 15% on every purchase.",
-		preview = "item:AncientSpear",
+		preview = "item:RarePotatoGun",
 	},
 }
 
 local PRODUCTS = {
+	{
+		key = "InstantAncientSpear",
+		name = "Ancient Spear",
+		description = "Super rare. The only weapon that strikes.",
+		preview = "item:AncientSpear",
+	},
 	{
 		key = "InstantBat",
 		name = "Instant Bat",
@@ -13374,7 +13410,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				priceColor = if owned then UIKit.LIME else UIKit.GOLD,
 				description = entry.description .. (if kind == "GamePass" then "  (permanent)" else ""),
 				preview = buildPreview(entry.preview),
-				button = if owned then "Owned" elseif id == 0 then "Set id in Config" else "Buy",
+				button = if owned then "Owned" elseif id == 0 then "Needs an id (README)" else "Buy",
 				buttonColor = UIKit.ACCENT,
 				enabled = not owned and id ~= 0,
 				onClick = function()

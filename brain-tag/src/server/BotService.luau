@@ -126,9 +126,8 @@ local ROSTER: { { name: string, level: number } } = {
 	{ name = "Stinkerbell", level = 5 },
 }
 
--- Weapons the bots "buy" at the start of a round.
-local STARTER_WEAPONS =
-	{ "Bat", "Spear", "Swordfish", "FryingPan", "Katana", "Lollipop", "Crowbar", "Baguette" }
+-- Cheap, common weapons a bot may start a round with (never rare ones).
+local STARTER_WEAPONS = { "Stick", "RubberChicken", "PoolNoodle", "Bat", "Baguette" }
 
 local rng = Random.new()
 
@@ -220,7 +219,12 @@ local function nearestItem(from: Vector3, range: number): Vector3?
 	local bestDistance = range
 	for _, model in folder:GetChildren() do
 		local x, z = model:GetAttribute("SpotX"), model:GetAttribute("SpotZ")
-		if typeof(x) == "number" and typeof(z) == "number" then
+		local item = Items.get(model:GetAttribute("ItemId") :: string?)
+		-- Bots leave the good stuff for players: only cheap, common items.
+		local common = item ~= nil
+			and not item.isRare
+			and (item.price or math.huge) <= Config.BOT_MAX_ITEM_PRICE
+		if common and typeof(x) == "number" and typeof(z) == "number" then
 			local spot = Vector3.new(x, from.Y, z)
 			local d = Util.flatDistance(spot, from)
 			if d < bestDistance then

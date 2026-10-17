@@ -149,7 +149,8 @@ Config.BOTS_MIN = 20 -- each round picks a bot count in this range
 Config.BOTS_MAX = 30
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
-Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a weapon
+Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a (cheap) weapon
+Config.BOT_MAX_ITEM_PRICE = 1000 -- bots only pick up common items up to this score price
 
 -- Characters bump into each other (human/human, zombie/zombie and
 -- zombie/human). Set false to let everyone walk through each other.
@@ -183,6 +184,7 @@ Config.MONETIZATION = {
 		InstantBat = 0,
 		InstantSpear = 0,
 		InstantShotgun = 0,
+		InstantAncientSpear = 0, -- the super rare spear: Robux only, the one weapon that strikes
 		ImmunityShot = 0, -- +50 immunity right now
 		ScoreBoost30 = 0, -- 2x score for 30 minutes (stacks time)
 		SkinDuck = 0,
@@ -201,5 +203,27 @@ Config.MONETIZATION = {
 	LUCKY_RARE_CHANCE = 0.15,
 	IMMUNITY_SHOT_AMOUNT = 50,
 }
+
+-- Ids saved in the place itself win over the zeros above: attributes on
+-- ReplicatedStorage named "Pass_<key>" or "Product_<key>" (for example
+-- Product_InstantBat = 1234567890). Updates to the game's code never touch
+-- them. See README "Setting up Robux items".
+do
+	local ok, storage = pcall(function()
+		return game:GetService("ReplicatedStorage")
+	end)
+	if ok and storage then
+		local function load(prefix: string, ids: { [string]: number })
+			for key in ids do
+				local saved = storage:GetAttribute(prefix .. key)
+				if typeof(saved) == "number" and saved > 0 then
+					ids[key] = saved
+				end
+			end
+		end
+		load("Pass_", Config.MONETIZATION.GamePasses :: any)
+		load("Product_", Config.MONETIZATION.Products :: any)
+	end
+end
 
 return Config
