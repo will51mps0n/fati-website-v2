@@ -28,7 +28,7 @@ spawns).*
 3. Paste this one line into the Command Bar and press **Enter**:
 
 ```lua
-local H=game:GetService("HttpService") H.HttpEnabled=true local M=Instance.new("ModuleScript") M.Source=H:GetAsync("https://raw.githubusercontent.com/will51mps0n/fati-website-v2/refs/heads/claude/pensive-mccarthy-jls1ep/brain-tag/studio/install.luau",true) require(M)()
+local H=game:GetService("HttpService") H.HttpEnabled=true local M=Instance.new("ModuleScript") M.Source=H:GetAsync("https://raw.githubusercontent.com/will51mps0n/fati-website-v2/61169082e8c957ff35d5e85ff6e3ae8dc0c60da2/brain-tag/studio/install.luau",true) require(M)()
 ```
 
 4. Output says `[Brain Tag] installed build ...`. Press **Play**.
@@ -36,8 +36,9 @@ local H=game:GetService("HttpService") H.HttpEnabled=true local M=Instance.new("
 Run the same line again whenever the game is updated: it replaces the Brain
 Tag scripts with the newest ones. (It also turns on HTTP requests for the
 place and removes the template's Baseplate and SpawnLocation, which would sit
-on top of the map.) Right after an update GitHub can serve the old file for a
-few minutes; the build time in Output tells you which one you got.
+on top of the map.) The line points at a fixed copy of the small installer,
+which asks GitHub for the newest commit, so it never picks up a stale cached
+version; Output shows the build time and commit it installed.
 
 ### As a file
 
