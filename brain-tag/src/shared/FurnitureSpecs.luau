@@ -34,7 +34,7 @@ local Specs: { [string]: Spec } = {
 	Wardrobe = { w = 6, d = 2.6, h = 8, weight = "Massive" },
 	Piano = { w = 8, d = 4.5, h = 4, weight = "Massive" },
 	PoolTable = { w = 10, d = 6, h = 3, weight = "Massive" },
-	Car = { w = 6, d = 12, h = 4, weight = "Massive" },
+	Car = { w = 9, d = 16, h = 4, weight = "Massive" }, -- the garage supercar
 	Dresser = { w = 5, d = 2.4, h = 4, weight = "Heavy" },
 	Washer = { w = 3, d = 3, h = 3.5, weight = "Heavy" },
 	Desk = { w = 6, d = 3, h = 3, weight = "Medium" },
@@ -52,6 +52,30 @@ local Specs: { [string]: Spec } = {
 }
 
 local FurnitureSpecs = { specs = Specs }
+
+-- Everything is drawn this much bigger than the numbers above (footprint
+-- only), so pieces read clearly at the game's camera distance.
+FurnitureSpecs.SIZE_SCALE = 1.15
+-- Pieces that sit tight against walls (and the already-huge car and rugs)
+-- keep their size.
+local KEEP_SIZE: { [string]: boolean } = {
+	Beanbag = true,
+	Bed = true,
+	Bookshelf = true,
+	Car = true,
+	Dresser = true,
+	Lamp = true,
+	Rug = true,
+	Sink = true,
+	Stove = true,
+	TVStand = true,
+}
+for kind, spec in Specs do
+	if not KEEP_SIZE[kind] then
+		spec.w *= FurnitureSpecs.SIZE_SCALE
+		spec.d *= FurnitureSpecs.SIZE_SCALE
+	end
+end
 
 function FurnitureSpecs.get(kind: string): Spec
 	local spec = Specs[kind]

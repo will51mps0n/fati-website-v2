@@ -241,6 +241,41 @@ local function snout(k: Kit, color: string, nose: string)
 end
 
 local STYLES: { [string]: Style } = {
+	-- The first zombie: red patches and claws, googly eyes, screaming mouth.
+	Alpha = function(k, skin)
+		local red = skin.accent or "B8323A"
+		local spots: { { number } } =
+			{ { -0.95, 0.55, 0.9 }, { 1.0, 0.0, 0.7 }, { 0.25, 0.85, 0.55 }, { -0.3, -0.4, 0.45 } }
+		for _, spot in spots do
+			k.dot(spot[1], spot[2], spot[3], 0.52, red)
+		end
+		for side = -1, 1, 2 do
+			k.dot(side * 1.3, -1.35, 0.5, 0.7, red) -- patch on the arm
+			k.dot(side * 1.3, -2.4, 0.95, 0.74, red) -- red hand
+			for i = -1, 1 do
+				k.bar(side * 1.3 + i * 0.28, -2.95, 0.16, 0.5, 0.75, "5A1010") -- claws
+			end
+			k.dot(side * 0.45, -0.42, 0.86, 1.0, "1C1C1C") -- googly eyes
+			k.dot(side * 0.45, -0.42, 0.72, 1.02, "FFFFFF")
+			k.dot(side * 0.53, -0.55, 0.3, 1.04, "1C1C1C")
+		end
+		k.pill(0, 0.4, 0.95, 0.55, 1.0, "5A1010") -- screaming mouth
+		k.bar(0, 0.22, 0.6, 0.12, 1.03, "FFFFFF") -- teeth
+		k.bar(0, 0.58, 0.5, 0.1, 1.03, "FFFFFF")
+	end,
+	Donkey = function(k, skin)
+		local dark = skin.accent or "3F3631"
+		k.pill(0, 1.45, 2.4, 2.3, 0.45, skin.shirt) -- long back end
+		k.bar(0, 0.8, 0.35, 2.6, 0.53, dark) -- mane down the back
+		k.pill(0, 2.75, 0.3, 1.0, 0.45, dark) -- tail
+		k.dot(0, 3.3, 0.55, 0.45, dark)
+		for side = -1, 1, 2 do
+			k.pill(side * 0.85, 1.0, 0.6, 2.0, 1.0, dark) -- long ears, laid back and out
+			k.pill(side * 0.85, 1.05, 0.3, 1.5, 1.02, "C9B8A8")
+			k.dot(side * 0.22, -1.3, 0.2, 1.03, "2B2B2B") -- nostrils
+		end
+		k.pill(0, -1.05, 1.1, 1.0, 1.0, "B5A69A") -- light muzzle
+	end,
 	Dog = function(k, skin)
 		local ear = skin.accent or "6B4226"
 		for side = -1, 1, 2 do
@@ -423,23 +458,51 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 	roundedRect(model, root, "Body", 0, 0.1 * s, w, d, r, 0.5 * s, 0.6 * s, skin.shirt)
 
 	if team == "Zombie" then
-		-- Arms reaching forward, drawn over the body.
+		-- Arms reaching straight forward from the shoulders, past the head:
+		-- sleeves in the shirt color, hands at the ends. The head is drawn
+		-- over their inner edge.
+		local armW, armLength, shoulderZ = 0.82 * s, 2.3 * s, -0.25 * s
 		for side = -1, 1, 2 do
-			local x, z = side * 0.85 * s, -1.45 * s
+			local x, z = side * 1.3 * s, shoulderZ - armLength / 2
 			roundedRect(
 				model,
 				root,
 				"ArmOutline",
 				x,
 				z,
-				0.86 * s,
-				2.0 * s,
-				0.43 * s,
-				0.62 * s,
+				armW + 2 * o,
+				armLength + 2 * o,
+				armW / 2 + o,
+				0.64 * s,
 				0.3 * s,
-				darker(skin.skin)
+				darker(skin.shirt)
 			)
-			roundedRect(model, root, "Arm", x, z, 0.62 * s, 1.76 * s, 0.31 * s, 0.68 * s, 0.3 * s, skin.skin)
+			roundedRect(
+				model,
+				root,
+				"Arm",
+				x,
+				z,
+				armW,
+				armLength,
+				armW / 2 * 0.999,
+				0.68 * s,
+				0.3 * s,
+				skin.shirt
+			)
+			local handZ = shoulderZ - armLength + 0.15 * s
+			attach(
+				root,
+				disc("HandOutline", 0.9 * s + 2 * o, 0.3 * s, darker(skin.skin, 0.75)),
+				CFrame.new(x, 0.55 * s, handZ) * UP,
+				model
+			)
+			attach(
+				root,
+				disc("Hand", 0.9 * s, 0.3 * s, skin.skin),
+				CFrame.new(x, 0.56 * s, handZ) * UP,
+				model
+			)
 		end
 	end
 
@@ -471,15 +534,18 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
-	-- A little nose poking out past the front of the head, like the original.
-	local nose = 0.3 * hd
-	attach(
-		root,
-		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
-		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
-		model
-	)
-	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	-- A little nose poking out past the front of the head, like the original
+	-- (the alpha zombie has a screaming mouth there instead).
+	if skin.hat ~= "Alpha" then
+		local nose = 0.3 * hd
+		attach(
+			root,
+			disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+			CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+			model
+		)
+		attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	end
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 

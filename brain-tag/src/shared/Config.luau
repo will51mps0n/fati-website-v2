@@ -42,10 +42,13 @@ end
 Config.SURVIVOR_WIN_REWARD = 500
 Config.INFECT_REWARD = 100
 Config.ZOMBIE_WIN_REWARD = 250
+-- Getting eaten costs you this share of your points, and the zombie that
+-- ate you gets them (so zombies grow as they feed).
+Config.INFECT_STEAL_FRACTION = 0.1
 
 -- Infection ----------------------------------------------------------------------
 
-Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size)
+Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size); must stay above ShellDiameter
 
 -- Immunity (pills) ----------------------------------------------------------------
 
@@ -54,10 +57,10 @@ Config.IMMUNITY_WEIGHT = 0.8 -- pick weight = 1 - immunity/100 * this
 
 -- Camera ---------------------------------------------------------------------------
 
-Config.CAMERA_HEIGHT = 150
+Config.CAMERA_HEIGHT = 175
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
 Config.CAMERA_SMOOTHING = 0 -- 0 = locked to you like the original; e.g. 12 for a soft follow
-Config.CAMERA_ZOOMS = { Close = 120, Normal = 150, Far = 195 }
+Config.CAMERA_ZOOMS = { Close = 140, Normal = 175, Far = 220 }
 Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
 
 -- Character look (studs, at scale 1) -------------------------------------------------
@@ -71,6 +74,9 @@ Config.CHARACTER = {
 	BodyWidth = 3.6, -- shoulders, side to side
 	BodyDepth = 2.1, -- front to back
 	HeadDiameter = 2.3,
+	-- Characters bump into each other with an invisible cylinder this wide
+	-- (only other characters collide with it, so doors still fit).
+	ShellDiameter = 3,
 }
 
 Config.COLORS = {
@@ -110,16 +116,27 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
-Config.GROUND_ITEMS_MIN = 4
-Config.GROUND_ITEMS_MAX = 6
+Config.GROUND_ITEMS_MIN = 2
+Config.GROUND_ITEMS_MAX = 3
 Config.RARE_CHANCE = 0.05
 Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
+-- Held melee weapons are solid: zombies touching the shaft are shoved off it
+-- (this fast, in short pulses), and furniture it overlaps is pushed aside.
+Config.SHAFT_ZOMBIE_PUSH = 22
+Config.SHAFT_ZOMBIE_SECONDS = 0.15
+Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
 
 -- Wizard ------------------------------------------------------------------------------------
 
 Config.WIZARD_SHOP_RADIUS = 10
 Config.WIZARD_ARRIVE_MIN = 8 -- seconds into the prep phase
 Config.WIZARD_ARRIVE_MAX = 40
+
+-- Admins ------------------------------------------------------------------------------------
+-- The admin panel (F2, or the ADMIN button) is open to: everyone while testing
+-- in Studio, the experience's owner (or rank 254+ in the owning group), and
+-- these UserIds.
+Config.ADMIN_USER_IDS = {} :: { number }
 
 -- Saving ------------------------------------------------------------------------------------
 
@@ -133,9 +150,9 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 Config.DEBUG_BOTS = true -- only ever active inside Roblox Studio
 Config.DEBUG_BOT_COUNT = 4
 
--- Players walk through each other (furniture and walls still block). The
--- original felt this way, and it stops humans from body-blocking doorways.
-Config.PLAYERS_COLLIDE = false
+-- Characters bump into each other (human/human, zombie/zombie and
+-- zombie/human). Set false to let everyone walk through each other.
+Config.PLAYERS_COLLIDE = true
 
 -- Sounds ---------------------------------------------------------------------------------------
 -- Paths are sounds that ship inside the Roblox client. Leave a value "" to skip

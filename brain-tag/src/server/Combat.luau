@@ -50,21 +50,39 @@ function Combat.wallParams(): RaycastParams
 	return wallParams
 end
 
-function Combat.knockback(target: Participant, velocity: Vector3, stun: number)
+-- `gentle` shoves (a zombie leaning on a held weapon) never cut short a
+-- real hit that is still sending the zombie flying.
+function Combat.knockback(
+	target: Participant,
+	velocity: Vector3,
+	stun: number,
+	seconds: number?,
+	gentle: boolean?
+)
 	local root = Participants.body(target)
 	local character = target.character
 	if not root or not character then
 		return
 	end
-	target.stunUntil = math.max(target.stunUntil, os.clock() + stun)
-	CharacterService.refreshSpeed(target)
-	task.delay(stun + 0.05, function()
+	local now = os.clock()
+	if gentle and now < target.knockedUntil then
+		return
+	end
+	if stun > 0 then
+		target.stunUntil = math.max(target.stunUntil, os.clock() + stun)
 		CharacterService.refreshSpeed(target)
-	end)
+		task.delay(stun + 0.05, function()
+			CharacterService.refreshSpeed(target)
+		end)
+	end
+	local duration = seconds or Config.KNOCKBACK_SECONDS
+	if not gentle then
+		target.knockedUntil = now + duration
+	end
 	if target.player then
-		knockbackRemote:FireClient(target.player, velocity, Config.KNOCKBACK_SECONDS)
+		knockbackRemote:FireClient(target.player, velocity, duration)
 	else
-		Knockback.apply(character, velocity, Config.KNOCKBACK_SECONDS)
+		Knockback.apply(character, velocity, duration)
 	end
 end
 

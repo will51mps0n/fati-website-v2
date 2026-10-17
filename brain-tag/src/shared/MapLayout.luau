@@ -89,6 +89,9 @@ MapLayout.HEIGHTS = {
 -- Picked from screenshots of the original.
 MapLayout.COLORS = {
 	Grass = "4FB35F",
+	Outside = "3B6E45", -- beyond the boundary wall
+	BoundaryBrick = "B5653A",
+	BoundaryCap = "5B3420",
 	GrassTuft = "3E9A4E",
 	Flower = "F48FB1",
 	FlowerCenter = "FFE066",
@@ -427,7 +430,7 @@ local MANSION: Plan = {
 		piece("Lamp", 146, 124),
 		piece("Arcade", 144.5, 116),
 		-- Garage
-		piece("Car", 174, 98),
+		piece("Car", 174, 100, 180), -- nose toward the garage door
 		piece("Crate", 155, 75),
 		piece("Crate", 155, 79),
 		piece("Barrel", 196, 74),
@@ -590,6 +593,7 @@ end
 
 local function buildNeighborhood(): Layout
 	local layout = newLayout("Neighborhood", "The Neighborhood")
+	layout.bounds = rect(-150, -182, 150, 182) -- brick wall just outside this
 	local B = layout.bounds
 	addHouse(layout, "North", LARGE, -110, -150, false, "Blue", "Large")
 	addHouse(layout, "South", LARGE, -30, 66, true, "Orange", "Large")
@@ -623,23 +627,23 @@ local function buildNeighborhood(): Layout
 		rect(-95, -66, -87, -20), -- north front door
 		rect(30, -112, 64, -104), -- north side door, east...
 		rect(56, -112, 64, -20), -- ...then down to the road
-		rect(10, -180, 18, -150), -- north kitchen door
-		rect(0, -192, 28, -180), -- garden patch
+		rect(10, -166, 18, -150), -- north kitchen door
+		rect(0, -178, 28, -166), -- garden patch
 	})
 
 	local north = {
 		bush(-130, -130, 4, "Green"),
-		bush(-150, -80, 5, "Green"),
+		bush(-135, -88, 5, "Green"),
 		bush(-125, -165, 4, "Orange"),
-		bush(-180, -182, 6, "Green"),
-		bush(-60, -176, 5, "Green"),
-		bush(45, -170, 4, "Orange"),
+		bush(-136, -168, 5, "Green"),
+		bush(-60, -168, 5, "Green"),
+		bush(45, -168, 4, "Orange"),
 		bush(95, -150, 6, "Green"),
-		bush(140, -120, 5, "Orange"),
+		bush(134, -125, 5, "Orange"),
 		bush(110, -62, 4, "Green"),
-		bush(170, -170, 5, "Green"),
-		bush(185, -80, 4, "Orange"),
-		bush(-186, -112, 4, "Orange"),
+		bush(134, -168, 5, "Green"),
+		bush(138, -82, 4, "Orange"),
+		bush(-138, -112, 4, "Orange"),
 		bush(-70, -40, 3, "Green"),
 		bush(20, -56, 3, "Orange"),
 	}
@@ -649,17 +653,17 @@ local function buildNeighborhood(): Layout
 	end
 
 	layout.humanSpawns = mirrorPoints({
-		pt(-160, -140),
-		pt(-72, -190),
-		pt(75, -186),
-		pt(130, -160),
-		pt(165, -45),
-		pt(-165, -45),
+		pt(-132, -140),
+		pt(-72, -172),
+		pt(75, -172),
+		pt(122, -150),
+		pt(136, -45),
+		pt(-136, -45),
 		pt(-35, -56),
 		pt(95, -95),
 	})
-	layout.zombieSpawns = { pt(-195, 0), pt(195, 0) }
-	layout.wizardSpots = mirrorPoints({ pt(-120, -186), pt(160, -100), pt(-178, -150) })
+	layout.zombieSpawns = { pt(-140, 0), pt(140, 0) }
+	layout.wizardSpots = mirrorPoints({ pt(-108, -172), pt(136, -100), pt(-136, -150) })
 	return layout
 end
 
@@ -667,6 +671,7 @@ end
 
 local function buildMansion(): Layout
 	local layout = newLayout("Mansion", "The Mansion")
+	layout.bounds = rect(-175, -148, 180, 186) -- brick wall just outside this
 	local B = layout.bounds
 	addHouse(layout, "Mansion", MANSION, -100, -40, false, "Blue", "Huge")
 	addHouse(layout, "Shed", SHED, 110, -120, false, "Orange", "Small")
@@ -694,42 +699,42 @@ local function buildMansion(): Layout
 	layout.pools = { rect(-40, -95, 40, -65) }
 
 	layout.bushes = {
-		bush(-150, -150, 6, "Green"),
-		bush(-110, -175, 4, "Orange"),
-		bush(-180, -90, 5, "Green"),
-		bush(-185, -20, 4, "Orange"),
-		bush(-180, 60, 5, "Green"),
+		bush(-150, -133, 6, "Green"),
+		bush(-110, -136, 4, "Orange"),
+		bush(-162, -90, 5, "Green"),
+		bush(-163, -20, 4, "Orange"),
+		bush(-163, 60, 5, "Green"),
 		bush(-60, 125, 4, "Green"),
 		bush(-30, 110, 3, "Orange"),
 		bush(40, 112, 4, "Green"),
 		bush(120, 120, 5, "Orange"),
 		bush(160, 100, 4, "Green"),
-		bush(185, 40, 5, "Green"),
-		bush(185, -40, 4, "Orange"),
-		bush(180, -150, 6, "Green"),
-		bush(60, -170, 5, "Orange"),
-		bush(-20, -170, 4, "Green"),
-		bush(150, -175, 4, "Orange"),
+		bush(167, 40, 5, "Green"),
+		bush(168, -40, 4, "Orange"),
+		bush(164, -133, 6, "Green"),
+		bush(60, -136, 5, "Orange"),
+		bush(-20, -136, 4, "Green"),
+		bush(150, -138, 4, "Orange"),
 	}
 
 	layout.humanSpawns = {
 		pt(-60, 116),
 		pt(30, 128),
 		pt(150, 125),
-		pt(-170, 100),
-		pt(-180, 25),
-		pt(180, 70),
-		pt(175, 5),
-		pt(-170, -60),
-		pt(170, -100),
-		pt(-120, -160),
-		pt(0, -150),
-		pt(100, -170),
+		pt(-162, 100),
+		pt(-162, 30),
+		pt(165, 70),
+		pt(165, 5),
+		pt(-162, -60),
+		pt(165, -100),
+		pt(-120, -138),
+		pt(0, -135),
+		pt(95, -136),
 		pt(-80, 100),
 		pt(110, 105),
 	}
-	layout.zombieSpawns = { pt(-195, 162), pt(195, 162) }
-	layout.wizardSpots = { pt(-130, -130), pt(160, -20), pt(-160, 128), pt(40, -180) }
+	layout.zombieSpawns = { pt(-165, 162), pt(170, 162) }
+	layout.wizardSpots = { pt(-130, -128), pt(160, -20), pt(-160, 128), pt(40, -136) }
 	return layout
 end
 

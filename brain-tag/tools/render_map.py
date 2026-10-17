@@ -210,6 +210,9 @@ def main() -> int:
         point(p, 1.8, "8E44AD")
 
     out.parent.mkdir(parents=True, exist_ok=True)
+    # The brick boundary wall (drawn just inside the edge of the picture).
+    wall = 3 * scale
+    draw.rectangle([0, 0, width - 1, height - 1], outline=hex_color(c["BoundaryBrick"]), width=wall)
     image.save(out)
     print(f"wrote {out} ({width}x{height})")
     return 0

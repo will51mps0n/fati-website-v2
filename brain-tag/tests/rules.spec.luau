@@ -150,6 +150,9 @@ test("item data is consistent", function()
 		if item.kind == "Projectile" then
 			expect(item.projectile ~= nil, id .. " has a projectile look")
 		end
+		if item.kind == "Melee" then
+			expect(item.firmness and item.guard, id .. " melee solidity (firmness, guard)")
+		end
 		if item.effect == "Explode" then
 			expect(item.radius, id .. " blast radius")
 		end
@@ -204,6 +207,7 @@ test("skin data is consistent", function()
 			+ (if skin.scorePrice then 1 else 0)
 			+ (if skin.product then 1 else 0)
 			+ (if skin.pass then 1 else 0)
+			+ (if skin.special then 1 else 0)
 		expectEq(unlocks, 1, skin.id .. " has exactly one way to unlock")
 		expect(#skin.shirt == 6 and #skin.hair == 6 and #skin.skin == 6, skin.id .. " colors are hex")
 	end

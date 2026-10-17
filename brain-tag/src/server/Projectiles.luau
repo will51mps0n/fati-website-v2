@@ -194,7 +194,7 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 		workspace:WaitForChild("Effects"),
 	}
 	local map = workspace:WaitForChild("Map")
-	for _, name in { "Ground", "Road", "Floors", "Boundary" } do
+	for _, name in { "Ground", "Road", "Floors" } do -- shots stop at the boundary wall
 		local child = map:FindFirstChild(name)
 		if child then
 			table.insert(ignored, child)

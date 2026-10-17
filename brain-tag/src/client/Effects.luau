@@ -27,6 +27,7 @@ local SOUND_STYLES: { [string]: { any } } = {
 	Twang = { "Lunge", 1.8, 0.6 },
 	Gulp = { "Pickup", 0.7, 0.6 },
 	Slip = { "Whoosh", 0.6, 0.8 },
+	Bump = { "Lunge", 0.35, 0.35 },
 }
 
 local function playStyle(style: string?, position: Vector3?): boolean
@@ -113,6 +114,7 @@ end
 -- Little bits flying out from a point and fading (stars, feathers, crumbs...).
 local BITS: { [string]: { colors: { string }, size: number, count: number, shape: Enum.PartType } } = {
 	Stars = { colors = { "FFE14D", "FFFFFF", "FFC21A" }, size = 0.5, count = 6, shape = Enum.PartType.Block },
+	Puff = { colors = { "FFFFFF", "EDEDED" }, size = 0.45, count = 4, shape = Enum.PartType.Ball },
 	Feathers = {
 		colors = { "FFFFFF", "FFF3B0", "FFE14D" },
 		size = 0.45,
@@ -501,7 +503,42 @@ local function startScrape()
 	end)
 end
 
+-- Bumping into another character: a soft thud and a little puff where you
+-- touched, so collisions read clearly. Your character's "Shell" is the
+-- body-sized cylinder only other characters collide with.
+local BUMP_COOLDOWN = 0.4
+local lastBump = 0
+
+local function watchShell(character: Model)
+	local function hook(shell: Instance)
+		if not shell:IsA("BasePart") or shell.Name ~= "Shell" then
+			return
+		end
+		shell.Touched:Connect(function(other)
+			if other.Name ~= "Shell" or other:IsDescendantOf(character) then
+				return
+			end
+			local now = os.clock()
+			if now - lastBump < BUMP_COOLDOWN then
+				return
+			end
+			lastBump = now
+			local between = (shell.Position + other.Position) / 2
+			playStyle("Bump", between)
+			bits("Puff", between)
+		end)
+	end
+	character.ChildAdded:Connect(hook)
+	for _, child in character:GetChildren() do
+		hook(child)
+	end
+end
+
 function Effects.start()
+	player.CharacterAdded:Connect(watchShell)
+	if player.Character then
+		watchShell(player.Character)
+	end
 	task.spawn(function()
 		while true do
 			task.wait(0.1)

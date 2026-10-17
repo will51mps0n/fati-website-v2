@@ -341,6 +341,41 @@ local function snout(k: Kit, color: string, nose: string)
 end
 
 local STYLES: { [string]: Style } = {
+	-- The first zombie: red patches and claws, googly eyes, screaming mouth.
+	Alpha = function(k, skin)
+		local red = skin.accent or "B8323A"
+		local spots: { { number } } =
+			{ { -0.95, 0.55, 0.9 }, { 1.0, 0.0, 0.7 }, { 0.25, 0.85, 0.55 }, { -0.3, -0.4, 0.45 } }
+		for _, spot in spots do
+			k.dot(spot[1], spot[2], spot[3], 0.52, red)
+		end
+		for side = -1, 1, 2 do
+			k.dot(side * 1.3, -1.35, 0.5, 0.7, red) -- patch on the arm
+			k.dot(side * 1.3, -2.4, 0.95, 0.74, red) -- red hand
+			for i = -1, 1 do
+				k.bar(side * 1.3 + i * 0.28, -2.95, 0.16, 0.5, 0.75, "5A1010") -- claws
+			end
+			k.dot(side * 0.45, -0.42, 0.86, 1.0, "1C1C1C") -- googly eyes
+			k.dot(side * 0.45, -0.42, 0.72, 1.02, "FFFFFF")
+			k.dot(side * 0.53, -0.55, 0.3, 1.04, "1C1C1C")
+		end
+		k.pill(0, 0.4, 0.95, 0.55, 1.0, "5A1010") -- screaming mouth
+		k.bar(0, 0.22, 0.6, 0.12, 1.03, "FFFFFF") -- teeth
+		k.bar(0, 0.58, 0.5, 0.1, 1.03, "FFFFFF")
+	end,
+	Donkey = function(k, skin)
+		local dark = skin.accent or "3F3631"
+		k.pill(0, 1.45, 2.4, 2.3, 0.45, skin.shirt) -- long back end
+		k.bar(0, 0.8, 0.35, 2.6, 0.53, dark) -- mane down the back
+		k.pill(0, 2.75, 0.3, 1.0, 0.45, dark) -- tail
+		k.dot(0, 3.3, 0.55, 0.45, dark)
+		for side = -1, 1, 2 do
+			k.pill(side * 0.85, 1.0, 0.6, 2.0, 1.0, dark) -- long ears, laid back and out
+			k.pill(side * 0.85, 1.05, 0.3, 1.5, 1.02, "C9B8A8")
+			k.dot(side * 0.22, -1.3, 0.2, 1.03, "2B2B2B") -- nostrils
+		end
+		k.pill(0, -1.05, 1.1, 1.0, 1.0, "B5A69A") -- light muzzle
+	end,
 	Dog = function(k, skin)
 		local ear = skin.accent or "6B4226"
 		for side = -1, 1, 2 do
@@ -523,23 +558,51 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 	roundedRect(model, root, "Body", 0, 0.1 * s, w, d, r, 0.5 * s, 0.6 * s, skin.shirt)
 
 	if team == "Zombie" then
-		-- Arms reaching forward, drawn over the body.
+		-- Arms reaching straight forward from the shoulders, past the head:
+		-- sleeves in the shirt color, hands at the ends. The head is drawn
+		-- over their inner edge.
+		local armW, armLength, shoulderZ = 0.82 * s, 2.3 * s, -0.25 * s
 		for side = -1, 1, 2 do
-			local x, z = side * 0.85 * s, -1.45 * s
+			local x, z = side * 1.3 * s, shoulderZ - armLength / 2
 			roundedRect(
 				model,
 				root,
 				"ArmOutline",
 				x,
 				z,
-				0.86 * s,
-				2.0 * s,
-				0.43 * s,
-				0.62 * s,
+				armW + 2 * o,
+				armLength + 2 * o,
+				armW / 2 + o,
+				0.64 * s,
 				0.3 * s,
-				darker(skin.skin)
+				darker(skin.shirt)
 			)
-			roundedRect(model, root, "Arm", x, z, 0.62 * s, 1.76 * s, 0.31 * s, 0.68 * s, 0.3 * s, skin.skin)
+			roundedRect(
+				model,
+				root,
+				"Arm",
+				x,
+				z,
+				armW,
+				armLength,
+				armW / 2 * 0.999,
+				0.68 * s,
+				0.3 * s,
+				skin.shirt
+			)
+			local handZ = shoulderZ - armLength + 0.15 * s
+			attach(
+				root,
+				disc("HandOutline", 0.9 * s + 2 * o, 0.3 * s, darker(skin.skin, 0.75)),
+				CFrame.new(x, 0.55 * s, handZ) * UP,
+				model
+			)
+			attach(
+				root,
+				disc("Hand", 0.9 * s, 0.3 * s, skin.skin),
+				CFrame.new(x, 0.56 * s, handZ) * UP,
+				model
+			)
 		end
 	end
 
@@ -571,15 +634,18 @@ function CharacterLook.apply(model: Model, root: BasePart, skinId: string?, team
 		CFrame.new(0, 0.72 * s, 0) * UP,
 		model
 	)
-	-- A little nose poking out past the front of the head, like the original.
-	local nose = 0.3 * hd
-	attach(
-		root,
-		disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
-		CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
-		model
-	)
-	attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	-- A little nose poking out past the front of the head, like the original
+	-- (the alpha zombie has a screaming mouth there instead).
+	if skin.hat ~= "Alpha" then
+		local nose = 0.3 * hd
+		attach(
+			root,
+			disc("NoseOutline", nose + 0.1 * s, 0.05 * s, darker(skin.skin, 0.75)),
+			CFrame.new(0, 0.89 * s, -0.47 * hd) * UP,
+			model
+		)
+		attach(root, disc("Nose", nose, 0.05 * s, skin.skin), CFrame.new(0, 0.9 * s, -0.47 * hd) * UP, model)
+	end
 	attach(root, disc("Face", 0.82 * hd, 0.04 * s, skin.skin), CFrame.new(0, 0.92 * s, -0.1 * s) * UP, model)
 	attach(root, disc("Hair", 0.74 * hd, 0.04 * s, skin.hair), CFrame.new(0, 0.95 * s, 0.08 * s) * UP, model)
 
@@ -669,10 +735,13 @@ end
 Config.SURVIVOR_WIN_REWARD = 500
 Config.INFECT_REWARD = 100
 Config.ZOMBIE_WIN_REWARD = 250
+-- Getting eaten costs you this share of your points, and the zombie that
+-- ate you gets them (so zombies grow as they feed).
+Config.INFECT_STEAL_FRACTION = 0.1
 
 -- Infection ----------------------------------------------------------------------
 
-Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size)
+Config.INFECT_DISTANCE = 4 -- studs between body centers at scale 1 (scales with size); must stay above ShellDiameter
 
 -- Immunity (pills) ----------------------------------------------------------------
 
@@ -681,10 +750,10 @@ Config.IMMUNITY_WEIGHT = 0.8 -- pick weight = 1 - immunity/100 * this
 
 -- Camera ---------------------------------------------------------------------------
 
-Config.CAMERA_HEIGHT = 150
+Config.CAMERA_HEIGHT = 175
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
 Config.CAMERA_SMOOTHING = 0 -- 0 = locked to you like the original; e.g. 12 for a soft follow
-Config.CAMERA_ZOOMS = { Close = 120, Normal = 150, Far = 195 }
+Config.CAMERA_ZOOMS = { Close = 140, Normal = 175, Far = 220 }
 Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
 
 -- Character look (studs, at scale 1) -------------------------------------------------
@@ -698,6 +767,9 @@ Config.CHARACTER = {
 	BodyWidth = 3.6, -- shoulders, side to side
 	BodyDepth = 2.1, -- front to back
 	HeadDiameter = 2.3,
+	-- Characters bump into each other with an invisible cylinder this wide
+	-- (only other characters collide with it, so doors still fit).
+	ShellDiameter = 3,
 }
 
 Config.COLORS = {
@@ -737,16 +809,27 @@ Config.BUSH_SEE_THROUGH = 0.55 -- the bush you're in fades this much on your scr
 -- Items -----------------------------------------------------------------------------------
 
 Config.PICKUP_RADIUS = 6
-Config.GROUND_ITEMS_MIN = 4
-Config.GROUND_ITEMS_MAX = 6
+Config.GROUND_ITEMS_MIN = 2
+Config.GROUND_ITEMS_MAX = 3
 Config.RARE_CHANCE = 0.05
 Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
+-- Held melee weapons are solid: zombies touching the shaft are shoved off it
+-- (this fast, in short pulses), and furniture it overlaps is pushed aside.
+Config.SHAFT_ZOMBIE_PUSH = 22
+Config.SHAFT_ZOMBIE_SECONDS = 0.15
+Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
 
 -- Wizard ------------------------------------------------------------------------------------
 
 Config.WIZARD_SHOP_RADIUS = 10
 Config.WIZARD_ARRIVE_MIN = 8 -- seconds into the prep phase
 Config.WIZARD_ARRIVE_MAX = 40
+
+-- Admins ------------------------------------------------------------------------------------
+-- The admin panel (F2, or the ADMIN button) is open to: everyone while testing
+-- in Studio, the experience's owner (or rank 254+ in the owning group), and
+-- these UserIds.
+Config.ADMIN_USER_IDS = {} :: { number }
 
 -- Saving ------------------------------------------------------------------------------------
 
@@ -760,9 +843,9 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 Config.DEBUG_BOTS = true -- only ever active inside Roblox Studio
 Config.DEBUG_BOT_COUNT = 4
 
--- Players walk through each other (furniture and walls still block). The
--- original felt this way, and it stops humans from body-blocking doorways.
-Config.PLAYERS_COLLIDE = false
+-- Characters bump into each other (human/human, zombie/zombie and
+-- zombie/human). Set false to let everyone walk through each other.
+Config.PLAYERS_COLLIDE = true
 
 -- Sounds ---------------------------------------------------------------------------------------
 -- Paths are sounds that ship inside the Roblox client. Leave a value "" to skip
@@ -864,12 +947,32 @@ function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): 
 	return CFrame.lookAt(center, center + dir), size
 end
 
--- Thin box along a held weapon, from the hand to the tip.
-function FurniturePush.itemProbe(root: BasePart, grip: CFrame, aim: Vector3, reach: number): (CFrame, Vector3)
+-- Box along a held weapon, from the hand to the tip, `guard` studs either
+-- side of the shaft (Items: thick bat, thin spear).
+function FurniturePush.itemProbe(
+	root: BasePart,
+	grip: CFrame,
+	aim: Vector3,
+	reach: number,
+	guard: number?
+): (CFrame, Vector3)
 	local hand = (root.CFrame * grip).Position
 	local start = Vector3.new(hand.X, root.Position.Y, hand.Z)
 	local center = start + aim * (reach / 2)
-	return CFrame.lookAt(center, center + aim), Vector3.new(1, root.Size.Y + 1, reach)
+	return CFrame.lookAt(center, center + aim), Vector3.new((guard or 0.5) * 2, root.Size.Y + 1, reach)
+end
+
+-- Held weapons are solid. While you stand still or turn, a piece the shaft
+-- overlaps is pushed out of its way: toward whichever side of the shaft its
+-- center is on (so a sweep shoves it along), and a little forward. Returns
+-- a flat unit direction.
+function FurniturePush.shaftExit(root: BasePart, aim: Vector3, body: BasePart): Vector3
+	local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+	local side = rel - aim * rel:Dot(aim)
+	if side.Magnitude < 0.3 then
+		return aim
+	end
+	return (side.Unit + aim * 0.5).Unit
 end
 
 function FurniturePush.add(pushes: Pushes, body: BasePart, desired: Vector3, strength: number, at: Vector3?)
@@ -954,7 +1057,7 @@ local Specs: { [string]: Spec } = {
 	Wardrobe = { w = 6, d = 2.6, h = 8, weight = "Massive" },
 	Piano = { w = 8, d = 4.5, h = 4, weight = "Massive" },
 	PoolTable = { w = 10, d = 6, h = 3, weight = "Massive" },
-	Car = { w = 6, d = 12, h = 4, weight = "Massive" },
+	Car = { w = 9, d = 16, h = 4, weight = "Massive" }, -- the garage supercar
 	Dresser = { w = 5, d = 2.4, h = 4, weight = "Heavy" },
 	Washer = { w = 3, d = 3, h = 3.5, weight = "Heavy" },
 	Desk = { w = 6, d = 3, h = 3, weight = "Medium" },
@@ -972,6 +1075,30 @@ local Specs: { [string]: Spec } = {
 }
 
 local FurnitureSpecs = { specs = Specs }
+
+-- Everything is drawn this much bigger than the numbers above (footprint
+-- only), so pieces read clearly at the game's camera distance.
+FurnitureSpecs.SIZE_SCALE = 1.15
+-- Pieces that sit tight against walls (and the already-huge car and rugs)
+-- keep their size.
+local KEEP_SIZE: { [string]: boolean } = {
+	Beanbag = true,
+	Bed = true,
+	Bookshelf = true,
+	Car = true,
+	Dresser = true,
+	Lamp = true,
+	Rug = true,
+	Sink = true,
+	Stove = true,
+	TVStand = true,
+}
+for kind, spec in Specs do
+	if not KEEP_SIZE[kind] then
+		spec.w *= FurnitureSpecs.SIZE_SCALE
+		spec.d *= FurnitureSpecs.SIZE_SCALE
+	end
+end
 
 function FurnitureSpecs.get(kind: string): Spec
 	local spec = Specs[kind]
@@ -1386,6 +1513,8 @@ export type Item = {
 	cooldown: number?,
 	straight: boolean?, -- shove along the aim line instead of away from you
 	dragsFurniture: boolean?,
+	firmness: number?, -- held melee: how hard the shaft holds things back (1 = normal, low = it gives)
+	guard: number?, -- held melee: studs around the shaft it keeps clear
 	breaksWalls: boolean?,
 	projectileSpeed: number?,
 	projectileRange: number?,
@@ -1865,6 +1994,34 @@ add({
 })
 
 -- Display order in the shops.
+-- How each held melee weapon holds zombies and furniture back (ItemService's
+-- shaftStep and FurniturePush): { firmness, guard }. The bat is short but
+-- stiff and thick; the pool noodle is long, fat and soft, so zombies squeeze
+-- past it; spears and the katana are thin.
+local SOLIDITY: { [string]: { number } } = {
+	Stick = { 0.8, 0.45 },
+	Bat = { 1.7, 0.9 },
+	Swordfish = { 1.0, 0.6 },
+	Spear = { 1.1, 0.35 },
+	AncientSpear = { 1.3, 0.4 },
+	RubberChicken = { 0.45, 0.6 },
+	PoolNoodle = { 0.35, 0.9 },
+	Baguette = { 0.7, 0.5 },
+	FryingPan = { 1.5, 1.0 },
+	GoldenPan = { 1.8, 1.1 },
+	Crowbar = { 1.4, 0.4 },
+	Plunger = { 0.9, 0.6 },
+	Lollipop = { 1.2, 1.0 },
+	Katana = { 1.0, 0.35 },
+	InflatableHammer = { 0.5, 1.3 },
+}
+for id, values in SOLIDITY do
+	local item = Items[id]
+	if item then
+		item.firmness, item.guard = values[1], values[2]
+	end
+end
+
 local SHOP_ORDER = {
 	"Stick",
 	"Pill",
@@ -2083,6 +2240,9 @@ MapLayout.HEIGHTS = {
 -- Picked from screenshots of the original.
 MapLayout.COLORS = {
 	Grass = "4FB35F",
+	Outside = "3B6E45", -- beyond the boundary wall
+	BoundaryBrick = "B5653A",
+	BoundaryCap = "5B3420",
 	GrassTuft = "3E9A4E",
 	Flower = "F48FB1",
 	FlowerCenter = "FFE066",
@@ -2421,7 +2581,7 @@ local MANSION: Plan = {
 		piece("Lamp", 146, 124),
 		piece("Arcade", 144.5, 116),
 		-- Garage
-		piece("Car", 174, 98),
+		piece("Car", 174, 100, 180), -- nose toward the garage door
 		piece("Crate", 155, 75),
 		piece("Crate", 155, 79),
 		piece("Barrel", 196, 74),
@@ -2584,6 +2744,7 @@ end
 
 local function buildNeighborhood(): Layout
 	local layout = newLayout("Neighborhood", "The Neighborhood")
+	layout.bounds = rect(-150, -182, 150, 182) -- brick wall just outside this
 	local B = layout.bounds
 	addHouse(layout, "North", LARGE, -110, -150, false, "Blue", "Large")
 	addHouse(layout, "South", LARGE, -30, 66, true, "Orange", "Large")
@@ -2617,23 +2778,23 @@ local function buildNeighborhood(): Layout
 		rect(-95, -66, -87, -20), -- north front door
 		rect(30, -112, 64, -104), -- north side door, east...
 		rect(56, -112, 64, -20), -- ...then down to the road
-		rect(10, -180, 18, -150), -- north kitchen door
-		rect(0, -192, 28, -180), -- garden patch
+		rect(10, -166, 18, -150), -- north kitchen door
+		rect(0, -178, 28, -166), -- garden patch
 	})
 
 	local north = {
 		bush(-130, -130, 4, "Green"),
-		bush(-150, -80, 5, "Green"),
+		bush(-135, -88, 5, "Green"),
 		bush(-125, -165, 4, "Orange"),
-		bush(-180, -182, 6, "Green"),
-		bush(-60, -176, 5, "Green"),
-		bush(45, -170, 4, "Orange"),
+		bush(-136, -168, 5, "Green"),
+		bush(-60, -168, 5, "Green"),
+		bush(45, -168, 4, "Orange"),
 		bush(95, -150, 6, "Green"),
-		bush(140, -120, 5, "Orange"),
+		bush(134, -125, 5, "Orange"),
 		bush(110, -62, 4, "Green"),
-		bush(170, -170, 5, "Green"),
-		bush(185, -80, 4, "Orange"),
-		bush(-186, -112, 4, "Orange"),
+		bush(134, -168, 5, "Green"),
+		bush(138, -82, 4, "Orange"),
+		bush(-138, -112, 4, "Orange"),
 		bush(-70, -40, 3, "Green"),
 		bush(20, -56, 3, "Orange"),
 	}
@@ -2643,17 +2804,17 @@ local function buildNeighborhood(): Layout
 	end
 
 	layout.humanSpawns = mirrorPoints({
-		pt(-160, -140),
-		pt(-72, -190),
-		pt(75, -186),
-		pt(130, -160),
-		pt(165, -45),
-		pt(-165, -45),
+		pt(-132, -140),
+		pt(-72, -172),
+		pt(75, -172),
+		pt(122, -150),
+		pt(136, -45),
+		pt(-136, -45),
 		pt(-35, -56),
 		pt(95, -95),
 	})
-	layout.zombieSpawns = { pt(-195, 0), pt(195, 0) }
-	layout.wizardSpots = mirrorPoints({ pt(-120, -186), pt(160, -100), pt(-178, -150) })
+	layout.zombieSpawns = { pt(-140, 0), pt(140, 0) }
+	layout.wizardSpots = mirrorPoints({ pt(-108, -172), pt(136, -100), pt(-136, -150) })
 	return layout
 end
 
@@ -2661,6 +2822,7 @@ end
 
 local function buildMansion(): Layout
 	local layout = newLayout("Mansion", "The Mansion")
+	layout.bounds = rect(-175, -148, 180, 186) -- brick wall just outside this
 	local B = layout.bounds
 	addHouse(layout, "Mansion", MANSION, -100, -40, false, "Blue", "Huge")
 	addHouse(layout, "Shed", SHED, 110, -120, false, "Orange", "Small")
@@ -2688,42 +2850,42 @@ local function buildMansion(): Layout
 	layout.pools = { rect(-40, -95, 40, -65) }
 
 	layout.bushes = {
-		bush(-150, -150, 6, "Green"),
-		bush(-110, -175, 4, "Orange"),
-		bush(-180, -90, 5, "Green"),
-		bush(-185, -20, 4, "Orange"),
-		bush(-180, 60, 5, "Green"),
+		bush(-150, -133, 6, "Green"),
+		bush(-110, -136, 4, "Orange"),
+		bush(-162, -90, 5, "Green"),
+		bush(-163, -20, 4, "Orange"),
+		bush(-163, 60, 5, "Green"),
 		bush(-60, 125, 4, "Green"),
 		bush(-30, 110, 3, "Orange"),
 		bush(40, 112, 4, "Green"),
 		bush(120, 120, 5, "Orange"),
 		bush(160, 100, 4, "Green"),
-		bush(185, 40, 5, "Green"),
-		bush(185, -40, 4, "Orange"),
-		bush(180, -150, 6, "Green"),
-		bush(60, -170, 5, "Orange"),
-		bush(-20, -170, 4, "Green"),
-		bush(150, -175, 4, "Orange"),
+		bush(167, 40, 5, "Green"),
+		bush(168, -40, 4, "Orange"),
+		bush(164, -133, 6, "Green"),
+		bush(60, -136, 5, "Orange"),
+		bush(-20, -136, 4, "Green"),
+		bush(150, -138, 4, "Orange"),
 	}
 
 	layout.humanSpawns = {
 		pt(-60, 116),
 		pt(30, 128),
 		pt(150, 125),
-		pt(-170, 100),
-		pt(-180, 25),
-		pt(180, 70),
-		pt(175, 5),
-		pt(-170, -60),
-		pt(170, -100),
-		pt(-120, -160),
-		pt(0, -150),
-		pt(100, -170),
+		pt(-162, 100),
+		pt(-162, 30),
+		pt(165, 70),
+		pt(165, 5),
+		pt(-162, -60),
+		pt(165, -100),
+		pt(-120, -138),
+		pt(0, -135),
+		pt(95, -136),
 		pt(-80, 100),
 		pt(110, 105),
 	}
-	layout.zombieSpawns = { pt(-195, 162), pt(195, 162) }
-	layout.wizardSpots = { pt(-130, -130), pt(160, -20), pt(-160, 128), pt(40, -180) }
+	layout.zombieSpawns = { pt(-165, 162), pt(170, 162) }
+	layout.wizardSpots = { pt(-130, -128), pt(160, -20), pt(-160, 128), pt(40, -136) }
 	return layout
 end
 
@@ -3051,6 +3213,7 @@ local UNRELIABLE = {
 local FUNCTIONS = {
 	"BuyItem", -- (itemId, fromWizard) -> (ok, message)
 	"BuySkin", -- (skinId) -> (status, message)
+	"Admin", -- (action, data) -> (ok, message); admins only, see AdminService
 }
 
 local Remotes = {}
@@ -3262,6 +3425,7 @@ export type Skin = {
 	product: string?,
 	pass: string?,
 	default: boolean?,
+	special: boolean?, -- given by the game (the alpha zombie), never sold or picked
 }
 
 type Extra = {
@@ -3271,6 +3435,7 @@ type Extra = {
 	product: string?,
 	pass: string?,
 	default: boolean?,
+	special: boolean?,
 }
 
 local function skin(
@@ -3296,6 +3461,7 @@ local function skin(
 		product = e.product,
 		pass = e.pass,
 		default = e.default,
+		special = e.special,
 	}
 end
 
@@ -3427,6 +3593,16 @@ local list: { Skin } = {
 		{ hat = "Hotdog", accent = "F7DC6F", product = "SkinHotdog" }
 	),
 
+	skin(
+		"Donkey",
+		"Donkey",
+		"Human",
+		"6E625A",
+		"5E534C",
+		"8C8079",
+		{ hat = "Donkey", accent = "3F3631", scorePrice = 9500 }
+	),
+
 	-- Zombies
 	skin("ClassicZombie", "Classic", "Zombie", "6B8F5A", "4C6B33", "9CCB5A", { default = true }),
 	skin("Toxic", "Toxic", "Zombie", "4C7A1F", "6FCF1F", "B6FF3B", { hat = "Spots", scorePrice = 5000 }),
@@ -3478,6 +3654,13 @@ local list: { Skin } = {
 		"F4F4F4",
 		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
 	),
+	-- The first zombies of each round: orange with red patches, a gray
+	-- screaming face and red claws.
+	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "77777D", "77777D", {
+		hat = "Alpha",
+		accent = "B8323A",
+		special = true,
+	}),
 }
 
 local byId: { [string]: Skin } = {}
@@ -3511,7 +3694,7 @@ end
 function Skins.forTeam(team: Team): { Skin }
 	local result = {}
 	for _, skin in list do
-		if skin.team == team then
+		if skin.team == team and not skin.special then
 			table.insert(result, skin)
 		end
 	end
@@ -3593,6 +3776,257 @@ return Util
       </Properties>
       <Item class="ModuleScript" referent="20">
         <Properties>
+          <string name="Name">AdminService</string>
+          <string name="Source"><![CDATA[-- The admin panel's server side. Every request is checked here: only admins
+-- (Studio testers, the experience owner, Config.ADMIN_USER_IDS) get through,
+-- and every argument is validated before it touches the game.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local CharacterService = require(script.Parent.CharacterService)
+local Config = require(ReplicatedStorage.Shared.Config)
+local FurnitureService = require(script.Parent.FurnitureService)
+local ItemService = require(script.Parent.ItemService)
+local Items = require(ReplicatedStorage.Shared.Items)
+local Participants = require(script.Parent.Participants)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local RoundManager = require(script.Parent.RoundManager)
+local Util = require(ReplicatedStorage.Shared.Util)
+
+type Participant = Participants.Participant
+
+local AdminService = {}
+
+local MAX_SPEED_FACTOR = 5
+local MAX_POINTS = 10_000_000
+
+function AdminService.isAdmin(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	if table.find(Config.ADMIN_USER_IDS, player.UserId) then
+		return true
+	end
+	if game.CreatorType == Enum.CreatorType.User then
+		return player.UserId == game.CreatorId
+	end
+	local ok, rank = pcall(function()
+		return player:GetRankInGroup(game.CreatorId)
+	end)
+	return ok and rank >= 254
+end
+
+-- "*" means everyone; otherwise one participant id.
+local function targets(data: { [string]: any }): { Participant }
+	local id = data.target
+	if id == "*" then
+		return Participants.all()
+	end
+	local p = if typeof(id) == "string" then Participants.get(id) else nil
+	return if p then { p } else {}
+end
+
+local function number(value: any, low: number, high: number): number?
+	if typeof(value) ~= "number" or value ~= value then
+		return nil
+	end
+	return math.clamp(value, low, high)
+end
+
+local function names(list: { Participant }): string
+	if #list == 1 then
+		return list[1].name
+	end
+	return #list .. " players"
+end
+
+type Handler = (admin: Participant, data: { [string]: any }) -> (boolean, string)
+
+local ACTIONS: { [string]: Handler } = {}
+
+-- Items ---------------------------------------------------------------------------------
+
+function ACTIONS.give(admin, data)
+	local item = Items.get(if typeof(data.item) == "string" then data.item else nil)
+	if not item then
+		return false, "Unknown item"
+	end
+	if data.ground == true then
+		local root = Participants.body(admin)
+		if not root then
+			return false, "You need a character to drop items"
+		end
+		ItemService.spawnGround(item.id, root.Position + root.CFrame.LookVector * 5)
+		return true, item.name .. " dropped in front of you"
+	end
+	local list = targets(data)
+	local given = 0
+	for _, p in list do
+		if p.team == "Human" then
+			ItemService.give(p, item.id)
+			given += 1
+		end
+	end
+	if given == 0 then
+		return false, "Only humans can hold items"
+	end
+	return true, string.format("Gave %s to %s", item.name, names(list))
+end
+
+-- Players -------------------------------------------------------------------------------
+
+function ACTIONS.speed(_admin, data)
+	local factor = number(data.factor, 0, MAX_SPEED_FACTOR)
+	if not factor then
+		return false, "Bad speed"
+	end
+	local list = targets(data)
+	for _, p in list do
+		p.adminSpeed = factor
+		CharacterService.refreshSpeed(p)
+	end
+	return #list > 0, string.format("Speed x%.2g for %s", factor, names(list))
+end
+
+function ACTIONS.points(_admin, data)
+	local add = number(data.add, -MAX_POINTS, MAX_POINTS)
+	local set = number(data.set, 0, MAX_POINTS)
+	if not add and not set then
+		return false, "Bad points"
+	end
+	local list = targets(data)
+	for _, p in list do
+		Participants.setScore(p, if set then set else p.score + (add or 0))
+		CharacterService.refreshSize(p)
+		CharacterService.refreshSpeed(p)
+	end
+	local what = if set then "set to " .. Util.commas(set) else string.format("%+d", add or 0)
+	return #list > 0, string.format("Points %s for %s", what, names(list))
+end
+
+function ACTIONS.immunity(_admin, data)
+	local value = number(data.value, 0, Config.IMMUNITY_MAX)
+	if not value then
+		return false, "Bad immunity"
+	end
+	local list = targets(data)
+	for _, p in list do
+		Participants.setImmunity(p, value)
+	end
+	return #list > 0, string.format("Immunity %d for %s", value, names(list))
+end
+
+function ACTIONS.team(_admin, data)
+	local team = data.team
+	if team ~= "Human" and team ~= "Zombie" then
+		return false, "Bad team"
+	end
+	local list = targets(data)
+	for _, p in list do
+		RoundManager.setTeam(p, team)
+	end
+	return #list > 0, string.format("%s now %s", names(list), if team == "Zombie" then "zombie" else "human")
+end
+
+function ACTIONS.bring(admin, data)
+	local root = Participants.body(admin)
+	if not root then
+		return false, "You need a character"
+	end
+	local list = targets(data)
+	for i, p in list do
+		if p ~= admin then
+			local angle = i / math.max(1, #list) * math.pi * 2
+			local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * 6
+			CharacterService.place(p, CFrame.new(root.Position + offset))
+		end
+	end
+	return #list > 0, "Brought " .. names(list)
+end
+
+function ACTIONS.goTo(admin, data)
+	local list = targets(data)
+	local target = list[1]
+	local root = target and Participants.body(target)
+	if not target or target == admin or not root then
+		return false, "Pick one other player"
+	end
+	CharacterService.place(admin, CFrame.new(root.Position + Vector3.new(6, 0, 0)))
+	return true, "Went to " .. target.name
+end
+
+function ACTIONS.respawn(_admin, data)
+	local list = targets(data)
+	for _, p in list do
+		RoundManager.respawn(p)
+	end
+	return #list > 0, "Respawned " .. names(list)
+end
+
+-- Round ---------------------------------------------------------------------------------
+
+function ACTIONS.skip()
+	return RoundManager.skipPhase(), "Skipped to the next phase"
+end
+
+function ACTIONS.time(_admin, data)
+	local seconds = number(data.seconds, -600, 600)
+	if not seconds then
+		return false, "Bad time"
+	end
+	RoundManager.addTime(seconds)
+	return true, string.format("%+d seconds", seconds)
+end
+
+function ACTIONS.nextMap()
+	RoundManager.queueNextMap()
+	return true, "Next round loads the next map"
+end
+
+function ACTIONS.resetFurniture()
+	FurnitureService.resetAll()
+	return true, "Furniture put back"
+end
+
+function ACTIONS.clearItems()
+	ItemService.clearGround()
+	return true, "Ground items removed"
+end
+
+local function handle(player: Player, action: unknown, data: unknown): (boolean, string)
+	if not AdminService.isAdmin(player) then
+		return false, "Not an admin"
+	end
+	local admin = Participants.fromPlayer(player)
+	local handler = if typeof(action) == "string" then ACTIONS[action] else nil
+	if not admin or not handler then
+		return false, "Unknown command"
+	end
+	local args: { [string]: any } = if typeof(data) == "table" then data :: any else {}
+	local ok, success, message = pcall(handler, admin, args)
+	if not ok then
+		warn("[Admin] " .. tostring(action) .. " failed: " .. tostring(success))
+		return false, "That failed (see server output)"
+	end
+	return success, message
+end
+
+function AdminService.init()
+	Remotes.func("Admin").OnServerInvoke = handle
+	Participants.onAdded(function(p)
+		if p.player and AdminService.isAdmin(p.player) then
+			p.state:SetAttribute("Admin", true)
+		end
+	end)
+end
+
+return AdminService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="21">
+        <Properties>
           <string name="Name">Announcer</string>
           <string name="Source"><![CDATA[-- Server -> client messages: yellow system lines in chat, short on-screen
 -- toasts, and visual/sound effects that every client plays locally.
@@ -3628,7 +4062,7 @@ return Announcer
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">BotService</string>
           <string name="Source"><![CDATA[-- Studio-only test bots so you can play a full round alone. They count as
@@ -3833,7 +4267,7 @@ return BotService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">BushService</string>
           <string name="Source"><![CDATA[-- Flags characters standing in a bush (character attribute "InBush") so bots
@@ -3894,7 +4328,7 @@ return BushService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">CharacterService</string>
           <string name="Source"><![CDATA[-- Spawns and dresses characters. Every player and bot uses the same custom
@@ -4010,7 +4444,38 @@ local function updateNameTag(p: Participant)
 end
 
 function CharacterService.skinFor(p: Participant): string
+	if p.team == "Zombie" and p.alpha then
+		return "Alpha"
+	end
 	return if p.team == "Zombie" then p.zombieSkin else p.humanSkin
+end
+
+-- An invisible cylinder the size of the drawn body. Only other characters'
+-- shells collide with it (see WorldSetup), so characters bump into each
+-- other while the narrow root box still decides what fits through doors.
+local function addShell(character: Model, root: BasePart, scale: number)
+	local old = character:FindFirstChild("Shell")
+	if old then
+		old:Destroy()
+	end
+	local diameter = C.ShellDiameter * scale
+	local shell = Instance.new("Part")
+	shell.Name = "Shell"
+	shell.Shape = Enum.PartType.Cylinder
+	shell.Size = Vector3.new(C.RootHeight * scale, diameter, diameter)
+	shell.CFrame = root.CFrame * Parts.UPRIGHT
+	shell.Transparency = 1
+	shell.Massless = true
+	shell.CanCollide = true
+	shell.CanQuery = false
+	shell.CanTouch = true -- your client plays a bump sound on contact
+	shell.CastShadow = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = shell
+	weld.Parent = shell
+	shell.Parent = character
+	shell.CollisionGroup = "CharacterShells"
 end
 
 -- Rebuilds the look for the participant's team, skin and size.
@@ -4034,12 +4499,25 @@ function CharacterService.applyLook(p: Participant)
 			part.CollisionGroup = "Characters"
 		end
 	end
+	addShell(character, root, p.scale)
 	character:SetAttribute("Team", p.team)
 	updateNameTag(p)
 end
 
 function CharacterService.refreshNameTag(p: Participant)
 	updateNameTag(p)
+end
+
+-- Size follows score live: call after a participant's score changes. Only
+-- rebuilds the look when the size really changed.
+function CharacterService.refreshSize(p: Participant)
+	local scale = RoundRules.scaleForScore(p.score)
+	if math.abs(scale - p.scale) < 0.01 then
+		return
+	end
+	p.scale = scale
+	p.state:SetAttribute("Scale", scale)
+	CharacterService.applyLook(p)
 end
 
 function CharacterService.refreshSpeed(p: Participant)
@@ -4052,7 +4530,7 @@ function CharacterService.refreshSpeed(p: Participant)
 		humanoid.WalkSpeed = 0
 		return
 	end
-	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie") * p.adminSpeed
 	if now < p.boostUntil then
 		speed *= p.boostFactor
 	end
@@ -4172,7 +4650,7 @@ return CharacterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- Shoves and stuns. Weapons never kill: they push zombies away and freeze
@@ -4227,21 +4705,39 @@ function Combat.wallParams(): RaycastParams
 	return wallParams
 end
 
-function Combat.knockback(target: Participant, velocity: Vector3, stun: number)
+-- `gentle` shoves (a zombie leaning on a held weapon) never cut short a
+-- real hit that is still sending the zombie flying.
+function Combat.knockback(
+	target: Participant,
+	velocity: Vector3,
+	stun: number,
+	seconds: number?,
+	gentle: boolean?
+)
 	local root = Participants.body(target)
 	local character = target.character
 	if not root or not character then
 		return
 	end
-	target.stunUntil = math.max(target.stunUntil, os.clock() + stun)
-	CharacterService.refreshSpeed(target)
-	task.delay(stun + 0.05, function()
+	local now = os.clock()
+	if gentle and now < target.knockedUntil then
+		return
+	end
+	if stun > 0 then
+		target.stunUntil = math.max(target.stunUntil, os.clock() + stun)
 		CharacterService.refreshSpeed(target)
-	end)
+		task.delay(stun + 0.05, function()
+			CharacterService.refreshSpeed(target)
+		end)
+	end
+	local duration = seconds or Config.KNOCKBACK_SECONDS
+	if not gentle then
+		target.knockedUntil = now + duration
+	end
 	if target.player then
-		knockbackRemote:FireClient(target.player, velocity, Config.KNOCKBACK_SECONDS)
+		knockbackRemote:FireClient(target.player, velocity, duration)
 	else
-		Knockback.apply(character, velocity, Config.KNOCKBACK_SECONDS)
+		Knockback.apply(character, velocity, duration)
 	end
 end
 
@@ -4304,7 +4800,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">DataService</string>
           <string name="Source"><![CDATA[-- Saves each player's score, stats, skins and purchases with DataStoreService.
@@ -4593,7 +5089,7 @@ return DataService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">FurnitureBuilder</string>
           <string name="Source"><![CDATA[-- Builds one furniture piece: an invisible-to-physics stack of colored details
@@ -4891,14 +5387,47 @@ local DESIGNS: { [string]: Design } = {
 			c:disc(2, -0.5, 0.45, 0.1, 0.1, "F2C230")
 		end,
 	},
+	-- A big yellow supercar: tapered nose, black glass with shiny streaks,
+	-- wing mirrors, a vented engine cover and a black tail (nose toward -Z).
 	Car = {
-		body = "D9443B",
+		body = "F5C518",
+		transparentBody = true,
 		draw = function(c)
-			c:top(0, -0.6, c.w - 1.2, 5.2, 0.3, 0.4, "B8352E") -- roof
-			c:top(0, -3.6, c.w - 1.4, 1.2, 0.32, 0.4, "9FD8F5") -- windshield
-			c:top(0, 2.3, c.w - 1.4, 1.0, 0.32, 0.4, "9FD8F5") -- rear window
-			for _, x in { -1, 1 } do
-				c:top(x * (c.w / 2 - 0.9), -c.d / 2 + 0.3, 0.9, 0.4, 0.05, 0.06, "FFF3B0") -- headlights
+			local yellow, edge, black = "F5C518", "B8860B", "151515"
+			c:top(0, 1.0, c.w, c.d - 2.2, -0.6, c.h - 0.8, edge) -- outline
+			c:top(0, 1.0, c.w - 0.6, c.d - 3.0, -0.4, c.h - 0.6, yellow) -- hull
+			c:top(0, -6.4, 6.8, 3.2, -0.65, c.h - 1.1, edge) -- nose outline
+			c:top(0, -6.6, 6.2, 2.6, -0.6, c.h - 1.0, yellow) -- nose
+			for side = -1, 1, 2 do
+				c:top(side * 2.9, -6.0, 2.2, 2.6, -0.6, c.h - 1.0, yellow, side * 0.45) -- nose corners
+				c:top(side * 2.6, -7.1, 1.4, 0.7, -0.55, 0.1, black, side * 0.4) -- front intakes
+				c:top(side * 2.6, -2.6, 1.2, 2.6, 0, 0.4, black, side * 0.35) -- windshield corners
+				c:top(side * 2.75, 0.4, 0.5, 4.4, 0, 0.3, black) -- side windows
+				local shine = c:top(side * 2.75, -0.2, 0.12, 1.6, 0.02, 0.05, "FFFFFF")
+				shine.Transparency = 0.4
+				c:top(side * 4.7, -2.6, 1.4, 0.55, -0.5, 0.3, black, side * 0.45) -- wing mirrors
+				c:top(side * 3.6, 2.6, 0.7, 2.4, -0.3, 0.1, black) -- side intakes
+				c:top(side * 3.0, 4.6, 2.6, 4.2, -0.2, 0.3, yellow, side * 0.12) -- rear haunches
+				c:top(side * 2.6, 7.55, 1.8, 0.3, -0.35, 0.1, "C0392B") -- tail lights
+				for _, z in { -4.4, 4.6 } do
+					c:top(side * 4.35, z, 0.6, 2.5, -1.6, 1.0, black) -- tyres peeking out
+				end
+			end
+			c:top(0, -2.4, 5.6, 3.0, 0, 0.4, black) -- windshield
+			-- Shiny streaks across the glass.
+			for _, streak in { { -0.9, 0.35, 0.3 }, { 0.4, 0.22, 0.45 }, { 1.5, 0.15, 0.6 } } do
+				local part = c:top(streak[1], -2.4, streak[2], 3.2, 0.03, 0.05, "FFFFFF", 0.7)
+				part.Transparency = streak[3]
+			end
+			c:top(0, 0.2, 5.0, 2.6, 0.05, 0.4, yellow) -- roof
+			c:top(0, 3.6, 4.6, 3.4, -0.1, 0.3, black) -- engine cover
+			for i = 0, 3 do
+				c:top(0, 2.4 + i * 0.75, 3.6, 0.3, 0, 0.1, "5E5E5E") -- vents
+			end
+			c:disc(0, 3.6, 1.4, 0.02, 0.1, "7A7A7A")
+			c:top(0, 7.4, 7.6, 1.2, -0.4, 0.4, black) -- tail
+			for side = -1, 1, 2 do
+				c:disc(side * 0.8, 7.7, 0.6, -0.3, 0.2, "9A9A9A") -- exhausts
 			end
 		end,
 	},
@@ -5178,7 +5707,7 @@ return FurnitureBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">FurnitureService</string>
           <string name="Source"><![CDATA[-- Owns every furniture piece: builds them, decides who simulates each one,
@@ -5228,6 +5757,9 @@ export type Mover = {
 	id: string,
 	scale: number,
 	aim: Vector3,
+	dragging: boolean?, -- hooking a piece with held click
+	firmness: number?, -- held weapon's Items.firmness
+	guard: number?, -- held weapon's Items.guard
 	reach: number?,
 }
 
@@ -5419,35 +5951,53 @@ local function collectPushes(now: number): FurniturePush.Pushes
 	external = {}
 	for _, mover in getMovers() do
 		local humanoid, root = mover.humanoid, mover.root
+		local walk = humanoid.WalkSpeed
+		if walk <= 0 then
+			continue
+		end
 		local move = humanoid.MoveDirection
 		local flat = Vector3.new(move.X, 0, move.Z)
-		if flat.Magnitude > 0.1 and humanoid.WalkSpeed > 0 then
-			local dir = flat.Unit
+		local moving = flat.Magnitude > 0.1
+		local dir = if moving then flat.Unit else Vector3.zero
+		local strength = RoundRules.pushStrength(mover.scale)
+		local touched: { [BasePart]: boolean } = {}
+		if moving then
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
-			local strength = RoundRules.pushStrength(mover.scale)
-			local touched: { [BasePart]: boolean } = {}
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
 					touched[part] = true
 					piece.pushers[mover.id] = now
-					FurniturePush.add(pushes, part, dir * humanoid.WalkSpeed, strength, probe.Position)
+					FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
 				end
 			end
-			-- A held weapon's shaft pushes what it touches, same as the client does.
-			if mover.reach then
-				local shaft, shaftSize =
-					FurniturePush.itemProbe(root, CharacterLook.grip(mover.scale), mover.aim, mover.reach)
-				for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
-					local piece = byBody[part]
-					if piece and not touched[part] then
-						piece.pushers[mover.id] = now
+		end
+		-- A held weapon's shaft is solid, same as on the client: it pushes
+		-- what it touches along your path, or out of its way when you stand
+		-- still or turn. While hooking a piece (held click) the drag does the work.
+		if mover.reach and not mover.dragging then
+			local shaft, shaftSize = FurniturePush.itemProbe(
+				root,
+				CharacterLook.grip(mover.scale),
+				mover.aim,
+				mover.reach,
+				mover.guard
+			)
+			local firm = strength * (mover.firmness or 1)
+			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
+				local piece = byBody[part]
+				if piece and not touched[part] then
+					piece.pushers[mover.id] = now
+					if moving then
+						FurniturePush.add(pushes, part, dir * walk, firm, part.Position + mover.aim * 0.5)
+					else
+						local exit = FurniturePush.shaftExit(root, mover.aim, part)
 						FurniturePush.add(
 							pushes,
 							part,
-							dir * humanoid.WalkSpeed,
-							strength,
-							part.Position + mover.aim * 0.5
+							exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+							firm,
+							nil
 						)
 					end
 				end
@@ -5574,7 +6124,7 @@ return FurnitureService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">ItemService</string>
           <string name="Source"><![CDATA[-- Held items and items lying on the ground. Each human holds at most one
@@ -5945,6 +6495,56 @@ end
 -- touches and pulls it toward you. Your own client does this instantly for
 -- pieces it drives; this server copy covers pieces the server is driving
 -- (for example during a tug of war at a barricade).
+-- Held melee weapons are solid to zombies too: a zombie touching the shaft
+-- (within the item's `guard`) is shoved off it in short pulses, so a stick
+-- held across a doorway keeps zombies out. Firm weapons (bat, pan) hold
+-- them completely; soft ones (pool noodle) give, so zombies squeeze past.
+-- A bigger holder holds harder, a bigger zombie pushes through easier.
+local SHAFT_INTERVAL = 1 / 15
+local nextShaftStep = 0
+
+local function shaftStep()
+	local now = os.clock()
+	if now < nextShaftStep then
+		return
+	end
+	nextShaftStep = now + SHAFT_INTERVAL
+	local zombies = Participants.onTeam("Zombie")
+	if #zombies == 0 then
+		return
+	end
+	for _, p in Participants.onTeam("Human") do
+		local item = Items.get(p.heldItem)
+		local root = Participants.body(p)
+		if not item or item.kind ~= "Melee" or not root then
+			continue
+		end
+		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local guard = item.guard or 0.5
+		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
+		local start = Vector3.new(hand.X, 0, hand.Z)
+		for _, zombie in zombies do
+			local zRoot = Participants.body(zombie)
+			if zRoot then
+				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
+				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
+				local offset = z - (start + p.aim * along)
+				local radius = Config.CHARACTER.ShellDiameter / 2 * zombie.scale
+				if
+					offset.Magnitude < radius + guard and Combat.lineOfSight(root.Position, zRoot.Position)
+				then
+					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
+					local away = Util.flatUnit(offset) or p.aim
+					-- Short pulses from soft weapons leave gaps the zombie walks through.
+					local seconds = Config.SHAFT_ZOMBIE_SECONDS * math.min(1, firmness ^ 1.5)
+					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
+					Combat.knockback(zombie, away * speed, 0, seconds, true)
+				end
+			end
+		end
+	end
+end
+
 local function dragStep()
 	for _, p in Participants.onTeam("Human") do
 		if p.dragging then
@@ -6066,6 +6666,7 @@ function ItemService.init()
 	end)
 
 	RunService.Heartbeat:Connect(dragStep)
+	RunService.Heartbeat:Connect(shaftStep)
 	RunService.Heartbeat:Connect(streamStep)
 end
 
@@ -6073,7 +6674,7 @@ return ItemService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="29">
+      <Item class="Script" referent="30">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -6092,6 +6693,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 
+local AdminService = require(script.Parent.AdminService)
 local BotService = require(script.Parent.BotService)
 local BushService = require(script.Parent.BushService)
 local CharacterService = require(script.Parent.CharacterService)
@@ -6128,6 +6730,9 @@ FurnitureService.start(function()
 				scale = p.scale,
 				aim = p.aim,
 				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
+				dragging = p.dragging,
+				firmness = if melee and item then item.firmness else nil,
+				guard = if melee and item then item.guard else nil,
 			})
 		end
 	end
@@ -6144,6 +6749,7 @@ DataService.init()
 MonetizationService.init()
 TopScores.start()
 RoundManager.start()
+AdminService.init()
 
 local function onPlayerAdded(player: Player)
 	player.CanLoadCharacterAppearance = false
@@ -6180,7 +6786,7 @@ print("[Brain Tag] server ready")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">MapBuilder</string>
           <string name="Source"><![CDATA[-- Builds the neighborhood from MapLayout: grass with little details, dirt
@@ -6282,9 +6888,12 @@ local function speckle(
 end
 
 local function buildGround(parent: Instance, layout: Layout)
-	-- Far bigger than the playable area so the camera never sees past it
-	-- (beyond the ground you would see the dark underside of the sky).
-	local ground = Parts.slab("Grass", -900, -900, 900, 900, H.Grass, 4, COLORS.Grass, parent)
+	-- Outside the brick wall: a darker field, far bigger than the playable
+	-- area so the camera never sees past it (beyond it you'd see the sky).
+	local outside = Parts.slab("Outside", -900, -900, 900, 900, H.Grass - 0.05, 4, COLORS.Outside, parent)
+	outside.Name = "Outside"
+	local b = layout.bounds
+	local ground = Parts.slab("Grass", b.x1, b.z1, b.x2, b.z2, H.Grass, 4, COLORS.Grass, parent)
 	ground.Name = "Ground"
 
 	local decor = sub("GrassDetails", parent)
@@ -6602,25 +7211,55 @@ local function buildBushes(parent: Instance, layout: Layout)
 	end
 end
 
+-- A brick wall around the playable area so it's obvious where the map ends:
+-- brick-textured tops with a dark cap line on the inside edge, plus an
+-- invisible tall barrier on top so nothing is ever knocked over it.
+local BOUNDARY_THICKNESS = 3
+local BOUNDARY_HEIGHT = 8
+
+type Side = { cx: number, cz: number, sx: number, sz: number, inward: Vector3 }
+
 local function buildBoundary(parent: Instance, layout: Layout)
 	local b = layout.bounds
-	local height, t = 40, 4
-	local function wall(cx: number, cz: number, sx: number, sz: number)
+	local t = BOUNDARY_THICKNESS
+	local w, d = b.x2 - b.x1, b.z2 - b.z1
+	local sides: { Side } = {
+		{ cx = (b.x1 + b.x2) / 2, cz = b.z1 - t / 2, sx = w + t * 2, sz = t, inward = Vector3.zAxis },
+		{ cx = (b.x1 + b.x2) / 2, cz = b.z2 + t / 2, sx = w + t * 2, sz = t, inward = -Vector3.zAxis },
+		{ cx = b.x1 - t / 2, cz = (b.z1 + b.z2) / 2, sx = t, sz = d, inward = Vector3.xAxis },
+		{ cx = b.x2 + t / 2, cz = (b.z1 + b.z2) / 2, sx = t, sz = d, inward = -Vector3.xAxis },
+	}
+	for _, side in sides do
+		local cx, cz, sx, sz, inward = side.cx, side.cz, side.sx, side.sz, side.inward
+		Parts.make({
+			name = "BrickWall",
+			size = Vector3.new(sx, BOUNDARY_HEIGHT, sz),
+			cframe = CFrame.new(cx, BOUNDARY_HEIGHT / 2, cz),
+			color = COLORS.BoundaryBrick,
+			material = Enum.Material.Brick,
+			parent = parent,
+		})
+		-- Dark line along the inside edge, like the outline on house walls.
+		local edge = Vector3.new(cx, 0, cz) + inward * (t / 2 - 0.25)
+		Parts.make({
+			name = "WallCap",
+			size = if inward.X == 0 then Vector3.new(sx, 0.1, 0.5) else Vector3.new(0.5, 0.1, sz),
+			cframe = CFrame.new(edge.X, BOUNDARY_HEIGHT + 0.05, edge.Z),
+			color = COLORS.BoundaryCap,
+			canCollide = false,
+			canQuery = false,
+			parent = parent,
+		})
 		Parts.make({
 			name = "Boundary",
-			size = Vector3.new(sx, height, sz),
-			cframe = CFrame.new(cx, height / 2, cz),
+			size = Vector3.new(sx, 40, sz),
+			cframe = CFrame.new(cx, BOUNDARY_HEIGHT + 20, cz),
 			color = "000000",
 			transparency = 1,
 			canQuery = false,
 			parent = parent,
 		})
 	end
-	local w, d = b.x2 - b.x1, b.z2 - b.z1
-	wall((b.x1 + b.x2) / 2, b.z1 - t / 2, w + t * 2, t)
-	wall((b.x1 + b.x2) / 2, b.z2 + t / 2, w + t * 2, t)
-	wall(b.x1 - t / 2, (b.z1 + b.z2) / 2, t, d)
-	wall(b.x2 + t / 2, (b.z1 + b.z2) / 2, t, d)
 end
 
 -- Public ----------------------------------------------------------------------------
@@ -6723,7 +7362,7 @@ return MapBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[-- Robux purchases: game passes (permanent perks) and developer products
@@ -6925,7 +7564,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">Participants</string>
           <string name="Source"><![CDATA[-- Everyone taking part in rounds: real players and Studio test bots, behind
@@ -6966,6 +7605,9 @@ export type Participant = {
 	boostUntil: number, -- energy drink
 	boostFactor: number,
 	slowUntil: number, -- snowball freeze
+	adminSpeed: number, -- speed multiplier set from the admin panel (1 = normal)
+	alpha: boolean, -- one of this round's first zombies (special look)
+	knockedUntil: number, -- a real hit's shove lasts until then (see Combat.knockback)
 	slowFactor: number,
 	spawning: boolean,
 	aim: Vector3,
@@ -7082,6 +7724,9 @@ function Participants.add(info: NewParticipant): Participant
 		boostUntil = 0,
 		boostFactor = 1,
 		slowUntil = 0,
+		adminSpeed = 1,
+		alpha = false,
+		knockedUntil = 0,
 		slowFactor = 1,
 		spawning = false,
 		aim = Vector3.new(0, 0, -1),
@@ -7202,7 +7847,7 @@ return Participants
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- Everything that flies: potatoes, pebbles, snowballs, bubbles and rubber
@@ -7401,7 +8046,7 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 		workspace:WaitForChild("Effects"),
 	}
 	local map = workspace:WaitForChild("Map")
-	for _, name in { "Ground", "Road", "Floors", "Boundary" } do
+	for _, name in { "Ground", "Road", "Floors" } do -- shots stop at the boundary wall
 		local child = map:FindFirstChild(name)
 		if child then
 			table.insert(ignored, child)
@@ -7436,7 +8081,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">RoundManager</string>
           <string name="Source"><![CDATA[-- The round loop: Waiting -> Prep -> Outbreak -> Infection -> End -> (reset) -> Prep.
@@ -7542,6 +8187,7 @@ end
 local function award(p: Participant, base: number, includeDrumstick: boolean, reason: string)
 	local amount = RoundRules.reward(base, bonusesFor(p, includeDrumstick))
 	Participants.addScore(p, amount)
+	CharacterService.refreshSize(p)
 	CharacterService.refreshSpeed(p)
 	if p.player then
 		Announcer.toast(
@@ -7554,7 +8200,31 @@ end
 
 local function infect(zombie: Participant, human: Participant)
 	local root = Participants.body(human)
-	RoundManager.setTeam(human, "Zombie")
+	-- The zombie eats a share of the human's points: the human shrinks and
+	-- slows, the zombie grows and speeds up.
+	local stolen = math.floor(human.score * Config.INFECT_STEAL_FRACTION)
+	if stolen > 0 then
+		Participants.addScore(human, -stolen)
+		Participants.addScore(zombie, stolen)
+		human.scale = RoundRules.scaleForScore(human.score)
+		human.state:SetAttribute("Scale", human.scale)
+		if human.player then
+			Announcer.toast(
+				human.player,
+				string.format("-%s points: %s ate them!", Util.commas(stolen), zombie.name),
+				Config.COLORS.ZombieText
+			)
+		end
+		if zombie.player then
+			Announcer.toast(
+				zombie.player,
+				string.format("+%s points eaten from %s", Util.commas(stolen), human.name),
+				Config.COLORS.Good
+			)
+		end
+	end
+	RoundManager.setTeam(human, "Zombie") -- rebuilds the look at the new size
+	CharacterService.refreshSpeed(human)
 	award(zombie, Config.INFECT_REWARD, false, "infection")
 	if zombie.profile then
 		zombie.profile.Infections = (zombie.profile.Infections or 0) + 1
@@ -7632,6 +8302,7 @@ local function resetWorld()
 		p.team = "Human"
 		p.stunUntil = 0
 		p.boostUntil, p.slowUntil = 0, 0
+		p.alpha = false
 		p.dragging = false
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
@@ -7696,6 +8367,7 @@ local function pickFirstZombies(): { Participant }
 end
 
 local function turnFirstZombie(p: Participant)
+	p.alpha = true -- the alpha look (see Skins "Alpha")
 	RoundManager.setTeam(p, "Zombie")
 	Participants.setImmunity(p, 0)
 	if Config.FIRST_ZOMBIES_TO_SPAWN then
@@ -7864,6 +8536,34 @@ local function onZombieReturn(player: Player)
 	CharacterService.place(p, spawnFrame("Zombie", p.scale))
 end
 
+-- Admin controls -------------------------------------------------------------------------------
+
+-- Ends the current phase now (prep -> outbreak, infection -> survivors win).
+function RoundManager.skipPhase(): boolean
+	if phase == "Waiting" then
+		return false
+	end
+	state:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow())
+	return true
+end
+
+function RoundManager.addTime(seconds: number)
+	local endsAt = state:GetAttribute("PhaseEndsAt")
+	if typeof(endsAt) == "number" and phase ~= "Waiting" then
+		state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	end
+end
+
+-- The next round starts on the next map in the rotation.
+function RoundManager.queueNextMap()
+	roundsOnMap = Config.ROUNDS_PER_MAP
+end
+
+function RoundManager.respawn(p: Participant)
+	CharacterService.spawn(p, spawnFrame(p.team, p.scale))
+	ItemService.refreshHand(p)
+end
+
 -- Lets bots press Z too.
 function RoundManager.zombieReturn(p: Participant)
 	if p.team == "Zombie" and phase == "Infection" and os.clock() >= p.returnReadyAt then
@@ -7898,7 +8598,7 @@ return RoundManager
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ShopService</string>
           <string name="Source"><![CDATA[-- Score shop (B), the wizard's shop, skins and the first-join tutorial flag.
@@ -7967,6 +8667,8 @@ local function buyItem(player: Player, itemId: unknown, fromWizard: unknown): (b
 	end
 
 	Participants.addScore(p, -price)
+	CharacterService.refreshSize(p) -- points are size and speed
+	CharacterService.refreshSpeed(p)
 	CharacterService.refreshSpeed(p)
 
 	local finalId = item.id
@@ -8033,6 +8735,8 @@ local function buySkin(player: Player, skinId: unknown): (string, string)
 			return "error", "You need " .. Util.commas(skin.scorePrice) .. " score"
 		end
 		Participants.addScore(p, -skin.scorePrice)
+		CharacterService.refreshSize(p) -- points are size and speed
+		CharacterService.refreshSpeed(p)
 		CharacterService.refreshSpeed(p)
 		ShopService.grantSkin(p, skin.id)
 		ShopService.equipSkin(p, skin)
@@ -8063,7 +8767,7 @@ return ShopService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">TopScores</string>
           <string name="Source"><![CDATA[-- All-time top 10 (across servers) for the trophy panel, refreshed every
@@ -8120,7 +8824,7 @@ return TopScores
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">Traps</string>
           <string name="Source"><![CDATA[-- Banana peels: dropped by humans, slippery for zombies. A zombie that steps
@@ -8227,7 +8931,7 @@ return Traps
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">Wizard</string>
           <string name="Source"><![CDATA[-- The wizard: shows up at a random moment during the prep phase in one of the
@@ -8363,7 +9067,7 @@ return Wizard
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">WorldSetup</string>
           <string name="Source"><![CDATA[-- One-time world settings: flat lighting, collision groups, the folders other
@@ -8381,6 +9085,7 @@ local WorldSetup = {}
 WorldSetup.GROUPS = {
 	Characters = "Characters",
 	Furniture = "Furniture",
+	Shells = "CharacterShells", -- body-sized cylinders that only hit each other
 }
 
 local function folder(name: string, parent: Instance): Folder
@@ -8411,13 +9116,17 @@ function WorldSetup.run()
 		end
 	end
 
-	PhysicsService:RegisterCollisionGroup(WorldSetup.GROUPS.Characters)
-	PhysicsService:RegisterCollisionGroup(WorldSetup.GROUPS.Furniture)
-	PhysicsService:CollisionGroupSetCollidable(
-		WorldSetup.GROUPS.Characters,
-		WorldSetup.GROUPS.Characters,
-		Config.PLAYERS_COLLIDE
-	)
+	local groups = WorldSetup.GROUPS
+	PhysicsService:RegisterCollisionGroup(groups.Characters)
+	PhysicsService:RegisterCollisionGroup(groups.Furniture)
+	PhysicsService:RegisterCollisionGroup(groups.Shells)
+	-- Root boxes never hit each other; the shells do the bumping, and only
+	-- with each other, so a big player's wide shell never snags a doorway.
+	PhysicsService:CollisionGroupSetCollidable(groups.Characters, groups.Characters, false)
+	for _, other in { "Default", groups.Characters, groups.Furniture } do
+		PhysicsService:CollisionGroupSetCollidable(groups.Shells, other, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Shells, Config.PLAYERS_COLLIDE)
 
 	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Traps", "Effects", "Bots" } do
 		folder(name, workspace)
@@ -8446,7 +9155,7 @@ return WorldSetup
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="40">
+  <Item class="StarterPlayer" referent="41">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="AutoJumpEnabled">false</bool>
@@ -8455,11 +9164,11 @@ return WorldSetup
       <float name="CharacterWalkSpeed">16</float>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="41">
+    <Item class="StarterCharacterScripts" referent="42">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="42">
+      <Item class="LocalScript" referent="43">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[-- Intentionally empty. Brain Tag characters are flat top-down blobs with no
@@ -8468,15 +9177,15 @@ return WorldSetup
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="43">
+    <Item class="StarterPlayerScripts" referent="44">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="44">
+      <Item class="Folder" referent="45">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">BushController</string>
             <string name="Source"><![CDATA[-- Hiding in bushes, on your screen: the bush you stand in fades so you can
@@ -8571,7 +9280,7 @@ return BushController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">CameraController</string>
             <string name="Source"><![CDATA[-- Straight-down camera that follows your character. A narrow field of view
@@ -8634,7 +9343,7 @@ return CameraController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">ChatSetup</string>
             <string name="Source"><![CDATA[-- TextChatService setup: chat window at the bottom-left with channel tabs,
@@ -8673,7 +9382,7 @@ function ChatSetup.start()
 	task.spawn(function()
 		local window = TextChatService:WaitForChild("ChatWindowConfiguration", 10) :: ChatWindowConfiguration?
 		if window then
-			window.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			window.HorizontalAlignment = Enum.HorizontalAlignment.Right -- points sit bottom-left
 			window.VerticalAlignment = Enum.VerticalAlignment.Bottom
 		end
 		local tabs = TextChatService:FindFirstChildOfClass("ChannelTabsConfiguration")
@@ -8721,7 +9430,7 @@ return ChatSetup
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">ClientState</string>
             <string name="Source"><![CDATA[-- Read-only view of the replicated game state for client code: the round
@@ -8833,7 +9542,7 @@ return ClientState
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- Plays what the server announces: your own knockback, item swings, potato
@@ -8865,6 +9574,7 @@ local SOUND_STYLES: { [string]: { any } } = {
 	Twang = { "Lunge", 1.8, 0.6 },
 	Gulp = { "Pickup", 0.7, 0.6 },
 	Slip = { "Whoosh", 0.6, 0.8 },
+	Bump = { "Lunge", 0.35, 0.35 },
 }
 
 local function playStyle(style: string?, position: Vector3?): boolean
@@ -8951,6 +9661,7 @@ end
 -- Little bits flying out from a point and fading (stars, feathers, crumbs...).
 local BITS: { [string]: { colors: { string }, size: number, count: number, shape: Enum.PartType } } = {
 	Stars = { colors = { "FFE14D", "FFFFFF", "FFC21A" }, size = 0.5, count = 6, shape = Enum.PartType.Block },
+	Puff = { colors = { "FFFFFF", "EDEDED" }, size = 0.45, count = 4, shape = Enum.PartType.Ball },
 	Feathers = {
 		colors = { "FFFFFF", "FFF3B0", "FFE14D" },
 		size = 0.45,
@@ -9339,7 +10050,42 @@ local function startScrape()
 	end)
 end
 
+-- Bumping into another character: a soft thud and a little puff where you
+-- touched, so collisions read clearly. Your character's "Shell" is the
+-- body-sized cylinder only other characters collide with.
+local BUMP_COOLDOWN = 0.4
+local lastBump = 0
+
+local function watchShell(character: Model)
+	local function hook(shell: Instance)
+		if not shell:IsA("BasePart") or shell.Name ~= "Shell" then
+			return
+		end
+		shell.Touched:Connect(function(other)
+			if other.Name ~= "Shell" or other:IsDescendantOf(character) then
+				return
+			end
+			local now = os.clock()
+			if now - lastBump < BUMP_COOLDOWN then
+				return
+			end
+			lastBump = now
+			local between = (shell.Position + other.Position) / 2
+			playStyle("Bump", between)
+			bits("Puff", between)
+		end)
+	end
+	character.ChildAdded:Connect(hook)
+	for _, child in character:GetChildren() do
+		hook(child)
+	end
+end
+
 function Effects.start()
+	player.CharacterAdded:Connect(watchShell)
+	if player.Character then
+		watchShell(player.Character)
+	end
 	task.spawn(function()
 		while true do
 			task.wait(0.1)
@@ -9377,7 +10123,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">FurnitureController</string>
             <string name="Source"><![CDATA[-- Drives the furniture YOU are pushing, on your own machine, so it responds
@@ -9475,15 +10221,10 @@ local function collect(): FurniturePush.Pushes
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
 		local reach = (item.reach or 5) * math.max(1, scale * 0.9)
-		local probe, size = FurniturePush.itemProbe(root, CharacterLook.grip(scale), aim, reach)
+		local probe, size = FurniturePush.itemProbe(root, CharacterLook.grip(scale), aim, reach, item.guard)
 		local touched = query(probe, size)
-		if moving then
-			for _, body in touched do
-				if not pushes[body] then
-					FurniturePush.add(pushes, body, dir * walk, strength, body.Position + aim * 0.5)
-				end
-			end
-		end
+		local firm = strength * (item.firmness or 1) -- a stiff bat shoves harder than a noodle
+		local hooked: BasePart? = nil
 		if InputController.isUsing() and walk > 0 then
 			local nearest: BasePart? = nil
 			local best = math.huge
@@ -9497,6 +10238,7 @@ local function collect(): FurniturePush.Pushes
 				local toward = Util.flatUnit(root.Position - nearest.Position)
 				local gap = FurniturePush.extent(nearest, toward or aim) + root.Size.X / 2 + 0.6
 				if toward and best > gap then
+					hooked = nearest
 					local hook = if item.dragsFurniture then 1.5 else 1
 					FurniturePush.add(
 						pushes,
@@ -9505,6 +10247,25 @@ local function collect(): FurniturePush.Pushes
 						strength * hook,
 						nil
 					)
+				end
+			end
+		end
+		-- The shaft is solid: what it overlaps moves out of the way.
+		if walk > 0 then
+			for _, body in touched do
+				if not pushes[body] and body ~= hooked then
+					if moving then
+						FurniturePush.add(pushes, body, dir * walk, firm, body.Position + aim * 0.5)
+					else
+						local exit = FurniturePush.shaftExit(root, aim, body)
+						FurniturePush.add(
+							pushes,
+							body,
+							exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+							firm,
+							nil
+						)
+					end
 				end
 			end
 		end
@@ -9593,7 +10354,7 @@ return FurnitureController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">InputController</string>
             <string name="Source"><![CDATA[-- Keyboard, mouse and gamepad actions. Touch buttons call the same functions.
@@ -9696,7 +10457,7 @@ return InputController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="52">
+        <Item class="LocalScript" referent="53">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Client entry point.
@@ -9714,7 +10475,7 @@ require(Client.UI.Hud).start()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">MovementController</string>
             <string name="Source"><![CDATA[-- Moves the character in SCREEN directions (W = up the screen = world -Z)
@@ -9899,7 +10660,7 @@ return MovementController
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[-- Plays short 2D sounds, quieter the farther they happen from you (the
@@ -9984,11 +10745,348 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="55">
+        <Item class="Folder" referent="56">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="56">
+          <Item class="ModuleScript" referent="57">
+            <Properties>
+              <string name="Name">AdminPanel</string>
+              <string name="Source"><![CDATA[-- The admin panel (F2, or the ADMIN button on the left). Only shown to
+-- admins; the server checks every request again (see AdminService).
+--   Target: one player or everyone
+--   Items:  give any item (or drop it in front of you)
+--   Speed, points, immunity, team, bring / go to / respawn
+--   Round:  skip phase, add time, next map, reset furniture, clear items
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local ClientState = require(script.Parent.Parent.ClientState)
+local Items = require(ReplicatedStorage.Shared.Items)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local UIKit = require(script.Parent.UIKit)
+
+local AdminPanel = {}
+
+local GRAY = Color3.fromRGB(70, 72, 78)
+local ADMIN_RED = Color3.fromRGB(196, 54, 54)
+
+export type Panel = {
+	open: () -> (),
+	close: () -> (),
+	isOpen: () -> boolean,
+	update: () -> (),
+}
+
+-- Every item: the shop's order, then the wizard's, then anything else.
+local function itemIds(): { string }
+	local list, seen = {}, {}
+	for _, group in { Items.shopOrder, Items.wizardOrder } do
+		for _, id in group do
+			if not seen[id] and Items.get(id) then
+				seen[id] = true
+				table.insert(list, id)
+			end
+		end
+	end
+	local rest = {}
+	for id in Items.all do
+		if not seen[id] then
+			table.insert(rest, id)
+		end
+	end
+	table.sort(rest)
+	for _, id in rest do
+		table.insert(list, id)
+	end
+	return list
+end
+
+function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Panel
+	local remote = Remotes.func("Admin")
+	local window, content = UIKit.modal(parent, "Admin", 660, 600, function() end)
+
+	local scroll = UIKit.new("ScrollingFrame", {
+		Name = "Scroll",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, -28),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 6,
+		ZIndex = 21,
+		Parent = content,
+	}, { UIKit.list(Enum.FillDirection.Vertical, 6) })
+	local status = UIKit.label({
+		Name = "Status",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 24),
+		TextSize = 16,
+		TextColor3 = UIKit.MUTED,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = "Pick a target, then a command.",
+		ZIndex = 21,
+		Parent = content,
+	})
+
+	local order = 0
+	local function nextOrder(): number
+		order += 1
+		return order
+	end
+
+	local function heading(text: string)
+		UIKit.label({
+			Text = text,
+			LayoutOrder = nextOrder(),
+			Size = UDim2.new(1, 0, 0, 22),
+			TextSize = 18,
+			Font = UIKit.HEAVY,
+			TextColor3 = UIKit.GOLD,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 21,
+			Parent = scroll,
+		})
+	end
+
+	-- A wrapping row of buttons.
+	local function row(height: number?): Frame
+		return UIKit.new("Frame", {
+			LayoutOrder = nextOrder(),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -8, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			ZIndex = 21,
+			Parent = scroll,
+		}, {
+			UIKit.new("UIGridLayout", {
+				CellSize = UDim2.fromOffset(118, height or 32),
+				CellPadding = UDim2.fromOffset(6, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		})
+	end
+
+	local function button(parentRow: Frame, text: string, color: Color3?, onClick: () -> ()): TextButton
+		return UIKit.button({
+			Text = text,
+			TextSize = 15,
+			TextWrapped = true,
+			BackgroundColor3 = color or UIKit.ACCENT,
+			ZIndex = 22,
+			Parent = parentRow,
+		}, onClick)
+	end
+
+	-- Target picker --------------------------------------------------------------------------
+	local target = ClientState.myId()
+	local targetRow: Frame
+	local function send(action: string, data: { [string]: any }?)
+		local args: { [string]: any } = data or {}
+		args.target = target
+		status.Text = "..."
+		task.spawn(function()
+			local ok, success, message = pcall(function()
+				return remote:InvokeServer(action, args)
+			end)
+			local text = if ok then tostring(message) else "Couldn't reach the server"
+			status.Text = text
+			status.TextColor3 = if ok and success then UIKit.GOOD else UIKit.RED
+			if ok and success then
+				toast(text)
+			end
+		end)
+	end
+
+	heading("Target")
+	targetRow = row(30)
+	local function refreshTargets()
+		for _, child in targetRow:GetChildren() do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+		local entries = { { id = "*", name = "Everyone" } }
+		for _, r in ClientState.rows() do
+			table.insert(entries, { id = r.id, name = (if r.isMe then "Me: " else "") .. r.name })
+		end
+		local stillThere = false
+		for _, entry in entries do
+			stillThere = stillThere or entry.id == target
+		end
+		if not stillThere then
+			target = ClientState.myId()
+		end
+		for i, entry in entries do
+			local b = button(
+				targetRow,
+				entry.name,
+				if entry.id == target then UIKit.GOOD else GRAY,
+				function()
+					target = entry.id
+					refreshTargets()
+				end
+			)
+			b.LayoutOrder = i
+		end
+	end
+
+	-- Items -------------------------------------------------------------------------------
+	heading("Give item (click)")
+	local toGround = false
+	local modeRow = row(30)
+	local modeButton: TextButton
+	modeButton = button(modeRow, "To: their hand", GRAY, function()
+		toGround = not toGround
+		modeButton.Text = if toGround then "To: ground near me" else "To: their hand"
+	end)
+	local itemRow = row(30)
+	for i, id in itemIds() do
+		local item = Items.get(id)
+		if item then
+			local b = button(itemRow, item.name, nil, function()
+				send("give", { item = id, ground = toGround })
+			end)
+			b.LayoutOrder = i
+		end
+	end
+
+	-- Speed ---------------------------------------------------------------------------------
+	heading("Speed")
+	local speedRow = row()
+	for _, factor in { 0, 0.25, 0.5, 1, 1.5, 2, 3 } do
+		local label = if factor == 0 then "Freeze" elseif factor == 1 then "Normal (1x)" else factor .. "x"
+		button(speedRow, label, if factor < 1 then GRAY else nil, function()
+			send("speed", { factor = factor })
+		end)
+	end
+
+	-- Points --------------------------------------------------------------------------------
+	heading("Points (size and speed follow points)")
+	local pointsRow = row()
+	for _, amount in { 1000, 10000, 100000, -1000 } do
+		button(pointsRow, string.format("%+d", amount), if amount < 0 then GRAY else nil, function()
+			send("points", { add = amount })
+		end)
+	end
+	button(pointsRow, "Set to 0", ADMIN_RED, function()
+		send("points", { set = 0 })
+	end)
+
+	-- Player --------------------------------------------------------------------------------
+	heading("Player")
+	local playerRow = row()
+	button(playerRow, "Make human", nil, function()
+		send("team", { team = "Human" })
+	end)
+	button(playerRow, "Make zombie", ADMIN_RED, function()
+		send("team", { team = "Zombie" })
+	end)
+	button(playerRow, "Immunity 100", nil, function()
+		send("immunity", { value = 100 })
+	end)
+	button(playerRow, "Bring to me", nil, function()
+		send("bring")
+	end)
+	button(playerRow, "Go to", nil, function()
+		send("goTo")
+	end)
+	button(playerRow, "Respawn", GRAY, function()
+		send("respawn")
+	end)
+
+	-- Round ---------------------------------------------------------------------------------
+	heading("Round")
+	local roundRow = row()
+	button(roundRow, "Skip phase", nil, function()
+		send("skip")
+	end)
+	button(roundRow, "+60 seconds", nil, function()
+		send("time", { seconds = 60 })
+	end)
+	button(roundRow, "-30 seconds", GRAY, function()
+		send("time", { seconds = -30 })
+	end)
+	button(roundRow, "Next map (next round)", nil, function()
+		send("nextMap")
+	end)
+	button(roundRow, "Reset furniture", GRAY, function()
+		send("resetFurniture")
+	end)
+	button(roundRow, "Clear ground items", GRAY, function()
+		send("clearItems")
+	end)
+
+	-- Open button (admins only) ----------------------------------------------------------------
+	local openButton = UIKit.button({
+		Name = "AdminButton",
+		Text = "ADMIN (F2)",
+		TextSize = 15,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		Size = UDim2.fromOffset(104, 34),
+		BackgroundColor3 = ADMIN_RED,
+		Visible = false,
+		Parent = parent,
+	})
+
+	local function isAdmin(): boolean
+		return ClientState.my("Admin") == true
+	end
+
+	local lastCount = -1
+	local panel: Panel = {
+		open = function()
+			if isAdmin() then
+				lastCount = #ClientState.rows()
+				refreshTargets()
+				window.Visible = true
+			end
+		end,
+		close = function()
+			window.Visible = false
+		end,
+		isOpen = function()
+			return window.Visible
+		end,
+		update = function()
+			openButton.Visible = isAdmin()
+			if window.Visible then
+				local count = #ClientState.rows()
+				if count ~= lastCount then
+					lastCount = count
+					refreshTargets()
+				end
+			end
+		end,
+	}
+	local function toggle()
+		if window.Visible then
+			panel.close()
+		else
+			panel.open()
+		end
+	end
+	openButton.Activated:Connect(toggle)
+	local close = window:FindFirstChild("Close")
+	if close and close:IsA("TextButton") then
+		close.Activated:Connect(panel.close)
+	end
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and input.KeyCode == Enum.KeyCode.F2 then
+			toggle()
+		end
+	end)
+	return panel
+end
+
+return AdminPanel
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="58">
             <Properties>
               <string name="Name">Banner</string>
               <string name="Source"><![CDATA[-- Top-center countdown banner: "Outbreak happening in N seconds", the
@@ -10046,7 +11144,7 @@ return Banner
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="57">
+          <Item class="ModuleScript" referent="59">
             <Properties>
               <string name="Name">BottomCenter</string>
               <string name="Source"><![CDATA[-- Bottom-center: a context hint ("Press E to pick up Bat"), the single item
@@ -10230,62 +11328,78 @@ return BottomCenter
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="58">
+          <Item class="ModuleScript" referent="60">
             <Properties>
-              <string name="Name">BottomRight</string>
-              <string name="Source"><![CDATA[-- Bottom-right: "Score" and "Speed Multiplier" (plus a 2x boost timer when
--- one is running).
+              <string name="Name">BottomLeft</string>
+              <string name="Source"><![CDATA[-- Bottom-left: your points, the speed boost and size they give you, and
+-- anything changing your speed right now (energy drink, freeze, stun).
+-- Plus a 2x score timer when one is running.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Config = require(ReplicatedStorage.Shared.Config)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local UIKit = require(script.Parent.UIKit)
 local Util = require(ReplicatedStorage.Shared.Util)
 
-local BottomRight = {}
+local BottomLeft = {}
 
-function BottomRight.build(parent: Instance): () -> ()
+local ICE = Color3.fromHex("8FD3FF")
+
+function BottomLeft.build(parent: Instance): () -> ()
 	local box = UIKit.panel({
 		Name = "ScoreBox",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -12, 1, -12),
-		Size = UDim2.fromOffset(210, 0),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 12, 1, -12),
+		Size = UDim2.fromOffset(220, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Parent = parent,
 	}, { UIKit.padding(12, 8), UIKit.list(Enum.FillDirection.Vertical, 2) })
-	local score = UIKit.label({
-		Name = "Score",
-		LayoutOrder = 1,
-		Size = UDim2.new(1, 0, 0, 24),
-		TextSize = 22,
-		Font = UIKit.HEAVY,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = box,
-	})
-	local speed = UIKit.label({
-		Name = "Speed",
-		LayoutOrder = 2,
-		Size = UDim2.new(1, 0, 0, 18),
-		TextSize = 16,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = box,
-	})
-	local boost = UIKit.label({
-		Name = "Boost",
-		LayoutOrder = 3,
-		Size = UDim2.new(1, 0, 0, 16),
-		TextSize = 14,
-		TextColor3 = UIKit.GOLD,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Visible = false,
-		Parent = box,
-	})
+	local function line(name: string, order: number, height: number, props: { [string]: any }?): TextLabel
+		local label = UIKit.label({
+			Name = name,
+			LayoutOrder = order,
+			Size = UDim2.new(1, 0, 0, height),
+			TextSize = height - 2,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = box,
+		})
+		local extra: { [string]: any } = props or {}
+		for key, value in extra do
+			(label :: any)[key] = value
+		end
+		return label
+	end
+	local points = line("Points", 1, 24, { Font = UIKit.HEAVY })
+	local speed = line("Speed", 2, 18)
+	local size = line("Size", 3, 18)
+	local effect = line("Effect", 4, 16, { Visible = false })
+	local boost = line("Boost", 5, 16, { TextColor3 = UIKit.GOLD, Visible = false })
 
 	return function()
 		local value = ClientState.my("Score") or 0
-		score.Text = "Score: " .. Util.commas(value)
-		speed.Text = string.format("Speed Multiplier: %.2f", Config.SPEED_MULTIPLIER(value))
+		points.Text = "Points: " .. Util.commas(value)
+		local multiplier = Config.SPEED_MULTIPLIER(value)
+		speed.Text = string.format("Speed boost: +%d%%", math.floor((multiplier - 1) * 100 + 0.5))
+		size.Text = string.format("Size: %.2fx", ClientState.my("Scale") or 1)
+
+		-- Compare your real walk speed with what your points alone give you.
+		local _, _, humanoid = ClientState.myCharacter()
+		local expected = RoundRules.walkSpeed(value, ClientState.isZombie())
+		local ratio = if humanoid and expected > 0 then humanoid.WalkSpeed / expected else 1
+		effect.Visible = math.abs(ratio - 1) > 0.03
+		if ratio < 0.01 then
+			effect.Text = "Stunned!"
+			effect.TextColor3 = ICE
+		elseif ratio > 1 then
+			effect.Text = string.format("Speed right now: x%.2f", ratio)
+			effect.TextColor3 = UIKit.GOLD
+		else
+			effect.Text = string.format("Slowed: x%.2f", ratio)
+			effect.TextColor3 = ICE
+		end
+
 		local endsAt = ClientState.my("BoostEndsAt")
 		local left = if typeof(endsAt) == "number" then endsAt - workspace:GetServerTimeNow() else 0
 		boost.Visible = left > 0
@@ -10295,11 +11409,11 @@ function BottomRight.build(parent: Instance): () -> ()
 	end
 end
 
-return BottomRight
+return BottomLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">Center</string>
               <string name="Source"><![CDATA[-- Center screen: the big "Survivors Win!!!" / "Zombies Win!!!" text, plus
@@ -10413,12 +11527,12 @@ return Center
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- Builds the whole HUD in code and keeps it up to date.
 --   top-left: buttons        top-center: countdown      top-right: counts + leaderboard
---   bottom-left: chat        bottom-center: item slot   bottom-right: score
+--   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
 
 local Players = game:GetService("Players")
@@ -10426,9 +11540,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
+local AdminPanel = require(script.Parent.AdminPanel)
 local Banner = require(script.Parent.Banner)
 local BottomCenter = require(script.Parent.BottomCenter)
-local BottomRight = require(script.Parent.BottomRight)
+local BottomLeft = require(script.Parent.BottomLeft)
 local Center = require(script.Parent.Center)
 local ChatSetup = require(script.Parent.Parent.ChatSetup)
 local ClientState = require(script.Parent.Parent.ClientState)
@@ -10493,11 +11608,13 @@ function Hud.start()
 	end)
 	local settings = SidePanels.buildSettings(gui, openQuick)
 	local trophy = SidePanels.buildTrophy(gui)
+	local admin = AdminPanel.build(gui, toast)
 
 	local function closeAll()
 		ShopPanel.close()
 		settings.close()
 		trophy.close()
+		admin.close()
 	end
 
 	local function toggleShop()
@@ -10544,7 +11661,7 @@ function Hud.start()
 		Banner.build(gui),
 		TopRight.build(gui),
 		BottomCenter.build(gui, touchMode),
-		BottomRight.build(gui),
+		BottomLeft.build(gui),
 		Center.buildWinText(gui),
 	}
 	if touchMode then
@@ -10553,7 +11670,7 @@ function Hud.start()
 
 	InputController.onShop = toggleShop
 	InputController.isMenuOpen = function()
-		return ShopPanel.isOpen() or settings.isOpen() or trophy.isOpen() or quickOpen()
+		return ShopPanel.isOpen() or settings.isOpen() or trophy.isOpen() or quickOpen() or admin.isOpen()
 	end
 
 	Remotes.event("Toast").OnClientEvent:Connect(function(text: string, hex: string?)
@@ -10583,6 +11700,7 @@ function Hud.start()
 			end
 			ShopPanel.update()
 			trophy.update()
+			admin.update()
 
 			-- Close the shop if you turned into a zombie or walked away from the wizard.
 			if ShopPanel.isOpen() then
@@ -10614,7 +11732,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">MobileButtons</string>
               <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
@@ -10695,7 +11813,7 @@ return MobileButtons
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">QuickStart</string>
               <string name="Source"><![CDATA[-- The "Quick start" card shown on your first visit (and from the menu button).
@@ -10793,7 +11911,7 @@ return QuickStart
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -11325,7 +12443,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="66">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -11553,7 +12671,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Top-left: five square icon buttons (menu, shop, settings, trophy, chat).
@@ -11605,7 +12723,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -11785,7 +12903,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -12015,7 +13133,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="68">
+      <Item class="LocalScript" referent="70">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -12025,13 +13143,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="69">
+  <Item class="TextChatService" referent="71">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="70">
+  <Item class="Workspace" referent="72">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

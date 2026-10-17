@@ -29,6 +29,8 @@ export type Item = {
 	cooldown: number?,
 	straight: boolean?, -- shove along the aim line instead of away from you
 	dragsFurniture: boolean?,
+	firmness: number?, -- held melee: how hard the shaft holds things back (1 = normal, low = it gives)
+	guard: number?, -- held melee: studs around the shaft it keeps clear
 	breaksWalls: boolean?,
 	projectileSpeed: number?,
 	projectileRange: number?,
@@ -508,6 +510,34 @@ add({
 })
 
 -- Display order in the shops.
+-- How each held melee weapon holds zombies and furniture back (ItemService's
+-- shaftStep and FurniturePush): { firmness, guard }. The bat is short but
+-- stiff and thick; the pool noodle is long, fat and soft, so zombies squeeze
+-- past it; spears and the katana are thin.
+local SOLIDITY: { [string]: { number } } = {
+	Stick = { 0.8, 0.45 },
+	Bat = { 1.7, 0.9 },
+	Swordfish = { 1.0, 0.6 },
+	Spear = { 1.1, 0.35 },
+	AncientSpear = { 1.3, 0.4 },
+	RubberChicken = { 0.45, 0.6 },
+	PoolNoodle = { 0.35, 0.9 },
+	Baguette = { 0.7, 0.5 },
+	FryingPan = { 1.5, 1.0 },
+	GoldenPan = { 1.8, 1.1 },
+	Crowbar = { 1.4, 0.4 },
+	Plunger = { 0.9, 0.6 },
+	Lollipop = { 1.2, 1.0 },
+	Katana = { 1.0, 0.35 },
+	InflatableHammer = { 0.5, 1.3 },
+}
+for id, values in SOLIDITY do
+	local item = Items[id]
+	if item then
+		item.firmness, item.guard = values[1], values[2]
+	end
+end
+
 local SHOP_ORDER = {
 	"Stick",
 	"Pill",

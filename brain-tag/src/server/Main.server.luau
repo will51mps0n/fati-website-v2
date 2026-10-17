@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 
+local AdminService = require(script.Parent.AdminService)
 local BotService = require(script.Parent.BotService)
 local BushService = require(script.Parent.BushService)
 local CharacterService = require(script.Parent.CharacterService)
@@ -49,6 +50,9 @@ FurnitureService.start(function()
 				scale = p.scale,
 				aim = p.aim,
 				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
+				dragging = p.dragging,
+				firmness = if melee and item then item.firmness else nil,
+				guard = if melee and item then item.guard else nil,
 			})
 		end
 	end
@@ -65,6 +69,7 @@ DataService.init()
 MonetizationService.init()
 TopScores.start()
 RoundManager.start()
+AdminService.init()
 
 local function onPlayerAdded(player: Player)
 	player.CanLoadCharacterAppearance = false

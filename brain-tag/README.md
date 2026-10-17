@@ -94,6 +94,22 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 Furniture weight and push feel will need a round or two of tuning. The numbers
 are all in `src/shared/Config.luau` (see "Tuning" below).
 
+## Admin panel
+
+Press **F2** (or the red **ADMIN** button on the left) to open it. It is
+available to everyone while testing in Studio, to the experience's owner (or
+rank 254+ in the owning group) in live servers, and to any UserId listed in
+`Config.ADMIN_USER_IDS`. Pick a target (one player, a bot, or everyone), then:
+
+- **Give item:** any item, into their hand or dropped at your feet.
+- **Speed:** freeze, 0.25x to 3x.
+- **Points:** +1,000 / +10,000 / +100,000 / -1,000, or reset to 0 (size and speed follow).
+- **Player:** make human or zombie, immunity 100, bring to you, go to them, respawn.
+- **Round:** skip the phase, +60 / -30 seconds, next map next round, reset furniture, clear ground items.
+
+The server checks every request, so the panel can't be used by anyone else
+even if they find it.
+
 ## Saving progress
 
 Score, wins, skins and purchases save with DataStores. Saving needs two things:
@@ -112,11 +128,14 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | A zombie touching a human converts them. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A zombie touching a human converts them and takes 10% of their points. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human. |
 
-Score persists, buys items, and sets your speed and size. Speed multiplier =
+Score (points) persists, buys items, and sets your speed and size, which
+update the moment your points change (bottom-left shows points, speed boost
+and size). A zombie that eats you takes 10% of your points
+(`INFECT_STEAL_FRACTION`), so zombies grow as they feed. Speed multiplier =
 1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
 12,000-point player is about 2.5x a newcomer, like in the original. Bigger
 players push heavier furniture faster: each pusher's strength is size squared,
@@ -128,8 +147,13 @@ settles the tug of war.
 
 ### Items (score prices)
 
-Melee weapons shove and daze zombies. Every melee weapon also pushes furniture
-with its tip, and holding click hooks the nearest piece and drags it to you.
+Melee weapons shove and daze zombies when you swing. A held weapon is also
+solid: furniture it touches is pushed out of the way, and zombies that walk
+into it are shoved back, so a weapon held across a doorway keeps them out.
+Each weapon has its own firmness and thickness (`SOLIDITY` in `Items.luau`):
+the bat is short but holds zombies firmly, the pool noodle is long and fat but
+soft, so zombies squeeze past it, spears are thin. A bigger holder holds
+harder. Holding click hooks the nearest piece of furniture and drags it to you.
 
 | Item | Price | Effect |
 | --- | --- | --- |
@@ -180,7 +204,7 @@ VIP-only skins), Double Score, Starter Kit (a Bat every round), Lucky (rare roll
 chance 5% to 15%).
 
 **3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
-Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
+Donkey, Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
 Shark, Hotdog, Duck, Astronaut. Zombie, for score: Toxic, Zombie Dog, Skeleton,
 Zombie Clown. Zombie, for Robux: Ghost, Vampire, Frost, Mummy. VIP: Royal and
 Golden. Score skins give non-paying players something to grind for; Robux
@@ -238,6 +262,10 @@ Everything lives in `src/shared/Config.luau`:
 - **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP`.
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
+- **Collisions:** `PLAYERS_COLLIDE` (characters bump into each other), `CHARACTER.ShellDiameter`.
+- **Held weapons:** `SHAFT_ZOMBIE_PUSH`, `SHAFT_ZOMBIE_SECONDS`, `SHAFT_FURNITURE_FACTOR`, and per item `SOLIDITY` in `Items.luau`.
+- **Furniture size:** `FurnitureSpecs.SIZE_SCALE` (and `KEEP_SIZE` for pieces that sit against walls).
+- **Points:** `INFECT_STEAL_FRACTION`, `GROUND_ITEMS_MIN` / `GROUND_ITEMS_MAX`.
 - **Bushes:** `BUSH_HEIGHT`, `BUSH_REVEAL_DISTANCE` (how close a bot must get to spot you), `BUSH_SEE_THROUGH`.
 - **Sounds:** `SOUNDS` uses sounds that ship with the Roblox client. Set any to
   `""` to mute it, or paste your own `rbxassetid://` id. The furniture scrape
@@ -264,5 +292,6 @@ Developer checks (need the standalone `luau` binary from
 python3 tools/run_tests.py path/to/luau      # 31 logic tests, incl. "every room is reachable"
 python3 tools/render_map.py path/to/luau     # writes tools/out/map.png
 python3 tools/build_installer.py path/to/rojo   # regenerates studio/ (the Command Bar installer)
+python3 tools/render_looks.py path/to/luau out.png Alpha:Zombie Furniture:Car   # top-down previews
 rojo sourcemap -o sourcemap.json && luau-lsp analyze --sourcemap sourcemap.json --definitions <roblox defs> src
 ```

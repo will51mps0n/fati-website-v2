@@ -293,14 +293,47 @@ local DESIGNS: { [string]: Design } = {
 			c:disc(2, -0.5, 0.45, 0.1, 0.1, "F2C230")
 		end,
 	},
+	-- A big yellow supercar: tapered nose, black glass with shiny streaks,
+	-- wing mirrors, a vented engine cover and a black tail (nose toward -Z).
 	Car = {
-		body = "D9443B",
+		body = "F5C518",
+		transparentBody = true,
 		draw = function(c)
-			c:top(0, -0.6, c.w - 1.2, 5.2, 0.3, 0.4, "B8352E") -- roof
-			c:top(0, -3.6, c.w - 1.4, 1.2, 0.32, 0.4, "9FD8F5") -- windshield
-			c:top(0, 2.3, c.w - 1.4, 1.0, 0.32, 0.4, "9FD8F5") -- rear window
-			for _, x in { -1, 1 } do
-				c:top(x * (c.w / 2 - 0.9), -c.d / 2 + 0.3, 0.9, 0.4, 0.05, 0.06, "FFF3B0") -- headlights
+			local yellow, edge, black = "F5C518", "B8860B", "151515"
+			c:top(0, 1.0, c.w, c.d - 2.2, -0.6, c.h - 0.8, edge) -- outline
+			c:top(0, 1.0, c.w - 0.6, c.d - 3.0, -0.4, c.h - 0.6, yellow) -- hull
+			c:top(0, -6.4, 6.8, 3.2, -0.65, c.h - 1.1, edge) -- nose outline
+			c:top(0, -6.6, 6.2, 2.6, -0.6, c.h - 1.0, yellow) -- nose
+			for side = -1, 1, 2 do
+				c:top(side * 2.9, -6.0, 2.2, 2.6, -0.6, c.h - 1.0, yellow, side * 0.45) -- nose corners
+				c:top(side * 2.6, -7.1, 1.4, 0.7, -0.55, 0.1, black, side * 0.4) -- front intakes
+				c:top(side * 2.6, -2.6, 1.2, 2.6, 0, 0.4, black, side * 0.35) -- windshield corners
+				c:top(side * 2.75, 0.4, 0.5, 4.4, 0, 0.3, black) -- side windows
+				local shine = c:top(side * 2.75, -0.2, 0.12, 1.6, 0.02, 0.05, "FFFFFF")
+				shine.Transparency = 0.4
+				c:top(side * 4.7, -2.6, 1.4, 0.55, -0.5, 0.3, black, side * 0.45) -- wing mirrors
+				c:top(side * 3.6, 2.6, 0.7, 2.4, -0.3, 0.1, black) -- side intakes
+				c:top(side * 3.0, 4.6, 2.6, 4.2, -0.2, 0.3, yellow, side * 0.12) -- rear haunches
+				c:top(side * 2.6, 7.55, 1.8, 0.3, -0.35, 0.1, "C0392B") -- tail lights
+				for _, z in { -4.4, 4.6 } do
+					c:top(side * 4.35, z, 0.6, 2.5, -1.6, 1.0, black) -- tyres peeking out
+				end
+			end
+			c:top(0, -2.4, 5.6, 3.0, 0, 0.4, black) -- windshield
+			-- Shiny streaks across the glass.
+			for _, streak in { { -0.9, 0.35, 0.3 }, { 0.4, 0.22, 0.45 }, { 1.5, 0.15, 0.6 } } do
+				local part = c:top(streak[1], -2.4, streak[2], 3.2, 0.03, 0.05, "FFFFFF", 0.7)
+				part.Transparency = streak[3]
+			end
+			c:top(0, 0.2, 5.0, 2.6, 0.05, 0.4, yellow) -- roof
+			c:top(0, 3.6, 4.6, 3.4, -0.1, 0.3, black) -- engine cover
+			for i = 0, 3 do
+				c:top(0, 2.4 + i * 0.75, 3.6, 0.3, 0, 0.1, "5E5E5E") -- vents
+			end
+			c:disc(0, 3.6, 1.4, 0.02, 0.1, "7A7A7A")
+			c:top(0, 7.4, 7.6, 1.2, -0.4, 0.4, black) -- tail
+			for side = -1, 1, 2 do
+				c:disc(side * 0.8, 7.7, 0.6, -0.3, 0.2, "9A9A9A") -- exhausts
 			end
 		end,
 	},

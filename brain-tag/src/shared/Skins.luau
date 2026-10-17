@@ -18,6 +18,7 @@ export type Skin = {
 	product: string?,
 	pass: string?,
 	default: boolean?,
+	special: boolean?, -- given by the game (the alpha zombie), never sold or picked
 }
 
 type Extra = {
@@ -27,6 +28,7 @@ type Extra = {
 	product: string?,
 	pass: string?,
 	default: boolean?,
+	special: boolean?,
 }
 
 local function skin(
@@ -52,6 +54,7 @@ local function skin(
 		product = e.product,
 		pass = e.pass,
 		default = e.default,
+		special = e.special,
 	}
 end
 
@@ -183,6 +186,16 @@ local list: { Skin } = {
 		{ hat = "Hotdog", accent = "F7DC6F", product = "SkinHotdog" }
 	),
 
+	skin(
+		"Donkey",
+		"Donkey",
+		"Human",
+		"6E625A",
+		"5E534C",
+		"8C8079",
+		{ hat = "Donkey", accent = "3F3631", scorePrice = 9500 }
+	),
+
 	-- Zombies
 	skin("ClassicZombie", "Classic", "Zombie", "6B8F5A", "4C6B33", "9CCB5A", { default = true }),
 	skin("Toxic", "Toxic", "Zombie", "4C7A1F", "6FCF1F", "B6FF3B", { hat = "Spots", scorePrice = 5000 }),
@@ -234,6 +247,13 @@ local list: { Skin } = {
 		"F4F4F4",
 		{ hat = "Clown", accent = "E5484D", scorePrice = 15000 }
 	),
+	-- The first zombies of each round: orange with red patches, a gray
+	-- screaming face and red claws.
+	skin("Alpha", "Alpha Zombie", "Zombie", "E39B4F", "77777D", "77777D", {
+		hat = "Alpha",
+		accent = "B8323A",
+		special = true,
+	}),
 }
 
 local byId: { [string]: Skin } = {}
@@ -267,7 +287,7 @@ end
 function Skins.forTeam(team: Team): { Skin }
 	local result = {}
 	for _, skin in list do
-		if skin.team == team then
+		if skin.team == team and not skin.special then
 			table.insert(result, skin)
 		end
 	end

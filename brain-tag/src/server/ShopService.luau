@@ -64,6 +64,8 @@ local function buyItem(player: Player, itemId: unknown, fromWizard: unknown): (b
 	end
 
 	Participants.addScore(p, -price)
+	CharacterService.refreshSize(p) -- points are size and speed
+	CharacterService.refreshSpeed(p)
 	CharacterService.refreshSpeed(p)
 
 	local finalId = item.id
@@ -130,6 +132,8 @@ local function buySkin(player: Player, skinId: unknown): (string, string)
 			return "error", "You need " .. Util.commas(skin.scorePrice) .. " score"
 		end
 		Participants.addScore(p, -skin.scorePrice)
+		CharacterService.refreshSize(p) -- points are size and speed
+		CharacterService.refreshSpeed(p)
 		CharacterService.refreshSpeed(p)
 		ShopService.grantSkin(p, skin.id)
 		ShopService.equipSkin(p, skin)

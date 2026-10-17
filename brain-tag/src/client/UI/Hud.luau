@@ -1,6 +1,6 @@
 -- Builds the whole HUD in code and keeps it up to date.
 --   top-left: buttons        top-center: countdown      top-right: counts + leaderboard
---   bottom-left: chat        bottom-center: item slot   bottom-right: score
+--   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
 
 local Players = game:GetService("Players")
@@ -8,9 +8,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
+local AdminPanel = require(script.Parent.AdminPanel)
 local Banner = require(script.Parent.Banner)
 local BottomCenter = require(script.Parent.BottomCenter)
-local BottomRight = require(script.Parent.BottomRight)
+local BottomLeft = require(script.Parent.BottomLeft)
 local Center = require(script.Parent.Center)
 local ChatSetup = require(script.Parent.Parent.ChatSetup)
 local ClientState = require(script.Parent.Parent.ClientState)
@@ -75,11 +76,13 @@ function Hud.start()
 	end)
 	local settings = SidePanels.buildSettings(gui, openQuick)
 	local trophy = SidePanels.buildTrophy(gui)
+	local admin = AdminPanel.build(gui, toast)
 
 	local function closeAll()
 		ShopPanel.close()
 		settings.close()
 		trophy.close()
+		admin.close()
 	end
 
 	local function toggleShop()
@@ -126,7 +129,7 @@ function Hud.start()
 		Banner.build(gui),
 		TopRight.build(gui),
 		BottomCenter.build(gui, touchMode),
-		BottomRight.build(gui),
+		BottomLeft.build(gui),
 		Center.buildWinText(gui),
 	}
 	if touchMode then
@@ -135,7 +138,7 @@ function Hud.start()
 
 	InputController.onShop = toggleShop
 	InputController.isMenuOpen = function()
-		return ShopPanel.isOpen() or settings.isOpen() or trophy.isOpen() or quickOpen()
+		return ShopPanel.isOpen() or settings.isOpen() or trophy.isOpen() or quickOpen() or admin.isOpen()
 	end
 
 	Remotes.event("Toast").OnClientEvent:Connect(function(text: string, hex: string?)
@@ -165,6 +168,7 @@ function Hud.start()
 			end
 			ShopPanel.update()
 			trophy.update()
+			admin.update()
 
 			-- Close the shop if you turned into a zombie or walked away from the wizard.
 			if ShopPanel.isOpen() then

@@ -27,6 +27,7 @@ local UNRELIABLE = {
 local FUNCTIONS = {
 	"BuyItem", -- (itemId, fromWizard) -> (ok, message)
 	"BuySkin", -- (skinId) -> (status, message)
+	"Admin", -- (action, data) -> (ok, message); admins only, see AdminService
 }
 
 local Remotes = {}

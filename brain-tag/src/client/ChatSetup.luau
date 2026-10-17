@@ -34,7 +34,7 @@ function ChatSetup.start()
 	task.spawn(function()
 		local window = TextChatService:WaitForChild("ChatWindowConfiguration", 10) :: ChatWindowConfiguration?
 		if window then
-			window.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			window.HorizontalAlignment = Enum.HorizontalAlignment.Right -- points sit bottom-left
 			window.VerticalAlignment = Enum.VerticalAlignment.Bottom
 		end
 		local tabs = TextChatService:FindFirstChildOfClass("ChannelTabsConfiguration")

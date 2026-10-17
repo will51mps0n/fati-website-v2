@@ -36,12 +36,32 @@ function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): 
 	return CFrame.lookAt(center, center + dir), size
 end
 
--- Thin box along a held weapon, from the hand to the tip.
-function FurniturePush.itemProbe(root: BasePart, grip: CFrame, aim: Vector3, reach: number): (CFrame, Vector3)
+-- Box along a held weapon, from the hand to the tip, `guard` studs either
+-- side of the shaft (Items: thick bat, thin spear).
+function FurniturePush.itemProbe(
+	root: BasePart,
+	grip: CFrame,
+	aim: Vector3,
+	reach: number,
+	guard: number?
+): (CFrame, Vector3)
 	local hand = (root.CFrame * grip).Position
 	local start = Vector3.new(hand.X, root.Position.Y, hand.Z)
 	local center = start + aim * (reach / 2)
-	return CFrame.lookAt(center, center + aim), Vector3.new(1, root.Size.Y + 1, reach)
+	return CFrame.lookAt(center, center + aim), Vector3.new((guard or 0.5) * 2, root.Size.Y + 1, reach)
+end
+
+-- Held weapons are solid. While you stand still or turn, a piece the shaft
+-- overlaps is pushed out of its way: toward whichever side of the shaft its
+-- center is on (so a sweep shoves it along), and a little forward. Returns
+-- a flat unit direction.
+function FurniturePush.shaftExit(root: BasePart, aim: Vector3, body: BasePart): Vector3
+	local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+	local side = rel - aim * rel:Dot(aim)
+	if side.Magnitude < 0.3 then
+		return aim
+	end
+	return (side.Unit + aim * 0.5).Unit
 end
 
 function FurniturePush.add(pushes: Pushes, body: BasePart, desired: Vector3, strength: number, at: Vector3?)

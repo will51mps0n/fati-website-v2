@@ -101,6 +101,7 @@ end
 local function award(p: Participant, base: number, includeDrumstick: boolean, reason: string)
 	local amount = RoundRules.reward(base, bonusesFor(p, includeDrumstick))
 	Participants.addScore(p, amount)
+	CharacterService.refreshSize(p)
 	CharacterService.refreshSpeed(p)
 	if p.player then
 		Announcer.toast(
@@ -113,7 +114,31 @@ end
 
 local function infect(zombie: Participant, human: Participant)
 	local root = Participants.body(human)
-	RoundManager.setTeam(human, "Zombie")
+	-- The zombie eats a share of the human's points: the human shrinks and
+	-- slows, the zombie grows and speeds up.
+	local stolen = math.floor(human.score * Config.INFECT_STEAL_FRACTION)
+	if stolen > 0 then
+		Participants.addScore(human, -stolen)
+		Participants.addScore(zombie, stolen)
+		human.scale = RoundRules.scaleForScore(human.score)
+		human.state:SetAttribute("Scale", human.scale)
+		if human.player then
+			Announcer.toast(
+				human.player,
+				string.format("-%s points: %s ate them!", Util.commas(stolen), zombie.name),
+				Config.COLORS.ZombieText
+			)
+		end
+		if zombie.player then
+			Announcer.toast(
+				zombie.player,
+				string.format("+%s points eaten from %s", Util.commas(stolen), human.name),
+				Config.COLORS.Good
+			)
+		end
+	end
+	RoundManager.setTeam(human, "Zombie") -- rebuilds the look at the new size
+	CharacterService.refreshSpeed(human)
 	award(zombie, Config.INFECT_REWARD, false, "infection")
 	if zombie.profile then
 		zombie.profile.Infections = (zombie.profile.Infections or 0) + 1
@@ -191,6 +216,7 @@ local function resetWorld()
 		p.team = "Human"
 		p.stunUntil = 0
 		p.boostUntil, p.slowUntil = 0, 0
+		p.alpha = false
 		p.dragging = false
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
@@ -255,6 +281,7 @@ local function pickFirstZombies(): { Participant }
 end
 
 local function turnFirstZombie(p: Participant)
+	p.alpha = true -- the alpha look (see Skins "Alpha")
 	RoundManager.setTeam(p, "Zombie")
 	Participants.setImmunity(p, 0)
 	if Config.FIRST_ZOMBIES_TO_SPAWN then
@@ -421,6 +448,34 @@ local function onZombieReturn(player: Player)
 	end
 	p.returnReadyAt = now + Config.ZOMBIE_RETURN_COOLDOWN
 	CharacterService.place(p, spawnFrame("Zombie", p.scale))
+end
+
+-- Admin controls -------------------------------------------------------------------------------
+
+-- Ends the current phase now (prep -> outbreak, infection -> survivors win).
+function RoundManager.skipPhase(): boolean
+	if phase == "Waiting" then
+		return false
+	end
+	state:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow())
+	return true
+end
+
+function RoundManager.addTime(seconds: number)
+	local endsAt = state:GetAttribute("PhaseEndsAt")
+	if typeof(endsAt) == "number" and phase ~= "Waiting" then
+		state:SetAttribute("PhaseEndsAt", endsAt + seconds)
+	end
+end
+
+-- The next round starts on the next map in the rotation.
+function RoundManager.queueNextMap()
+	roundsOnMap = Config.ROUNDS_PER_MAP
+end
+
+function RoundManager.respawn(p: Participant)
+	CharacterService.spawn(p, spawnFrame(p.team, p.scale))
+	ItemService.refreshHand(p)
 end
 
 -- Lets bots press Z too.

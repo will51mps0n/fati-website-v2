@@ -36,6 +36,9 @@ export type Participant = {
 	boostUntil: number, -- energy drink
 	boostFactor: number,
 	slowUntil: number, -- snowball freeze
+	adminSpeed: number, -- speed multiplier set from the admin panel (1 = normal)
+	alpha: boolean, -- one of this round's first zombies (special look)
+	knockedUntil: number, -- a real hit's shove lasts until then (see Combat.knockback)
 	slowFactor: number,
 	spawning: boolean,
 	aim: Vector3,
@@ -152,6 +155,9 @@ function Participants.add(info: NewParticipant): Participant
 		boostUntil = 0,
 		boostFactor = 1,
 		slowUntil = 0,
+		adminSpeed = 1,
+		alpha = false,
+		knockedUntil = 0,
 		slowFactor = 1,
 		spawning = false,
 		aim = Vector3.new(0, 0, -1),

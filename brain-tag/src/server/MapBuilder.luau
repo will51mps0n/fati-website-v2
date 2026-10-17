@@ -97,9 +97,12 @@ local function speckle(
 end
 
 local function buildGround(parent: Instance, layout: Layout)
-	-- Far bigger than the playable area so the camera never sees past it
-	-- (beyond the ground you would see the dark underside of the sky).
-	local ground = Parts.slab("Grass", -900, -900, 900, 900, H.Grass, 4, COLORS.Grass, parent)
+	-- Outside the brick wall: a darker field, far bigger than the playable
+	-- area so the camera never sees past it (beyond it you'd see the sky).
+	local outside = Parts.slab("Outside", -900, -900, 900, 900, H.Grass - 0.05, 4, COLORS.Outside, parent)
+	outside.Name = "Outside"
+	local b = layout.bounds
+	local ground = Parts.slab("Grass", b.x1, b.z1, b.x2, b.z2, H.Grass, 4, COLORS.Grass, parent)
 	ground.Name = "Ground"
 
 	local decor = sub("GrassDetails", parent)
@@ -417,25 +420,55 @@ local function buildBushes(parent: Instance, layout: Layout)
 	end
 end
 
+-- A brick wall around the playable area so it's obvious where the map ends:
+-- brick-textured tops with a dark cap line on the inside edge, plus an
+-- invisible tall barrier on top so nothing is ever knocked over it.
+local BOUNDARY_THICKNESS = 3
+local BOUNDARY_HEIGHT = 8
+
+type Side = { cx: number, cz: number, sx: number, sz: number, inward: Vector3 }
+
 local function buildBoundary(parent: Instance, layout: Layout)
 	local b = layout.bounds
-	local height, t = 40, 4
-	local function wall(cx: number, cz: number, sx: number, sz: number)
+	local t = BOUNDARY_THICKNESS
+	local w, d = b.x2 - b.x1, b.z2 - b.z1
+	local sides: { Side } = {
+		{ cx = (b.x1 + b.x2) / 2, cz = b.z1 - t / 2, sx = w + t * 2, sz = t, inward = Vector3.zAxis },
+		{ cx = (b.x1 + b.x2) / 2, cz = b.z2 + t / 2, sx = w + t * 2, sz = t, inward = -Vector3.zAxis },
+		{ cx = b.x1 - t / 2, cz = (b.z1 + b.z2) / 2, sx = t, sz = d, inward = Vector3.xAxis },
+		{ cx = b.x2 + t / 2, cz = (b.z1 + b.z2) / 2, sx = t, sz = d, inward = -Vector3.xAxis },
+	}
+	for _, side in sides do
+		local cx, cz, sx, sz, inward = side.cx, side.cz, side.sx, side.sz, side.inward
+		Parts.make({
+			name = "BrickWall",
+			size = Vector3.new(sx, BOUNDARY_HEIGHT, sz),
+			cframe = CFrame.new(cx, BOUNDARY_HEIGHT / 2, cz),
+			color = COLORS.BoundaryBrick,
+			material = Enum.Material.Brick,
+			parent = parent,
+		})
+		-- Dark line along the inside edge, like the outline on house walls.
+		local edge = Vector3.new(cx, 0, cz) + inward * (t / 2 - 0.25)
+		Parts.make({
+			name = "WallCap",
+			size = if inward.X == 0 then Vector3.new(sx, 0.1, 0.5) else Vector3.new(0.5, 0.1, sz),
+			cframe = CFrame.new(edge.X, BOUNDARY_HEIGHT + 0.05, edge.Z),
+			color = COLORS.BoundaryCap,
+			canCollide = false,
+			canQuery = false,
+			parent = parent,
+		})
 		Parts.make({
 			name = "Boundary",
-			size = Vector3.new(sx, height, sz),
-			cframe = CFrame.new(cx, height / 2, cz),
+			size = Vector3.new(sx, 40, sz),
+			cframe = CFrame.new(cx, BOUNDARY_HEIGHT + 20, cz),
 			color = "000000",
 			transparency = 1,
 			canQuery = false,
 			parent = parent,
 		})
 	end
-	local w, d = b.x2 - b.x1, b.z2 - b.z1
-	wall((b.x1 + b.x2) / 2, b.z1 - t / 2, w + t * 2, t)
-	wall((b.x1 + b.x2) / 2, b.z2 + t / 2, w + t * 2, t)
-	wall(b.x1 - t / 2, (b.z1 + b.z2) / 2, t, d)
-	wall(b.x2 + t / 2, (b.z1 + b.z2) / 2, t, d)
 end
 
 -- Public ----------------------------------------------------------------------------

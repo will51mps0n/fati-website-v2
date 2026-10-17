@@ -45,6 +45,9 @@ export type Mover = {
 	id: string,
 	scale: number,
 	aim: Vector3,
+	dragging: boolean?, -- hooking a piece with held click
+	firmness: number?, -- held weapon's Items.firmness
+	guard: number?, -- held weapon's Items.guard
 	reach: number?,
 }
 
@@ -236,35 +239,53 @@ local function collectPushes(now: number): FurniturePush.Pushes
 	external = {}
 	for _, mover in getMovers() do
 		local humanoid, root = mover.humanoid, mover.root
+		local walk = humanoid.WalkSpeed
+		if walk <= 0 then
+			continue
+		end
 		local move = humanoid.MoveDirection
 		local flat = Vector3.new(move.X, 0, move.Z)
-		if flat.Magnitude > 0.1 and humanoid.WalkSpeed > 0 then
-			local dir = flat.Unit
+		local moving = flat.Magnitude > 0.1
+		local dir = if moving then flat.Unit else Vector3.zero
+		local strength = RoundRules.pushStrength(mover.scale)
+		local touched: { [BasePart]: boolean } = {}
+		if moving then
 			local probe, size = FurniturePush.moverProbe(root, dir, mover.scale)
-			local strength = RoundRules.pushStrength(mover.scale)
-			local touched: { [BasePart]: boolean } = {}
 			for _, part in workspace:GetPartBoundsInBox(probe, size, overlap) do
 				local piece = byBody[part]
 				if piece then
 					touched[part] = true
 					piece.pushers[mover.id] = now
-					FurniturePush.add(pushes, part, dir * humanoid.WalkSpeed, strength, probe.Position)
+					FurniturePush.add(pushes, part, dir * walk, strength, probe.Position)
 				end
 			end
-			-- A held weapon's shaft pushes what it touches, same as the client does.
-			if mover.reach then
-				local shaft, shaftSize =
-					FurniturePush.itemProbe(root, CharacterLook.grip(mover.scale), mover.aim, mover.reach)
-				for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
-					local piece = byBody[part]
-					if piece and not touched[part] then
-						piece.pushers[mover.id] = now
+		end
+		-- A held weapon's shaft is solid, same as on the client: it pushes
+		-- what it touches along your path, or out of its way when you stand
+		-- still or turn. While hooking a piece (held click) the drag does the work.
+		if mover.reach and not mover.dragging then
+			local shaft, shaftSize = FurniturePush.itemProbe(
+				root,
+				CharacterLook.grip(mover.scale),
+				mover.aim,
+				mover.reach,
+				mover.guard
+			)
+			local firm = strength * (mover.firmness or 1)
+			for _, part in workspace:GetPartBoundsInBox(shaft, shaftSize, overlap) do
+				local piece = byBody[part]
+				if piece and not touched[part] then
+					piece.pushers[mover.id] = now
+					if moving then
+						FurniturePush.add(pushes, part, dir * walk, firm, part.Position + mover.aim * 0.5)
+					else
+						local exit = FurniturePush.shaftExit(root, mover.aim, part)
 						FurniturePush.add(
 							pushes,
 							part,
-							dir * humanoid.WalkSpeed,
-							strength,
-							part.Position + mover.aim * 0.5
+							exit * walk * Config.SHAFT_FURNITURE_FACTOR,
+							firm,
+							nil
 						)
 					end
 				end

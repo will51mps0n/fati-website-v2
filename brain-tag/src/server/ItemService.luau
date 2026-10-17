@@ -366,6 +366,56 @@ end
 -- touches and pulls it toward you. Your own client does this instantly for
 -- pieces it drives; this server copy covers pieces the server is driving
 -- (for example during a tug of war at a barricade).
+-- Held melee weapons are solid to zombies too: a zombie touching the shaft
+-- (within the item's `guard`) is shoved off it in short pulses, so a stick
+-- held across a doorway keeps zombies out. Firm weapons (bat, pan) hold
+-- them completely; soft ones (pool noodle) give, so zombies squeeze past.
+-- A bigger holder holds harder, a bigger zombie pushes through easier.
+local SHAFT_INTERVAL = 1 / 15
+local nextShaftStep = 0
+
+local function shaftStep()
+	local now = os.clock()
+	if now < nextShaftStep then
+		return
+	end
+	nextShaftStep = now + SHAFT_INTERVAL
+	local zombies = Participants.onTeam("Zombie")
+	if #zombies == 0 then
+		return
+	end
+	for _, p in Participants.onTeam("Human") do
+		local item = Items.get(p.heldItem)
+		local root = Participants.body(p)
+		if not item or item.kind ~= "Melee" or not root then
+			continue
+		end
+		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local guard = item.guard or 0.5
+		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
+		local start = Vector3.new(hand.X, 0, hand.Z)
+		for _, zombie in zombies do
+			local zRoot = Participants.body(zombie)
+			if zRoot then
+				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
+				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
+				local offset = z - (start + p.aim * along)
+				local radius = Config.CHARACTER.ShellDiameter / 2 * zombie.scale
+				if
+					offset.Magnitude < radius + guard and Combat.lineOfSight(root.Position, zRoot.Position)
+				then
+					local firmness = (item.firmness or 1) * math.clamp(p.scale / zombie.scale, 0.5, 2)
+					local away = Util.flatUnit(offset) or p.aim
+					-- Short pulses from soft weapons leave gaps the zombie walks through.
+					local seconds = Config.SHAFT_ZOMBIE_SECONDS * math.min(1, firmness ^ 1.5)
+					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
+					Combat.knockback(zombie, away * speed, 0, seconds, true)
+				end
+			end
+		end
+	end
+end
+
 local function dragStep()
 	for _, p in Participants.onTeam("Human") do
 		if p.dragging then
@@ -487,6 +537,7 @@ function ItemService.init()
 	end)
 
 	RunService.Heartbeat:Connect(dragStep)
+	RunService.Heartbeat:Connect(shaftStep)
 	RunService.Heartbeat:Connect(streamStep)
 end
 

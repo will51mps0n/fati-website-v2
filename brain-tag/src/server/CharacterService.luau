@@ -111,7 +111,38 @@ local function updateNameTag(p: Participant)
 end
 
 function CharacterService.skinFor(p: Participant): string
+	if p.team == "Zombie" and p.alpha then
+		return "Alpha"
+	end
 	return if p.team == "Zombie" then p.zombieSkin else p.humanSkin
+end
+
+-- An invisible cylinder the size of the drawn body. Only other characters'
+-- shells collide with it (see WorldSetup), so characters bump into each
+-- other while the narrow root box still decides what fits through doors.
+local function addShell(character: Model, root: BasePart, scale: number)
+	local old = character:FindFirstChild("Shell")
+	if old then
+		old:Destroy()
+	end
+	local diameter = C.ShellDiameter * scale
+	local shell = Instance.new("Part")
+	shell.Name = "Shell"
+	shell.Shape = Enum.PartType.Cylinder
+	shell.Size = Vector3.new(C.RootHeight * scale, diameter, diameter)
+	shell.CFrame = root.CFrame * Parts.UPRIGHT
+	shell.Transparency = 1
+	shell.Massless = true
+	shell.CanCollide = true
+	shell.CanQuery = false
+	shell.CanTouch = true -- your client plays a bump sound on contact
+	shell.CastShadow = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = shell
+	weld.Parent = shell
+	shell.Parent = character
+	shell.CollisionGroup = "CharacterShells"
 end
 
 -- Rebuilds the look for the participant's team, skin and size.
@@ -135,12 +166,25 @@ function CharacterService.applyLook(p: Participant)
 			part.CollisionGroup = "Characters"
 		end
 	end
+	addShell(character, root, p.scale)
 	character:SetAttribute("Team", p.team)
 	updateNameTag(p)
 end
 
 function CharacterService.refreshNameTag(p: Participant)
 	updateNameTag(p)
+end
+
+-- Size follows score live: call after a participant's score changes. Only
+-- rebuilds the look when the size really changed.
+function CharacterService.refreshSize(p: Participant)
+	local scale = RoundRules.scaleForScore(p.score)
+	if math.abs(scale - p.scale) < 0.01 then
+		return
+	end
+	p.scale = scale
+	p.state:SetAttribute("Scale", scale)
+	CharacterService.applyLook(p)
 end
 
 function CharacterService.refreshSpeed(p: Participant)
@@ -153,7 +197,7 @@ function CharacterService.refreshSpeed(p: Participant)
 		humanoid.WalkSpeed = 0
 		return
 	end
-	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie")
+	local speed = RoundRules.walkSpeed(p.score, p.team == "Zombie") * p.adminSpeed
 	if now < p.boostUntil then
 		speed *= p.boostFactor
 	end

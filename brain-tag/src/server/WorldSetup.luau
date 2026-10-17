@@ -13,6 +13,7 @@ local WorldSetup = {}
 WorldSetup.GROUPS = {
 	Characters = "Characters",
 	Furniture = "Furniture",
+	Shells = "CharacterShells", -- body-sized cylinders that only hit each other
 }
 
 local function folder(name: string, parent: Instance): Folder
@@ -43,13 +44,17 @@ function WorldSetup.run()
 		end
 	end
 
-	PhysicsService:RegisterCollisionGroup(WorldSetup.GROUPS.Characters)
-	PhysicsService:RegisterCollisionGroup(WorldSetup.GROUPS.Furniture)
-	PhysicsService:CollisionGroupSetCollidable(
-		WorldSetup.GROUPS.Characters,
-		WorldSetup.GROUPS.Characters,
-		Config.PLAYERS_COLLIDE
-	)
+	local groups = WorldSetup.GROUPS
+	PhysicsService:RegisterCollisionGroup(groups.Characters)
+	PhysicsService:RegisterCollisionGroup(groups.Furniture)
+	PhysicsService:RegisterCollisionGroup(groups.Shells)
+	-- Root boxes never hit each other; the shells do the bumping, and only
+	-- with each other, so a big player's wide shell never snags a doorway.
+	PhysicsService:CollisionGroupSetCollidable(groups.Characters, groups.Characters, false)
+	for _, other in { "Default", groups.Characters, groups.Furniture } do
+		PhysicsService:CollisionGroupSetCollidable(groups.Shells, other, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Shells, Config.PLAYERS_COLLIDE)
 
 	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Traps", "Effects", "Bots" } do
 		folder(name, workspace)
