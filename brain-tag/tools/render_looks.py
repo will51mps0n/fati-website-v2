@@ -4,7 +4,7 @@ Runs the real CharacterLook.apply / FurnitureBuilder.build under a tiny fake
 of Roblox's Instance, Vector3, CFrame and Color3, then paints every part
 from straight above, lowest first (like the game camera sees them).
 
-Usage: python3 tools/render_looks.py path/to/luau [out.png] [Skin:Team | Furniture:Kind ...]
+Usage: python3 tools/render_looks.py path/to/luau [out.png] [Skin:Team | Furniture:Kind | Item:Id ...]
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ try:
 except ImportError:  # pragma: no cover
     raise SystemExit("needs Pillow: pip install pillow")
 
-MODULES = ["Config", "Items", "Skins", "RoundRules", "Parts", "CharacterLook", "FurnitureSpecs", "MapLayout"]
+MODULES = ["Config", "Items", "Skins", "RoundRules", "Parts", "CharacterLook", "FurnitureSpecs", "MapLayout", "ItemModels"]
 SERVER_MODULES = ["FurnitureBuilder"]
 
 FAKES = r"""
@@ -169,6 +169,7 @@ local workspace = {}
 MAIN = r"""
 local CharacterLook = require(script.Parent.CharacterLook)
 local FurnitureBuilder = require(script.Parent.FurnitureBuilder)
+local ItemModels = require(script.Parent.ItemModels)
 local out = {}
 for _, entry in ARGS do
 	local model, root
@@ -176,6 +177,9 @@ for _, entry in ARGS do
 		local folder = Instance.new("Folder")
 		model = FurnitureBuilder.build({ kind = entry[2], x = 0, z = 0, rot = 0, house = "" }, folder).model
 		entry = { entry[2], "Furniture" }
+	elseif entry[1] == "Item" then
+		model = ItemModels.build(entry[2])
+		entry = { entry[2], "Item" }
 	else
 		model = Instance.new("Model")
 		root = Instance.new("Part")
@@ -239,11 +243,14 @@ def main() -> None:
     data = json.loads(result.stdout.strip().splitlines()[-1])
 
     furniture = any(look["team"] == "Furniture" for look in data)
-    cell, scale = (520, 26) if furniture else (260, 40)  # px per cell, px per stud
+    items = any(look["team"] == "Item" for look in data)
+    cell, scale = (520, 26) if furniture else (520, 52) if items else (260, 40)  # px per cell, px per stud
     image = Image.new("RGBA", (cell * len(data), cell + 30), (205, 140, 85, 255))
     draw = ImageDraw.Draw(image)
     for index, look in enumerate(data):
         ox, oz = index * cell + cell / 2, cell / 2 + 10
+        if look["team"] == "Item":
+            oz = cell - 70  # items point up the picture from the hand
         shapes = []
         for p in look["parts"]:
             r, pos, size = p["r"], p["pos"], p["size"]

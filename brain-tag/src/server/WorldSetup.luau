@@ -13,7 +13,8 @@ local WorldSetup = {}
 WorldSetup.GROUPS = {
 	Characters = "Characters",
 	Furniture = "Furniture",
-	Shells = "CharacterShells", -- body-sized cylinders that hit each other and furniture
+	Shells = "CharacterShells", -- body-sized cylinders that hit each other
+	Bumpers = "Bumpers", -- wider cylinders that only furniture hits
 	SecretWalls = "SecretWalls", -- fake walls: stop furniture, let people through
 }
 
@@ -49,16 +50,21 @@ function WorldSetup.run()
 	PhysicsService:RegisterCollisionGroup(groups.Characters)
 	PhysicsService:RegisterCollisionGroup(groups.Furniture)
 	PhysicsService:RegisterCollisionGroup(groups.Shells)
-	-- Root boxes never hit each other; the shells do the bumping: with each
-	-- other and with furniture (so a body never sinks into a couch), but not
-	-- with walls, so a big player's wide shell never snags a doorway.
+	PhysicsService:RegisterCollisionGroup(groups.Bumpers)
+	PhysicsService:RegisterCollisionGroup(groups.SecretWalls)
+	-- Root boxes never hit each other; the shells do the bumping with each
+	-- other, and the wider bumpers keep furniture a little way off (so a body
+	-- never sinks into a couch). Neither hits walls, so a big player's wide
+	-- shell never snags a doorway.
 	PhysicsService:CollisionGroupSetCollidable(groups.Characters, groups.Characters, false)
-	for _, other in { "Default", groups.Characters } do
+	for _, other in { "Default", groups.Characters, groups.Furniture } do
 		PhysicsService:CollisionGroupSetCollidable(groups.Shells, other, false)
 	end
-	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Furniture, true)
 	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Shells, Config.PLAYERS_COLLIDE)
-	PhysicsService:RegisterCollisionGroup(groups.SecretWalls)
+	for _, other in { "Default", groups.Characters, groups.Shells, groups.Bumpers, groups.SecretWalls } do
+		PhysicsService:CollisionGroupSetCollidable(groups.Bumpers, other, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable(groups.Bumpers, groups.Furniture, true)
 	for _, other in { "Default", groups.Characters, groups.Shells } do
 		PhysicsService:CollisionGroupSetCollidable(groups.SecretWalls, other, false)
 	end

@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Items = require(ReplicatedStorage.Shared.Items)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 
 local ForceField = {}
 
@@ -122,7 +123,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 				-- Shared by strength (size squared, times how firm the weapon is):
 				-- a much bigger holder holds you off completely.
 				local hold = scale * scale * (item.firmness or 1)
-				local share = hold / (hold + myScale * myScale)
+				local share = hold / (hold + RoundRules.pushStrength(myScale, myTeam == "Zombie"))
 				local dir = if away.Magnitude > 0.01 then away.Unit else facing.Unit
 				push += dir * math.min(overlap * Config.FIELD_WEAPON * share * 2, Config.FIELD_WEAPON_MAX)
 			end
@@ -149,7 +150,8 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 			if overlap > 0 then
 				local back = if offset.Magnitude > 0.01 then offset.Unit else -aim
 				local mine = myScale * myScale * (myItem.firmness or 1)
-				local share = scale * scale / (mine + scale * scale)
+				local theirs = RoundRules.pushStrength(scale, model:GetAttribute("Team") == "Zombie")
+				local share = theirs / (mine + theirs)
 				push += back * math.min(overlap * Config.FIELD_RECOIL * share * 2, Config.FIELD_WEAPON_MAX)
 			end
 		end

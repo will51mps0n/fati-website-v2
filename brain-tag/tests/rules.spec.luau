@@ -122,8 +122,14 @@ test("bigger players push heavier furniture", function()
 	expect(RoundRules.pushFraction(mass.Light, 100) <= Config.PUSH_MAX_FRACTION, "capped")
 end)
 
-test("zombies are a little faster", function()
+test("zombies are faster and stronger", function()
 	expect(RoundRules.walkSpeed(0, true) > RoundRules.walkSpeed(0, false), "zombie faster")
+	expect(RoundRules.pushStrength(1, true) > RoundRules.pushStrength(1), "zombie stronger")
+	local mass = Config.FURNITURE_MASS
+	expect(
+		RoundRules.pushFraction(mass.Heavy, RoundRules.pushStrength(1, true)) > 0.5,
+		"a zombie shoves a couch at over half speed"
+	)
 	expectEq(RoundRules.walkSpeed(0, false), Config.BASE_WALKSPEED, "base speed")
 end)
 

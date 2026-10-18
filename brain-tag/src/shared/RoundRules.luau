@@ -101,9 +101,10 @@ function RoundRules.scaleForScore(score: number): number
 	return Config.SIZE_MULTIPLIER(score)
 end
 
--- Pushing strength of one player: grows with the square of their size.
-function RoundRules.pushStrength(scale: number): number
-	return scale * scale
+-- Pushing strength of one player: grows with the square of their size, and
+-- zombies are stronger (Config.ZOMBIE_STRENGTH).
+function RoundRules.pushStrength(scale: number, zombie: boolean?): number
+	return scale * scale * (if zombie then Config.ZOMBIE_STRENGTH else 1)
 end
 
 -- Fraction of walk speed a piece of `mass` moves at under `strength` (the

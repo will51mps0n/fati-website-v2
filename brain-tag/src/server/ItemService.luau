@@ -503,7 +503,7 @@ local function shaftStep(dt: number)
 			local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
 			local overlap = radius + guard - offset.Magnitude
 			if overlap > 0 and Combat.lineOfSight(root.Position, oRoot.Position) then
-				local push = other.scale * other.scale
+				local push = RoundRules.pushStrength(other.scale, other.team == "Zombie")
 				local away = Util.flatUnit(offset) or p.aim
 				local step = math.min(overlap, 2) * rate
 				if not other.player then

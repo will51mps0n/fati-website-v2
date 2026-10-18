@@ -27,12 +27,20 @@ function FurniturePush.mass(body: BasePart): number
 	return (Config.FURNITURE_MASS :: { [string]: number })[FurniturePush.weightOf(body)] or 0.45
 end
 
--- Box just in front of a mover heading `dir`, a little wider than the
--- collision box so shoulder contact counts.
+-- How far furniture is kept from a mover's center (CharacterService's
+-- bumper).
+function FurniturePush.bumperRadius(scale: number): number
+	return Config.CHARACTER.BumperDiameter / 2 * scale
+end
+
+-- Box in front of a mover heading `dir`: from just inside the bumper to
+-- PUSH_REACH beyond it, so a piece starts moving before you reach it.
 function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): (CFrame, Vector3)
-	local depth = Config.PUSH_PROBE_DEPTH
-	local center = root.Position + dir * (root.Size.X / 2 + depth / 2 - 0.3)
-	local size = Vector3.new(Config.CHARACTER.BodyWidth * scale * 0.8, root.Size.Y + 1, depth)
+	local bumper = FurniturePush.bumperRadius(scale)
+	local from = bumper - 0.6 * scale
+	local to = bumper + Config.PUSH_REACH * scale
+	local center = root.Position + dir * ((from + to) / 2)
+	local size = Vector3.new(Config.CHARACTER.BumperDiameter * scale * 0.8, root.Size.Y + 1, to - from)
 	return CFrame.lookAt(center, center + dir), size
 end
 

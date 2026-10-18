@@ -87,6 +87,10 @@ local function secondsLeft(): number
 	return (state:GetAttribute("PhaseEndsAt") :: number) - workspace:GetServerTimeNow()
 end
 
+function RoundManager.secondsLeft(): number
+	return secondsLeft()
+end
+
 -- Teams --------------------------------------------------------------------------------
 
 function RoundManager.setTeam(p: Participant, team: Participants.Team)
@@ -136,6 +140,17 @@ local function award(p: Participant, base: number, includeDrumstick: boolean, re
 			string.format("+%s score  %s", Util.commas(amount), reason),
 			Config.COLORS.Good
 		)
+	end
+end
+
+-- Survival points: a little score for every human still standing.
+local function payStanding()
+	for _, p in Participants.onTeam("Human") do
+		if Participants.body(p) then
+			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
+			CharacterService.refreshSize(p)
+			CharacterService.refreshSpeed(p)
+		end
 	end
 end
 
@@ -386,10 +401,15 @@ end
 
 local function runInfection(): Winner?
 	setPhase("Infection", Config.ROUND_SECONDS)
+	local nextPay = os.clock() + Config.SURVIVAL_POINTS_SECONDS
 	while true do
 		task.wait(0.1)
 		if endRequested then
 			return nil
+		end
+		if os.clock() >= nextPay then
+			nextPay += Config.SURVIVAL_POINTS_SECONDS
+			payStanding()
 		end
 		local humans = Participants.onTeam("Human")
 		local zombies = Participants.onTeam("Zombie")

@@ -72,7 +72,7 @@ local function collect(): FurniturePush.Pushes
 		return pushes
 	end
 	local scale = ClientState.my("Scale") or 1
-	local strength = RoundRules.pushStrength(scale)
+	local strength = RoundRules.pushStrength(scale, ClientState.isZombie())
 	local walk = humanoid.WalkSpeed
 	local move = Vector3.new(humanoid.MoveDirection.X, 0, humanoid.MoveDirection.Z)
 	local moving = move.Magnitude > 0.1 and walk > 0

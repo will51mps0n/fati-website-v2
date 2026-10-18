@@ -7,6 +7,14 @@
 --     them instead of walking into it. A human they can't reach (barricaded in)
 --     draws a crowd: the pack picks one door, lines up outside it and
 --     shoves through together (pushers in a line add their strength)
+--   * zombies with nobody in sight hunt: they split up to check bushes (and
+--     rooms on roofed maps), and a second zombie on the same human cuts it
+--     off from the side instead of trailing behind
+--   * every round each human bot takes a role. Builders team up in one room
+--     (a fort), split its doors between them, shove furniture into the
+--     doorways (two get behind a piece too heavy for one) and lean on the
+--     barricade when a zombie knocks. Hiders each pick their own bush before
+--     the outbreak and keep still in it. Runners keep away from the zombies.
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
 --     toward open ground or through doorways away from every zombie, juke
@@ -20,6 +28,7 @@
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local BushService = require(script.Parent.BushService)
@@ -35,6 +44,7 @@ local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Participants = require(script.Parent.Participants)
 local Roofs = require(ReplicatedStorage.Shared.Roofs)
 local RoundManager = require(script.Parent.RoundManager)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Skins = require(ReplicatedStorage.Shared.Skins)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -190,6 +200,51 @@ local leaning: { [Participant]: number } = setmetatable({}, { __mode = "k" }) ::
 local doorsOf = ""
 local doorList: { MapLayout.Door } = {}
 
+-- Teams of human bots, reset every round. A fort is a room builders share:
+-- who is in it, which doors are done, and the pieces being pushed into
+-- doorways (with whoever is pushing each one).
+type Job = {
+	body: BasePart,
+	target: Vector3,
+	key: string,
+	startedAt: number,
+	pushers: { [string]: number }, -- bot id -> last push
+	done: boolean,
+}
+type Fort = { members: { [string]: number }, barricaded: { [string]: boolean }, jobs: { Job } }
+local forts: { [MapLayout.Room]: Fort } = {}
+local bushTaken: { [BasePart]: string } = {} -- leaves -> the hider bot that picked it
+local bushChecked: { [BasePart]: number } = {} -- leaves -> when a zombie last went to look
+local teamsRound = -1
+
+local function teamsFor(round: number)
+	if teamsRound ~= round then
+		teamsRound = round
+		table.clear(forts)
+		table.clear(bushTaken)
+		table.clear(bushChecked)
+	end
+end
+
+local function fortOf(room: MapLayout.Room): Fort
+	local fort = forts[room]
+	if not fort then
+		fort = { members = {}, barricaded = {}, jobs = {} }
+		forts[room] = fort
+	end
+	return fort
+end
+
+local function count(list: { [string]: number }, now: number, within: number): number
+	local n = 0
+	for _, seen in list do
+		if now - seen < within then
+			n += 1
+		end
+	end
+	return n
+end
+
 local function doors(): { MapLayout.Door }
 	local layout = MapLayout.current()
 	if doorsOf ~= layout.name then
@@ -267,6 +322,49 @@ local function nearestBush(from: Vector3, range: number): Vector3?
 		local d = Util.flatDistance(leaves.Position, from)
 		if d < bestDistance then
 			best, bestDistance = Vector3.new(leaves.Position.X, from.Y, leaves.Position.Z), d
+		end
+	end
+	return best
+end
+
+-- The nearest bush no other hider has picked, away from the zombies.
+local function freeBush(p: Participant, from: Vector3): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = 160
+	for _, leaves in Bushes.leaves() do
+		local owner = bushTaken[leaves]
+		if owner and owner ~= p.id then
+			continue
+		end
+		local d = Util.flatDistance(leaves.Position, from)
+		if d >= bestDistance then
+			continue
+		end
+		local safe = true
+		for _, zombie in seenZombies do
+			if Util.flatDistance(zombie.position, leaves.Position) < 25 then
+				safe = false
+				break
+			end
+		end
+		if safe then
+			best, bestDistance = leaves, d
+		end
+	end
+	if best then
+		bushTaken[best] = p.id
+	end
+	return best
+end
+
+-- The nearest bush no zombie has looked in lately (zombies hunting).
+local function bushToCheck(from: Vector3, now: number): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = 110
+	for _, leaves in Bushes.leaves() do
+		local d = Util.flatDistance(leaves.Position, from)
+		if d < bestDistance and now - (bushChecked[leaves] or -math.huge) > 25 then
+			best, bestDistance = leaves, d
 		end
 	end
 	return best
@@ -430,15 +528,18 @@ local function brain(p: Participant, level: Level, seed: number)
 	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
 	local dodgeSpot: Vector3? = nil
 	local dodgeUntil, nextDodge = 0, 0
-	-- Builders (more of the smarter bots) hole up in a room and barricade it.
-	local builder = random:NextNumber() < (if level.flank then 0.55 else 0.2)
+	-- A role for each round (human): Builders team up in a fort, Hiders take a
+	-- bush of their own, Runners keep away from the zombies.
+	local role: "Builder" | "Hider" | "Runner" = "Runner"
+	local roleRound = -1
+	local myBush: BasePart? = nil
 	local home: MapLayout.Room? = nil
 	local homeRound = -1
-	type Barricade = { body: BasePart, target: Vector3, key: string, startedAt: number }
-	local barricade: Barricade? = nil
-	local barricaded: { [string]: boolean } = {}
+	local barricade: Job? = nil
 	local waryOf: Participant? = nil
 	local waryUntil = 0
+	-- Zombies chasing alongside another zombie cut in from this side.
+	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -539,29 +640,67 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 	end
 
-	-- Leaning on something that can give: furniture right where we're
-	-- walking (in reach of body or arms), or the back of another zombie
-	-- that is leaning on something (a queue: our strength adds to theirs).
-	local function leaningOn(root: BasePart, humanoid: Humanoid): boolean
+	-- What we're leaning on, if anything can give: furniture right where
+	-- we're walking (in reach of body or arms), or the back of another
+	-- zombie that is leaning on something (a queue: our strength adds to
+	-- theirs). Returns the piece (nil for a queue) and whether other zombies
+	-- are shoving with us.
+	local function leaningOn(root: BasePart, humanoid: Humanoid): (boolean, BasePart?, boolean)
 		local dir = Util.flatUnit(humanoid.MoveDirection)
 		if not dir then
-			return false
-		end
-		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
-		if #FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale)) > 0 then
-			return true
+			return false, nil, false
 		end
 		local now = os.clock()
+		local helped = false
+		for _, entry in seenZombies do
+			if
+				entry.p ~= p
+				and now - (leaning[entry.p] or 0) < 1
+				and Util.flatDistance(entry.position, root.Position) < 9 * p.scale
+			then
+				helped = true
+			end
+		end
+		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
+		local found = FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale))
+		if #found > 0 then
+			return true, found[1], helped
+		end
 		for _, entry in seenZombies do
 			if entry.p ~= p and now - (leaning[entry.p] or 0) < 1 then
 				local rel = Util.flat(entry.position - root.Position)
 				local along = rel:Dot(dir)
 				if along > 0.5 and along < 4 * p.scale and (rel - dir * along).Magnitude < 2.5 * p.scale then
-					return true
+					return true, nil, true
 				end
 			end
 		end
-		return false
+		return false, nil, false
+	end
+
+	-- A spot just past the side of a piece that won't give, on the side
+	-- nearer the goal: walk round it instead of into it.
+	local function roundPiece(body: BasePart, root: BasePart, goal: Vector3): Vector3?
+		local here = root.Position
+		local dir = Util.flatUnit(goal - here)
+		if not dir then
+			return nil
+		end
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		local reach = FurniturePush.extent(body, side) + FurniturePush.bumperRadius(p.scale) + 1
+		local center = Vector3.new(body.Position.X, here.Y, body.Position.Z)
+		local best: Vector3? = nil
+		local bestDistance = math.huge
+		for _, sign in { 1, -1 } do
+			local spot = center + side * sign * reach + dir * 1.5
+			if inBounds(spot, 3) and Combat.clearWide(here, spot, radius()) then
+				local d = Util.flatDistance(spot, goal)
+				if d < bestDistance then
+					best, bestDistance = spot, d
+				end
+			end
+		end
+		return best
 	end
 
 	-- No progress for a moment while trying to move: step aside, then
@@ -575,11 +714,17 @@ local function brain(p: Participant, level: Level, seed: number)
 			return
 		end
 		if goal and now - progressAt > 0.9 and not (detour and now < detourUntil) then
-			if p.team == "Zombie" and leaningOn(root, humanoid) then
+			local leant, piece, helped = false, nil, false
+			if p.team == "Zombie" then
+				leant, piece, helped = leaningOn(root, humanoid)
+			end
+			if leant then
 				if leanFrom == 0 then
 					leanFrom = now
 				end
-				if now - leanFrom < 6 then
+				-- Keep shoving while the pack is on it with us (or on its way);
+				-- alone against a piece that won't budge, go round it soon.
+				if now - leanFrom < (if helped then 6 else 2) then
 					progressAt = now
 					leaning[p] = now
 					local target = chasing[p.id]
@@ -590,8 +735,8 @@ local function brain(p: Participant, level: Level, seed: number)
 				end
 			end
 			leanFrom = 0
-			detour = sidestep(root, goal)
-			detourUntil = now + 0.7
+			detour = (if piece then roundPiece(piece, root, goal) else nil) or sidestep(root, goal)
+			detourUntil = now + (if piece then 1 else 0.7)
 			pathGoal = nil
 			progressAt = now
 		end
@@ -729,24 +874,66 @@ local function brain(p: Participant, level: Level, seed: number)
 		local now = os.clock()
 		local here = root.Position
 		local phase = RoundManager.phase()
+		teamsFor(RoundManager.roundNumber())
+
+		-- Distance from a spot to the nearest zombie we can see.
+		local function zombieGap(spot: Vector3): number
+			local gap = math.huge
+			for _, zombie in seenZombies do
+				gap = math.min(gap, Util.flatDistance(zombie.position, spot))
+			end
+			return gap
+		end
 
 		local function wander()
-			if not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4 then
+			local due = not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4
+			-- A human heading somewhere a zombie now stands picks again.
+			if
+				not due
+				and p.team == "Human"
+				and phase == "Infection"
+				and zombieGap(wanderGoal :: Vector3) < 20
+			then
+				due = true
+			end
+			if due then
 				wanderGoal = randomSpot()
 				wanderUntil = now + random:NextNumber(6, 12)
-				-- On roofed maps nobody can see into rooms: zombies go and look.
-				if p.team == "Zombie" and MapLayout.current().roofs then
-					local rooms = {}
-					for _, room in MapLayout.current().rooms do
-						if room.house ~= "" then
-							table.insert(rooms, room)
+				if p.team == "Zombie" then
+					-- Hunting: zombies split up to check the bushes, and on roofed
+					-- maps (nobody can see into rooms) they go and look in rooms.
+					local roofed = MapLayout.current().roofs
+					local bush = if random:NextNumber() < (if roofed then 0.4 else 0.65)
+						then bushToCheck(here, now)
+						else nil
+					if bush then
+						bushChecked[bush] = now
+						wanderGoal = Vector3.new(bush.Position.X, 2, bush.Position.Z)
+						wanderUntil = now + random:NextNumber(6, 10)
+					elseif roofed then
+						local rooms = {}
+						for _, room in MapLayout.current().rooms do
+							if room.house ~= "" then
+								table.insert(rooms, room)
+							end
+						end
+						if #rooms > 0 then
+							local r = rooms[random:NextInteger(1, #rooms)].rect
+							wanderGoal = Vector3.new((r.x1 + r.x2) / 2, 2, (r.z1 + r.z2) / 2)
+							wanderUntil = now + random:NextNumber(5, 9)
 						end
 					end
-					if #rooms > 0 then
-						local r = rooms[random:NextInteger(1, #rooms)].rect
-						wanderGoal = Vector3.new((r.x1 + r.x2) / 2, 2, (r.z1 + r.z2) / 2)
-						wanderUntil = now + random:NextNumber(5, 9)
+				elseif phase == "Infection" then
+					-- Runners: of a few spots, the one farthest from the zombies.
+					local best, bestGap = wanderGoal, zombieGap(wanderGoal :: Vector3)
+					for _ = 1, 4 do
+						local spot = randomSpot()
+						local gap = zombieGap(spot)
+						if gap > bestGap then
+							best, bestGap = spot, gap
+						end
 					end
+					wanderGoal = best
 				end
 			end
 			goTo(wanderGoal :: Vector3, root, humanoid, false)
@@ -779,6 +966,18 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
+				-- Another zombie is already on them: cut in from the side ahead
+				-- of them instead of trailing behind it.
+				if chasers(best.p, p.id) > 0 and d > 10 and d < 70 and best.velocity.Magnitude > 4 then
+					local ahead = best.velocity.Unit
+					local side = Vector3.new(-ahead.Z, 0, ahead.X) * cutSide
+					local cut = best.position
+						+ best.velocity * (level.lead * 1.6)
+						+ side * math.min(12, d * 0.4)
+					if inBounds(cut, 3) and Combat.clearWide(here, cut, radius()) then
+						goal = cut
+					end
+				end
 				-- Just got hit, or held off a weapon? Be wary of that human for a
 				-- while: no more running straight back into it.
 				if now < p.knockedUntil + 0.3 or now < p.pressedUntil then
@@ -816,6 +1015,16 @@ local function brain(p: Participant, level: Level, seed: number)
 
 		-- Human ----------------------------------------------------------------------
 		local round = RoundManager.roundNumber()
+		if roleRound ~= round then
+			roleRound = round
+			local roll = random:NextNumber()
+			local builders = if level.flank then 0.5 else 0.25
+			role = if roll < builders
+				then "Builder"
+				elseif roll < builders + level.hide * 0.7 then "Hider"
+				else "Runner"
+			myBush = nil
+		end
 		if phase == "Prep" and armedRound ~= round then
 			armedRound = round -- one roll per round: only some bots start armed
 			if not p.heldItem and random:NextNumber() < Config.BOT_WEAPON_CHANCE then
@@ -894,32 +1103,42 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 
-		-- Builders: hole up in a room, shove furniture into its doorways, and
-		-- lean on the barricade when a zombie comes knocking.
-		if builder and (phase == "Prep" or phase == "Infection") then
+		-- Builders team up in a fort: they hole up in one room, split its
+		-- doorways, shove furniture into them (two get behind a piece too
+		-- heavy for one), and lean on the barricade when a zombie knocks.
+		if role == "Builder" and (phase == "Prep" or phase == "Infection") then
 			if homeRound ~= round then
 				homeRound, home, barricade = round, nil, nil
-				table.clear(barricaded)
 			end
 			local threatInside = closest ~= nil
 				and closestDistance < 16
 				and home ~= nil
 				and roomAt(closest.position.X, closest.position.Z) == home
 			if not home and phase == "Prep" then
+				-- The nearest good room, but join teammates already holing up
+				-- somewhere close (up to four to a fort).
 				local best: MapLayout.Room? = nil
-				local bestDistance = 140
+				local bestScore = math.huge
 				for _, room in MapLayout.current().rooms do
 					local r = room.rect
 					local d =
 						Util.flatDistance(Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2), here)
-					if room.house ~= "" and d < bestDistance and goodHideout(room) then
-						best, bestDistance = room, d
+					if room.house ~= "" and d < 160 and goodHideout(room) then
+						local mates = count(fortOf(room).members, now, 3)
+						local score = d
+							- (if mates > 0 and mates < 4 then 50 else 0)
+							+ (if mates >= 4 then 200 else 0)
+						if score < bestScore then
+							best, bestScore = room, score
+						end
 					end
 				end
 				home = best
 			end
 			local myHome = home
 			if myHome and not threatInside then
+				local fort = fortOf(myHome)
+				fort.members[p.id] = now
 				local r = myHome.rect
 				local middle = Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2)
 				local inside = roomAt(here.X, here.Z) == myHome
@@ -932,7 +1151,7 @@ local function brain(p: Participant, level: Level, seed: number)
 						handled = true
 					end
 				else
-					-- A zombie at one of our doors: lean on the barricade.
+					-- A zombie at one of our doors: everyone leans on that barricade.
 					for _, entry in roomDoors do
 						if closest and Util.flatDistance(closest.position, entry.center) < 12 then
 							humanoid:MoveTo(entry.center)
@@ -942,10 +1161,39 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 					-- Otherwise finish the barricades.
 					if not handled and (not closest or closestDistance > 18) then
-						if not barricade then
+						local job = barricade
+						if job and job.done then
+							job = nil
+						end
+						if not job then
+							-- Help a teammate behind a piece too heavy to push alone.
+							local alone = RoundRules.pushStrength(p.scale)
+							for _, other in fort.jobs do
+								if
+									not other.done
+									and other.body.Parent
+									and count(other.pushers, now, 1) == 1
+									and RoundRules.pushFraction(FurniturePush.mass(other.body), alone)
+										< 0.45
+								then
+									job = other
+									break
+								end
+							end
+						end
+						if not job then
+							-- Our own doorway: one no teammate is already blocking.
+							local busy: { [string]: boolean } = {}
+							local used: { [BasePart]: boolean } = {}
+							for _, other in fort.jobs do
+								if not other.done then
+									busy[other.key] = true
+									used[other.body] = true
+								end
+							end
 							for _, entry in roomDoors do
 								local key = doorKey(entry.door)
-								if barricaded[key] then
+								if fort.barricaded[key] or busy[key] then
 									continue
 								end
 								local block = CFrame.new(entry.center + entry.inward * 3)
@@ -955,52 +1203,84 @@ local function brain(p: Participant, level: Level, seed: number)
 										Vector3.new(entry.door.width + 1, 4, 4)
 									) > 0
 								then
-									barricaded[key] = true -- already blocked
+									fort.barricaded[key] = true -- already blocked
 									continue
 								end
+								-- Close pieces that cover the doorway well (not the
+								-- immovable ones, and not one a teammate is using).
+								local along = if entry.door.horizontal then Vector3.xAxis else Vector3.zAxis
 								local piece: BasePart? = nil
-								local pieceDistance = 30
+								local pieceScore = math.huge
 								for _, body in FurnitureService.piecesNear(entry.center, 30) do
 									local d = Util.flatDistance(body.Position, entry.center)
 									if
-										FurnitureService.weightOf(body) ~= "Massive"
-										and d > 4
-										and d < pieceDistance
-										and MapLayout.inRect(r, body.Position.X, body.Position.Z)
+										used[body]
+										or FurnitureService.weightOf(body) == "Massive"
+										or d <= 4
+										or not MapLayout.inRect(r, body.Position.X, body.Position.Z)
 									then
-										piece, pieceDistance = body, d
+										continue
+									end
+									local cover = FurniturePush.extent(body, along) * 2 / entry.door.width
+									local score = d - 8 * math.min(cover, 1.2)
+									if score < pieceScore then
+										piece, pieceScore = body, score
 									end
 								end
 								if piece then
 									local depth = FurniturePush.extent(piece, entry.inward)
-									barricade = {
+									local made: Job = {
 										body = piece,
 										target = Util.flat(entry.center + entry.inward * (depth + 1.6)),
 										key = key,
 										startedAt = now,
+										pushers = {},
+										done = false,
 									}
+									table.insert(fort.jobs, made)
+									job = made
 									break
 								end
-								barricaded[key] = true -- nothing to block it with
+								fort.barricaded[key] = true -- nothing to block it with
 							end
 						end
-						local job = barricade
+						barricade = job
 						if job then
+							job.pushers[p.id] = now
 							local body = job.body
 							local at = Util.flat(body.Position)
 							local toTarget = job.target - at
-							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 14 then
-								barricaded[job.key] = true
+							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 18 then
+								job.done = true
+								fort.barricaded[job.key] = true
 								barricade = nil
 							else
-								-- Get behind the piece, then walk it to the doorway.
+								-- Get behind the piece (side by side with a helper), then
+								-- walk it to the doorway.
 								local push = toTarget.Unit
-								local behind = at - push * (FurniturePush.extent(body, push) + radius() + 1.2)
+								local side = Vector3.new(-push.Z, 0, push.X)
+								local offset = 0
+								if count(job.pushers, now, 1) >= 2 then
+									local first = true
+									for id, seen in job.pushers do
+										if now - seen < 1 and id < p.id then
+											first = false
+										end
+									end
+									offset = (if first then -1 else 1) * 1.4 * p.scale
+								end
+								local behind = at
+									- push * (FurniturePush.extent(body, push) + FurniturePush.bumperRadius(
+										p.scale
+									) + 0.6)
+									+ side * offset
 								if Util.flatDistance(behind, here) > 2.5 then
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
 								else
 									humanoid:MoveTo(
-										Vector3.new(job.target.X, here.Y, job.target.Z) + push * 2
+										Vector3.new(job.target.X, here.Y, job.target.Z)
+											+ push * 2
+											+ side * offset
 									)
 								end
 								handled = true
@@ -1025,6 +1305,28 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 
 		local hidden = BushService.hidden(p)
+		-- Hiders take a bush of their own just before the outbreak and keep
+		-- still in it; one a zombie flushed them out of is given up.
+		if role == "Hider" then
+			if #threats > 0 and not hidden then
+				myBush = nil
+			elseif
+				not hidden
+				and (phase == "Infection" or (phase == "Prep" and RoundManager.secondsLeft() < 15))
+			then
+				local bush = myBush
+				if not bush or bush.Parent == nil then
+					bush = freeBush(p, here)
+					myBush = bush
+				end
+				if bush then
+					local spot = Vector3.new(bush.Position.X, here.Y, bush.Position.Z)
+					goTo(spot, root, humanoid, false)
+					checkProgress(root, spot, humanoid)
+					continue
+				end
+			end
+		end
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
 			humanoid:MoveTo(here) -- stay still and hope
 		elseif #threats > 0 then
@@ -1166,6 +1468,31 @@ local function addBot(index: number)
 	task.spawn(brain, p, level, nextId * 97 + os.time())
 end
 
+-- Sharp movement, like players get from their own client: full speed the
+-- instant a bot walks, a dead stop the instant it arrives, and it turns on
+-- the spot (a Humanoid alone eases in and out and slides on the floors).
+-- A shove (KnockbackForce) plays out untouched.
+local function drive()
+	for _, p in active do
+		local root, humanoid = Participants.body(p)
+		if not root or not humanoid or root:FindFirstChild("KnockbackForce") then
+			continue
+		end
+		local v = root.AssemblyLinearVelocity
+		local move = Util.flatUnit(humanoid.MoveDirection)
+		local speed = humanoid.WalkSpeed
+		if move and speed > 0 then
+			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+			-- Not aiming a weapon: face where we walk, at once.
+			if humanoid.AutoRotate and root.CFrame.LookVector:Dot(move) < 0.995 then
+				root.CFrame = CFrame.lookAt(root.Position, root.Position + move)
+			end
+		elseif math.abs(v.X) + math.abs(v.Z) > 0.05 then
+			root.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+		end
+	end
+end
+
 -- How many bots this round: a random count in range, leaving room for
 -- real players.
 local function wanted(): number
@@ -1208,6 +1535,7 @@ function BotService.start()
 		return
 	end
 	rebalance()
+	RunService.Heartbeat:Connect(drive)
 	print("[Bots] bots are playing. Set Config.BOTS = false to turn them off.")
 	-- A fresh mix of bots for every round.
 	local state = ReplicatedStorage:WaitForChild("BrainTagState")

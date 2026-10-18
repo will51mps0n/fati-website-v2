@@ -906,7 +906,7 @@ Config.ROUNDS_PER_MAP = 2
 -- Movement and size ------------------------------------------------------------
 
 Config.BASE_WALKSPEED = 16
-Config.ZOMBIE_SPEED_FACTOR = 1.05
+Config.ZOMBIE_SPEED_FACTOR = 1.15 -- zombies are faster than humans of the same size
 Config.SPEED_MULTIPLIER_CAP = 1.6 -- keeps very high scores from becoming uncatchable
 
 -- 1 + score / 30000, fitted to the two screenshots (500 -> 1.02, 6729 -> 1.22).
@@ -924,6 +924,10 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
+-- Staying alive pays as you go: every human gets this much every few
+-- seconds of the outbreak (a "+10" floats up on their screen).
+Config.SURVIVAL_POINTS = 10
+Config.SURVIVAL_POINTS_SECONDS = 5
 Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
@@ -957,6 +961,10 @@ Config.CHARACTER = {
 	-- Characters bump into each other with an invisible cylinder this wide
 	-- (only other characters collide with it, so doors still fit).
 	ShellDiameter = 3,
+	-- Furniture keeps a little space from you: only furniture collides with
+	-- this wider invisible cylinder, so you never end up right on top of
+	-- what you push.
+	BumperDiameter = 4.4,
 }
 
 Config.COLORS = {
@@ -982,11 +990,16 @@ Config.PUSH_MAX_FRACTION = 0.9
 -- Each person behind the one touching a piece lends this share of their
 -- (already compounded) strength, so five zombies in a queue shove like ~3.7.
 Config.PUSH_CHAIN_SHARE = 0.85
+-- Zombies are stronger than humans of the same size: furniture, a weapon held
+-- out at them, a barricade standoff.
+Config.ZOMBIE_STRENGTH = 1.5
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
-Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
+-- A piece starts moving this far (studs, at size 1) before it reaches your
+-- bumper, so you push it from a little way off instead of walking into it.
+Config.PUSH_REACH = 1.4
 
 -- Bushes ------------------------------------------------------------------------------------
 -- Walk into a bush to hide: it covers you from above, your name tag
@@ -1157,12 +1170,20 @@ function FurniturePush.mass(body: BasePart): number
 	return (Config.FURNITURE_MASS :: { [string]: number })[FurniturePush.weightOf(body)] or 0.45
 end
 
--- Box just in front of a mover heading `dir`, a little wider than the
--- collision box so shoulder contact counts.
+-- How far furniture is kept from a mover's center (CharacterService's
+-- bumper).
+function FurniturePush.bumperRadius(scale: number): number
+	return Config.CHARACTER.BumperDiameter / 2 * scale
+end
+
+-- Box in front of a mover heading `dir`: from just inside the bumper to
+-- PUSH_REACH beyond it, so a piece starts moving before you reach it.
 function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): (CFrame, Vector3)
-	local depth = Config.PUSH_PROBE_DEPTH
-	local center = root.Position + dir * (root.Size.X / 2 + depth / 2 - 0.3)
-	local size = Vector3.new(Config.CHARACTER.BodyWidth * scale * 0.8, root.Size.Y + 1, depth)
+	local bumper = FurniturePush.bumperRadius(scale)
+	local from = bumper - 0.6 * scale
+	local to = bumper + Config.PUSH_REACH * scale
+	local center = root.Position + dir * ((from + to) / 2)
+	local size = Vector3.new(Config.CHARACTER.BumperDiameter * scale * 0.8, root.Size.Y + 1, to - from)
 	return CFrame.lookAt(center, center + dir), size
 end
 
@@ -1299,6 +1320,11 @@ local Specs: { [string]: Spec } = {
 	Desk = { w = 6, d = 3, h = 3, weight = "Medium" },
 	TVStand = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Crate = { w = 3.4, d = 3.4, h = 3.4, weight = "Medium" },
+	-- Clutter of every size (MapLayout drops these into rooms).
+	SmallBox = { w = 1.7, d = 1.7, h = 1.7, weight = "Light" },
+	BoxStack = { w = 4.4, d = 2.8, h = 3, weight = "Medium" },
+	LongCrate = { w = 7, d = 3, h = 3, weight = "Medium" },
+	BigCrate = { w = 5, d = 5, h = 5, weight = "Heavy" },
 	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
 	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },
@@ -1477,13 +1503,31 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		rod(2.6, 0.75, -2.9, "E0AE6A"),
 		ballAt(0.75, 0, 0, -4.2, "E0AE6A"),
 	},
+	-- Held by the tail: a round, torpedo-shaped fish with a sail fin, side
+	-- fins, big eyes and a long, sharp sword for a nose.
 	Swordfish = {
-		blockAt(Vector3.new(1.2, 0.6, 3.2), 0, 0, -1.6, "4E7FA6"),
-		blockAt(Vector3.new(0.6, 0.62, 3.0), 0, 0, -1.6, "A9C8E0"),
-		rod(3.6, 0.2, -5.0, "3B6585"),
-		blockAt(Vector3.new(1.3, 0.2, 0.5), 0.35, 0, 0.35, "4E7FA6", CFrame.Angles(0, 0.6, 0)),
-		blockAt(Vector3.new(1.3, 0.2, 0.5), -0.35, 0, 0.35, "4E7FA6", CFrame.Angles(0, -0.6, 0)),
-		ballAt(0.25, 0.4, 0.3, -2.8, "111111"),
+		blockAt(Vector3.new(0.38, 0.14, 1.3), 0.4, 0, 0.45, "2B4F73", yaw(0.7)),
+		blockAt(Vector3.new(0.38, 0.14, 1.3), -0.4, 0, 0.45, "2B4F73", yaw(-0.7)),
+		rod(1.1, 0.36, -0.4, "3F73A3"),
+		ballAt(0.62, 0, 0, -1.05, "3F73A3"),
+		ballAt(0.88, 0, 0, -1.45, "3F73A3"),
+		ballAt(1.1, 0, 0, -1.8, "4F86B5"),
+		rod(2.6, 1.1, -3.1, "4F86B5"),
+		ballAt(1.1, 0, 0, -4.4, "4F86B5"),
+		rod(2.8, 0.8, -3.1, "C9DDEC", 0, -0.22),
+		rod(3.0, 0.42, -3.05, "2A527A", 0, 0.38),
+		ballAt(0.82, 0, 0, -4.95, "4F86B5"),
+		ballAt(0.52, 0, 0, -5.35, "4F86B5"),
+		blockAt(Vector3.new(0.12, 0.95, 1.1), 0, 0.75, -3.2, "2B4F73"),
+		blockAt(Vector3.new(0.9, 0.1, 0.4), 0.72, -0.1, -4.0, "2B4F73", yaw(-0.5)),
+		blockAt(Vector3.new(0.9, 0.1, 0.4), -0.72, -0.1, -4.0, "2B4F73", yaw(0.5)),
+		ballAt(0.36, 0.34, 0.16, -4.95, "FFFFFF"),
+		ballAt(0.36, -0.34, 0.16, -4.95, "FFFFFF"),
+		ballAt(0.2, 0.45, 0.2, -5.0, "111111"),
+		ballAt(0.2, -0.45, 0.2, -5.0, "111111"),
+		rod(2.3, 0.26, -6.7, "3A4F63"),
+		rod(0.7, 0.16, -8.1, "3A4F63"),
+		blockAt(Vector3.new(0.13, 0.1, 0.13), 0, 0, -8.5, "3A4F63", DIAMOND),
 	},
 	Spear = {
 		rod(7, 0.3, -3.5, "8B5A2B"),
@@ -2408,6 +2452,11 @@ return Knockback
 -- behind fake walls, outhouses, a crypt, a shed, a graveyard and a pumpkin
 -- patch. Every room has a pitch black roof (you see inside only once you're
 -- in). These two are generated by tools/map_plans.py.
+-- Every built-in map then gets extra clutter (crates and boxes of all sizes,
+-- a big piece in bigger rooms) dropped into its rooms; see `clutter`.
+
+local Config = require(script.Parent.Config)
+local FurnitureSpecs = require(script.Parent.FurnitureSpecs)
 
 export type Rect = { x1: number, z1: number, x2: number, z2: number }
 export type Range = { number }
@@ -4712,16 +4761,23 @@ function MapLayout.rotation(configured: { string }): { string }
 	return out
 end
 
+-- Built-in maps get their clutter the first time they're used (see
+-- `clutter` below), so loading this module stays instant.
+local prepare: (Layout) -> Layout = function(layout)
+	return layout
+end
+
 function MapLayout.current(): Layout
-	return current
+	return prepare(current)
 end
 
 function MapLayout.get(name: string): Layout?
-	return MapLayout.maps[name]
+	local layout = MapLayout.maps[name]
+	return if layout then prepare(layout) else nil
 end
 
 function MapLayout.use(name: string): Layout
-	current = MapLayout.maps[name] or MapLayout.maps.Neighborhood
+	current = prepare(MapLayout.maps[name] or MapLayout.maps.Neighborhood)
 	return current
 end
 
@@ -4878,6 +4934,330 @@ end
 function MapLayout.rectsOverlap(a: Rect, b: Rect, margin: number?): boolean
 	local m = margin or 0
 	return a.x1 < b.x2 + m and b.x1 < a.x2 + m and a.z1 < b.z2 + m and b.z1 < a.z2 + m
+end
+
+-- Clutter -------------------------------------------------------------------------------------
+-- Extra things to shove in every room of every built-in map: crates and
+-- boxes of all sizes, and one big piece in the bigger rooms. A fixed seed per
+-- map, so the server and every client build the same thing. Doorways, a wide
+-- lane from each doorway to the middle of the room (or its item spot), the
+-- middle of hallways, spawns, bushes and other furniture all stay clear.
+
+local CLUTTER_SMALL = { "SmallBox", "Box", "Crate", "BoxStack", "Barrel", "Box", "Crate", "SmallBox", "Box" }
+local CLUTTER_BIG =
+	{ "BigCrate", "LongCrate", "BigCrate", "Table", "Couch", "LongCrate", "Armchair", "BoxStack" }
+-- Out in yard rooms (a graveyard, a pumpkin patch), by theme.
+local CLUTTER_YARD: { [string]: { string } } = {
+	Haunted = { "Crate", "Barrel", "HayBale", "Pumpkin", "Coffin", "BigCrate", "JackOLantern" },
+	Winter = { "Present", "Crate", "Barrel", "BigCrate", "Box", "Present" },
+	Other = { "Crate", "Barrel", "HayBale", "BigCrate", "LongCrate", "Box" },
+}
+CLUTTER_YARD.BloodMoon = CLUTTER_YARD.Haunted
+CLUTTER_YARD.Swamp = CLUTTER_YARD.Haunted
+local CLUTTER_LANE = 3 -- half-width of the clear lanes into each room
+local CLUTTER_GAP = 1.8 -- room left between pieces
+
+-- Park-Miller: plain arithmetic, the same everywhere (no Roblox Random).
+local function numbers(seed: number): () -> number
+	local state = seed % 2147483646 + 1
+	return function(): number
+		state = (state * 16807) % 2147483647
+		return (state - 1) / 2147483646
+	end
+end
+
+-- A way from the zombie spawn to every item spot that the biggest players
+-- fit along: a flood fill on a 1-stud grid (walls, furniture, bushes and
+-- pools grown by their body radius), then each spot's path back to the
+-- start. Returns `blocks(rect)`: would furniture there block one of them?
+local function itemPaths(layout: Layout, pieces: { WallPiece }): (Rect) -> boolean
+	local B = layout.bounds
+	local width, height = math.floor(B.x2 - B.x1), math.floor(B.z2 - B.z1)
+	local radius = Config.CHARACTER.RootWidth / 2 * Config.MAX_SCALE
+	local blocked: { [number]: boolean } = {}
+	local function block(r: Rect)
+		for cz = math.max(0, math.floor(r.z1 - radius - B.z1)), math.min(height - 1, math.ceil(r.z2 + radius - B.z1)) do
+			for cx = math.max(0, math.floor(r.x1 - radius - B.x1)), math.min(width - 1, math.ceil(r.x2 + radius - B.x1)) do
+				local x, z = B.x1 + cx + 0.5, B.z1 + cz + 0.5
+				if x > r.x1 - radius and x < r.x2 + radius and z > r.z1 - radius and z < r.z2 + radius then
+					blocked[cz * width + cx] = true
+				end
+			end
+		end
+	end
+	for _, piece in pieces do
+		if not piece.secret then
+			block(piece.rect)
+		end
+	end
+	for _, spot in layout.furniture do
+		if not FurnitureSpecs.get(spot.kind).decor then
+			local w, d = FurnitureSpecs.footprint(spot.kind, spot.rot)
+			block(rect(spot.x - w / 2, spot.z - d / 2, spot.x + w / 2, spot.z + d / 2))
+		end
+	end
+	for _, b in layout.bushes do
+		block(rect(b.x - b.r, b.z - b.r, b.x + b.r, b.z + b.r))
+	end
+	for _, pool in layout.pools do
+		block(pool)
+	end
+
+	local from: { [number]: number } = {}
+	local spawn = layout.zombieSpawns[1]
+	local first = math.floor(spawn.z - B.z1) * width + math.floor(spawn.x - B.x1)
+	from[first] = first
+	local queue, head = { first }, 1
+	while head <= #queue do
+		local index = queue[head]
+		head += 1
+		local cx, cz = index % width, index // width
+		for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = cx + step[1], cz + step[2]
+			if nx >= 0 and nx < width and nz >= 0 and nz < height then
+				local n = nz * width + nx
+				if from[n] == nil and not blocked[n] then
+					from[n] = index
+					table.insert(queue, n)
+				end
+			end
+		end
+	end
+
+	local path: { [number]: boolean } = {}
+	for _, p in layout.itemSpots do
+		local index = math.floor(p.z - B.z1) * width + math.floor(p.x - B.x1)
+		while from[index] ~= nil and not path[index] do
+			path[index] = true
+			if from[index] == index then
+				break
+			end
+			index = from[index]
+		end
+	end
+
+	return function(r: Rect): boolean
+		local grow = radius + 0.5
+		for cz = math.max(0, math.floor(r.z1 - grow - B.z1)), math.min(height - 1, math.ceil(r.z2 + grow - B.z1)) do
+			for cx = math.max(0, math.floor(r.x1 - grow - B.x1)), math.min(width - 1, math.ceil(r.x2 + grow - B.x1)) do
+				if path[cz * width + cx] then
+					local x, z = B.x1 + cx + 0.5, B.z1 + cz + 0.5
+					if x > r.x1 - grow and x < r.x2 + grow and z > r.z1 - grow and z < r.z2 + grow then
+						return true
+					end
+				end
+			end
+		end
+		return false
+	end
+end
+
+local function clutter(layout: Layout, seed: number)
+	local random = numbers(seed)
+	local function around(x: number, z: number, r: number): Rect
+		return rect(x - r, z - r, x + r, z + r)
+	end
+	local function spotRect(kind: string, x: number, z: number, rot: number): Rect
+		local w, d = FurnitureSpecs.footprint(kind, rot)
+		return rect(x - w / 2, z - d / 2, x + w / 2, z + d / 2)
+	end
+	local function hits(r: Rect, list: { Rect }, margin: number): boolean
+		for _, other in list do
+			if MapLayout.rectsOverlap(r, other, margin) then
+				return true
+			end
+		end
+		return false
+	end
+
+	local placed: { Rect } = {}
+	for _, spot in layout.furniture do
+		if not FurnitureSpecs.get(spot.kind).decor then
+			table.insert(placed, spotRect(spot.kind, spot.x, spot.z, spot.rot))
+		end
+	end
+	local zones: { Rect } = {}
+	local reach = T / 2 + 4
+	for _, w in layout.walls do
+		for _, list in { w.gaps, w.secrets } do
+			for _, g in list do
+				table.insert(
+					zones,
+					if w.horizontal
+						then rect(g[1] - 0.6, w.z1 - reach, g[2] + 0.6, w.z1 + reach)
+						else rect(w.x1 - reach, g[1] - 0.6, w.x1 + reach, g[2] + 0.6)
+				)
+			end
+		end
+	end
+	for _, list in { layout.itemSpots, layout.humanSpawns, layout.zombieSpawns, layout.wizardSpots } do
+		for _, p in list do
+			table.insert(zones, around(p.x, p.z, 4.5))
+		end
+	end
+	table.insert(zones, around(layout.start.x, layout.start.z, 18))
+	for _, b in layout.bushes do
+		table.insert(zones, around(b.x, b.z, b.r + 2))
+	end
+	for _, pool in layout.pools do
+		table.insert(zones, rect(pool.x1 - 2, pool.z1 - 2, pool.x2 + 2, pool.z2 + 2))
+	end
+	local pieces = MapLayout.allWallPieces(layout)
+	local onPath = itemPaths(layout, pieces)
+	-- Furniture belongs to the smallest house around it (as MapMarks reads it).
+	local function houseAt(x: number, z: number): string
+		local best, bestArea = "", math.huge
+		for _, house in layout.houses do
+			if MapLayout.inRect(house.rect, x, z) then
+				local area = (house.rect.x2 - house.rect.x1) * (house.rect.z2 - house.rect.z1)
+				if area < bestArea then
+					best, bestArea = house.id, area
+				end
+			end
+		end
+		return best
+	end
+
+	for _, room in layout.rooms do
+		local yard = room.house == ""
+		local r = room.rect
+		local inner = MapLayout.roomInterior(room)
+		local w, d = inner.x2 - inner.x1, inner.z2 - inner.z1
+		if w < 9 or d < 9 then
+			continue
+		end
+		local walls: { Rect } = {}
+		for _, piece in pieces do
+			if MapLayout.rectsOverlap(piece.rect, r, 1) then
+				table.insert(walls, piece.rect)
+			end
+		end
+		-- Keep a way in: from each doorway (and secret wall) to the room's
+		-- item spot or middle, in through the door and then across.
+		local tx, tz = (inner.x1 + inner.x2) / 2, (inner.z1 + inner.z2) / 2
+		for _, p in layout.itemSpots do
+			if MapLayout.inRect(inner, p.x, p.z) then
+				tx, tz = p.x, p.z
+			end
+		end
+		local keep: { Rect } = { around(tx, tz, 4) }
+		local L = CLUTTER_LANE
+		if string.find(string.lower(room.name), "hall") then
+			local cx, cz = (inner.x1 + inner.x2) / 2, (inner.z1 + inner.z2) / 2
+			table.insert(
+				keep,
+				if w >= d
+					then rect(inner.x1, cz - L, inner.x2, cz + L)
+					else rect(cx - L, inner.z1, cx + L, inner.z2)
+			)
+		end
+		for _, wall in layout.walls do
+			for _, list in { wall.gaps, wall.secrets } do
+				for _, g in list do
+					local mid = (g[1] + g[2]) / 2
+					local dx, dz, alongX
+					if
+						wall.horizontal
+						and mid > r.x1
+						and mid < r.x2
+						and (math.abs(wall.z1 - r.z1) < 0.01 or math.abs(wall.z1 - r.z2) < 0.01)
+					then
+						dx, dz, alongX = mid, wall.z1, false
+					elseif
+						not wall.horizontal
+						and mid > r.z1
+						and mid < r.z2
+						and (math.abs(wall.x1 - r.x1) < 0.01 or math.abs(wall.x1 - r.x2) < 0.01)
+					then
+						dx, dz, alongX = wall.x1, mid, true
+					end
+					if dx then
+						local bx, bz = if alongX then tx else dx, if alongX then dz else tz
+						table.insert(
+							keep,
+							rect(
+								math.min(dx, bx) - L,
+								math.min(dz, bz) - L,
+								math.max(dx, bx) + L,
+								math.max(dz, bz) + L
+							)
+						)
+						table.insert(
+							keep,
+							rect(
+								math.min(bx, tx) - L,
+								math.min(bz, tz) - L,
+								math.max(bx, tx) + L,
+								math.max(bz, tz) + L
+							)
+						)
+					end
+				end
+			end
+		end
+
+		local count = if yard
+			then math.clamp(math.floor(w * d / 200), 1, 10)
+			else math.clamp(math.floor(w * d / 90), 1, 8)
+		for i = 1, count do
+			local list = if yard
+				then CLUTTER_YARD[layout.theme] or CLUTTER_YARD.Other
+				elseif i <= 2 and w * d >= 360 then CLUTTER_BIG
+				else CLUTTER_SMALL
+			local kind = list[math.floor(random() * #list) + 1]
+			for _ = 1, 60 do
+				local rot = if random() < 0.5 then 0 else 90
+				local fw, fd = FurnitureSpecs.footprint(kind, rot)
+				if fw + 1 > w or fd + 1 > d then
+					continue
+				end
+				local x = inner.x1 + fw / 2 + 0.4 + random() * (w - fw - 0.8)
+				local z = inner.z1 + fd / 2 + 0.4 + random() * (d - fd - 0.8)
+				x, z = math.floor(x * 4 + 0.5) / 4, math.floor(z * 4 + 0.5) / 4
+				local box = spotRect(kind, x, z, rot)
+				if
+					box.x1 < inner.x1 + 0.2
+					or box.x2 > inner.x2 - 0.2
+					or box.z1 < inner.z1 + 0.2
+					or box.z2 > inner.z2 - 0.2
+				then
+					continue
+				end
+				if
+					hits(box, placed, CLUTTER_GAP)
+					or hits(box, zones, 0)
+					or hits(box, keep, 0)
+					or hits(box, walls, 0.3)
+					or onPath(box)
+				then
+					continue
+				end
+				table.insert(placed, box)
+				table.insert(
+					layout.furniture,
+					{ kind = kind, x = x, z = z, rot = rot, house = houseAt(x, z) }
+				)
+				break
+			end
+		end
+	end
+end
+
+local unprepared: { [Layout]: number } = {} -- built-in layout -> its clutter seed
+for i, name in MapLayout.names do
+	local seed = 7919 * i
+	for c = 1, #name do
+		seed = (seed * 31 + string.byte(name, c)) % 1000003
+	end
+	unprepared[MapLayout.maps[name]] = seed
+end
+prepare = function(layout: Layout): Layout
+	local seed = unprepared[layout]
+	if seed then
+		unprepared[layout] = nil
+		clutter(layout, seed)
+	end
+	return layout
 end
 
 return MapLayout
@@ -5975,7 +6355,7 @@ function Roofs.all(): { BasePart }
 		cached = {}
 		if folder then
 			for _, part in folder:GetChildren() do
-				if part:IsA("BasePart") then
+				if part:IsA("BasePart") and part.Name == "Roof" then -- not the door panels
 					table.insert(cached, part)
 				end
 			end
@@ -6118,9 +6498,10 @@ function RoundRules.scaleForScore(score: number): number
 	return Config.SIZE_MULTIPLIER(score)
 end
 
--- Pushing strength of one player: grows with the square of their size.
-function RoundRules.pushStrength(scale: number): number
-	return scale * scale
+-- Pushing strength of one player: grows with the square of their size, and
+-- zombies are stronger (Config.ZOMBIE_STRENGTH).
+function RoundRules.pushStrength(scale: number, zombie: boolean?): number
+	return scale * scale * (if zombie then Config.ZOMBIE_STRENGTH else 1)
 end
 
 -- Fraction of walk speed a piece of `mass` moves at under `strength` (the
@@ -6923,6 +7304,14 @@ return Announcer
 --     them instead of walking into it. A human they can't reach (barricaded in)
 --     draws a crowd: the pack picks one door, lines up outside it and
 --     shoves through together (pushers in a line add their strength)
+--   * zombies with nobody in sight hunt: they split up to check bushes (and
+--     rooms on roofed maps), and a second zombie on the same human cuts it
+--     off from the side instead of trailing behind
+--   * every round each human bot takes a role. Builders team up in one room
+--     (a fort), split its doors between them, shove furniture into the
+--     doorways (two get behind a piece too heavy for one) and lean on the
+--     barricade when a zombie knocks. Hiders each pick their own bush before
+--     the outbreak and keep still in it. Runners keep away from the zombies.
 --   * humans grab the odd item (some start with one), hold weapons out
 --     toward close zombies (weapons are solid; a few can swing), flee
 --     toward open ground or through doorways away from every zombie, juke
@@ -6936,6 +7325,7 @@ return Announcer
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local BushService = require(script.Parent.BushService)
@@ -6951,6 +7341,7 @@ local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Participants = require(script.Parent.Participants)
 local Roofs = require(ReplicatedStorage.Shared.Roofs)
 local RoundManager = require(script.Parent.RoundManager)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 local Skins = require(ReplicatedStorage.Shared.Skins)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -7106,6 +7497,51 @@ local leaning: { [Participant]: number } = setmetatable({}, { __mode = "k" }) ::
 local doorsOf = ""
 local doorList: { MapLayout.Door } = {}
 
+-- Teams of human bots, reset every round. A fort is a room builders share:
+-- who is in it, which doors are done, and the pieces being pushed into
+-- doorways (with whoever is pushing each one).
+type Job = {
+	body: BasePart,
+	target: Vector3,
+	key: string,
+	startedAt: number,
+	pushers: { [string]: number }, -- bot id -> last push
+	done: boolean,
+}
+type Fort = { members: { [string]: number }, barricaded: { [string]: boolean }, jobs: { Job } }
+local forts: { [MapLayout.Room]: Fort } = {}
+local bushTaken: { [BasePart]: string } = {} -- leaves -> the hider bot that picked it
+local bushChecked: { [BasePart]: number } = {} -- leaves -> when a zombie last went to look
+local teamsRound = -1
+
+local function teamsFor(round: number)
+	if teamsRound ~= round then
+		teamsRound = round
+		table.clear(forts)
+		table.clear(bushTaken)
+		table.clear(bushChecked)
+	end
+end
+
+local function fortOf(room: MapLayout.Room): Fort
+	local fort = forts[room]
+	if not fort then
+		fort = { members = {}, barricaded = {}, jobs = {} }
+		forts[room] = fort
+	end
+	return fort
+end
+
+local function count(list: { [string]: number }, now: number, within: number): number
+	local n = 0
+	for _, seen in list do
+		if now - seen < within then
+			n += 1
+		end
+	end
+	return n
+end
+
 local function doors(): { MapLayout.Door }
 	local layout = MapLayout.current()
 	if doorsOf ~= layout.name then
@@ -7183,6 +7619,49 @@ local function nearestBush(from: Vector3, range: number): Vector3?
 		local d = Util.flatDistance(leaves.Position, from)
 		if d < bestDistance then
 			best, bestDistance = Vector3.new(leaves.Position.X, from.Y, leaves.Position.Z), d
+		end
+	end
+	return best
+end
+
+-- The nearest bush no other hider has picked, away from the zombies.
+local function freeBush(p: Participant, from: Vector3): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = 160
+	for _, leaves in Bushes.leaves() do
+		local owner = bushTaken[leaves]
+		if owner and owner ~= p.id then
+			continue
+		end
+		local d = Util.flatDistance(leaves.Position, from)
+		if d >= bestDistance then
+			continue
+		end
+		local safe = true
+		for _, zombie in seenZombies do
+			if Util.flatDistance(zombie.position, leaves.Position) < 25 then
+				safe = false
+				break
+			end
+		end
+		if safe then
+			best, bestDistance = leaves, d
+		end
+	end
+	if best then
+		bushTaken[best] = p.id
+	end
+	return best
+end
+
+-- The nearest bush no zombie has looked in lately (zombies hunting).
+local function bushToCheck(from: Vector3, now: number): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = 110
+	for _, leaves in Bushes.leaves() do
+		local d = Util.flatDistance(leaves.Position, from)
+		if d < bestDistance and now - (bushChecked[leaves] or -math.huge) > 25 then
+			best, bestDistance = leaves, d
 		end
 	end
 	return best
@@ -7346,15 +7825,18 @@ local function brain(p: Participant, level: Level, seed: number)
 	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
 	local dodgeSpot: Vector3? = nil
 	local dodgeUntil, nextDodge = 0, 0
-	-- Builders (more of the smarter bots) hole up in a room and barricade it.
-	local builder = random:NextNumber() < (if level.flank then 0.55 else 0.2)
+	-- A role for each round (human): Builders team up in a fort, Hiders take a
+	-- bush of their own, Runners keep away from the zombies.
+	local role: "Builder" | "Hider" | "Runner" = "Runner"
+	local roleRound = -1
+	local myBush: BasePart? = nil
 	local home: MapLayout.Room? = nil
 	local homeRound = -1
-	type Barricade = { body: BasePart, target: Vector3, key: string, startedAt: number }
-	local barricade: Barricade? = nil
-	local barricaded: { [string]: boolean } = {}
+	local barricade: Job? = nil
 	local waryOf: Participant? = nil
 	local waryUntil = 0
+	-- Zombies chasing alongside another zombie cut in from this side.
+	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -7455,29 +7937,67 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 	end
 
-	-- Leaning on something that can give: furniture right where we're
-	-- walking (in reach of body or arms), or the back of another zombie
-	-- that is leaning on something (a queue: our strength adds to theirs).
-	local function leaningOn(root: BasePart, humanoid: Humanoid): boolean
+	-- What we're leaning on, if anything can give: furniture right where
+	-- we're walking (in reach of body or arms), or the back of another
+	-- zombie that is leaning on something (a queue: our strength adds to
+	-- theirs). Returns the piece (nil for a queue) and whether other zombies
+	-- are shoving with us.
+	local function leaningOn(root: BasePart, humanoid: Humanoid): (boolean, BasePart?, boolean)
 		local dir = Util.flatUnit(humanoid.MoveDirection)
 		if not dir then
-			return false
-		end
-		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
-		if #FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale)) > 0 then
-			return true
+			return false, nil, false
 		end
 		local now = os.clock()
+		local helped = false
+		for _, entry in seenZombies do
+			if
+				entry.p ~= p
+				and now - (leaning[entry.p] or 0) < 1
+				and Util.flatDistance(entry.position, root.Position) < 9 * p.scale
+			then
+				helped = true
+			end
+		end
+		local probe, size = FurniturePush.moverProbe(root, dir, p.scale)
+		local found = FurnitureService.findInBox(probe, size + Vector3.new(0, 0, 1.5 * p.scale))
+		if #found > 0 then
+			return true, found[1], helped
+		end
 		for _, entry in seenZombies do
 			if entry.p ~= p and now - (leaning[entry.p] or 0) < 1 then
 				local rel = Util.flat(entry.position - root.Position)
 				local along = rel:Dot(dir)
 				if along > 0.5 and along < 4 * p.scale and (rel - dir * along).Magnitude < 2.5 * p.scale then
-					return true
+					return true, nil, true
 				end
 			end
 		end
-		return false
+		return false, nil, false
+	end
+
+	-- A spot just past the side of a piece that won't give, on the side
+	-- nearer the goal: walk round it instead of into it.
+	local function roundPiece(body: BasePart, root: BasePart, goal: Vector3): Vector3?
+		local here = root.Position
+		local dir = Util.flatUnit(goal - here)
+		if not dir then
+			return nil
+		end
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		local reach = FurniturePush.extent(body, side) + FurniturePush.bumperRadius(p.scale) + 1
+		local center = Vector3.new(body.Position.X, here.Y, body.Position.Z)
+		local best: Vector3? = nil
+		local bestDistance = math.huge
+		for _, sign in { 1, -1 } do
+			local spot = center + side * sign * reach + dir * 1.5
+			if inBounds(spot, 3) and Combat.clearWide(here, spot, radius()) then
+				local d = Util.flatDistance(spot, goal)
+				if d < bestDistance then
+					best, bestDistance = spot, d
+				end
+			end
+		end
+		return best
 	end
 
 	-- No progress for a moment while trying to move: step aside, then
@@ -7491,11 +8011,17 @@ local function brain(p: Participant, level: Level, seed: number)
 			return
 		end
 		if goal and now - progressAt > 0.9 and not (detour and now < detourUntil) then
-			if p.team == "Zombie" and leaningOn(root, humanoid) then
+			local leant, piece, helped = false, nil, false
+			if p.team == "Zombie" then
+				leant, piece, helped = leaningOn(root, humanoid)
+			end
+			if leant then
 				if leanFrom == 0 then
 					leanFrom = now
 				end
-				if now - leanFrom < 6 then
+				-- Keep shoving while the pack is on it with us (or on its way);
+				-- alone against a piece that won't budge, go round it soon.
+				if now - leanFrom < (if helped then 6 else 2) then
 					progressAt = now
 					leaning[p] = now
 					local target = chasing[p.id]
@@ -7506,8 +8032,8 @@ local function brain(p: Participant, level: Level, seed: number)
 				end
 			end
 			leanFrom = 0
-			detour = sidestep(root, goal)
-			detourUntil = now + 0.7
+			detour = (if piece then roundPiece(piece, root, goal) else nil) or sidestep(root, goal)
+			detourUntil = now + (if piece then 1 else 0.7)
 			pathGoal = nil
 			progressAt = now
 		end
@@ -7645,24 +8171,66 @@ local function brain(p: Participant, level: Level, seed: number)
 		local now = os.clock()
 		local here = root.Position
 		local phase = RoundManager.phase()
+		teamsFor(RoundManager.roundNumber())
+
+		-- Distance from a spot to the nearest zombie we can see.
+		local function zombieGap(spot: Vector3): number
+			local gap = math.huge
+			for _, zombie in seenZombies do
+				gap = math.min(gap, Util.flatDistance(zombie.position, spot))
+			end
+			return gap
+		end
 
 		local function wander()
-			if not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4 then
+			local due = not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4
+			-- A human heading somewhere a zombie now stands picks again.
+			if
+				not due
+				and p.team == "Human"
+				and phase == "Infection"
+				and zombieGap(wanderGoal :: Vector3) < 20
+			then
+				due = true
+			end
+			if due then
 				wanderGoal = randomSpot()
 				wanderUntil = now + random:NextNumber(6, 12)
-				-- On roofed maps nobody can see into rooms: zombies go and look.
-				if p.team == "Zombie" and MapLayout.current().roofs then
-					local rooms = {}
-					for _, room in MapLayout.current().rooms do
-						if room.house ~= "" then
-							table.insert(rooms, room)
+				if p.team == "Zombie" then
+					-- Hunting: zombies split up to check the bushes, and on roofed
+					-- maps (nobody can see into rooms) they go and look in rooms.
+					local roofed = MapLayout.current().roofs
+					local bush = if random:NextNumber() < (if roofed then 0.4 else 0.65)
+						then bushToCheck(here, now)
+						else nil
+					if bush then
+						bushChecked[bush] = now
+						wanderGoal = Vector3.new(bush.Position.X, 2, bush.Position.Z)
+						wanderUntil = now + random:NextNumber(6, 10)
+					elseif roofed then
+						local rooms = {}
+						for _, room in MapLayout.current().rooms do
+							if room.house ~= "" then
+								table.insert(rooms, room)
+							end
+						end
+						if #rooms > 0 then
+							local r = rooms[random:NextInteger(1, #rooms)].rect
+							wanderGoal = Vector3.new((r.x1 + r.x2) / 2, 2, (r.z1 + r.z2) / 2)
+							wanderUntil = now + random:NextNumber(5, 9)
 						end
 					end
-					if #rooms > 0 then
-						local r = rooms[random:NextInteger(1, #rooms)].rect
-						wanderGoal = Vector3.new((r.x1 + r.x2) / 2, 2, (r.z1 + r.z2) / 2)
-						wanderUntil = now + random:NextNumber(5, 9)
+				elseif phase == "Infection" then
+					-- Runners: of a few spots, the one farthest from the zombies.
+					local best, bestGap = wanderGoal, zombieGap(wanderGoal :: Vector3)
+					for _ = 1, 4 do
+						local spot = randomSpot()
+						local gap = zombieGap(spot)
+						if gap > bestGap then
+							best, bestGap = spot, gap
+						end
 					end
+					wanderGoal = best
 				end
 			end
 			goTo(wanderGoal :: Vector3, root, humanoid, false)
@@ -7695,6 +8263,18 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
+				-- Another zombie is already on them: cut in from the side ahead
+				-- of them instead of trailing behind it.
+				if chasers(best.p, p.id) > 0 and d > 10 and d < 70 and best.velocity.Magnitude > 4 then
+					local ahead = best.velocity.Unit
+					local side = Vector3.new(-ahead.Z, 0, ahead.X) * cutSide
+					local cut = best.position
+						+ best.velocity * (level.lead * 1.6)
+						+ side * math.min(12, d * 0.4)
+					if inBounds(cut, 3) and Combat.clearWide(here, cut, radius()) then
+						goal = cut
+					end
+				end
 				-- Just got hit, or held off a weapon? Be wary of that human for a
 				-- while: no more running straight back into it.
 				if now < p.knockedUntil + 0.3 or now < p.pressedUntil then
@@ -7732,6 +8312,16 @@ local function brain(p: Participant, level: Level, seed: number)
 
 		-- Human ----------------------------------------------------------------------
 		local round = RoundManager.roundNumber()
+		if roleRound ~= round then
+			roleRound = round
+			local roll = random:NextNumber()
+			local builders = if level.flank then 0.5 else 0.25
+			role = if roll < builders
+				then "Builder"
+				elseif roll < builders + level.hide * 0.7 then "Hider"
+				else "Runner"
+			myBush = nil
+		end
 		if phase == "Prep" and armedRound ~= round then
 			armedRound = round -- one roll per round: only some bots start armed
 			if not p.heldItem and random:NextNumber() < Config.BOT_WEAPON_CHANCE then
@@ -7810,32 +8400,42 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 
-		-- Builders: hole up in a room, shove furniture into its doorways, and
-		-- lean on the barricade when a zombie comes knocking.
-		if builder and (phase == "Prep" or phase == "Infection") then
+		-- Builders team up in a fort: they hole up in one room, split its
+		-- doorways, shove furniture into them (two get behind a piece too
+		-- heavy for one), and lean on the barricade when a zombie knocks.
+		if role == "Builder" and (phase == "Prep" or phase == "Infection") then
 			if homeRound ~= round then
 				homeRound, home, barricade = round, nil, nil
-				table.clear(barricaded)
 			end
 			local threatInside = closest ~= nil
 				and closestDistance < 16
 				and home ~= nil
 				and roomAt(closest.position.X, closest.position.Z) == home
 			if not home and phase == "Prep" then
+				-- The nearest good room, but join teammates already holing up
+				-- somewhere close (up to four to a fort).
 				local best: MapLayout.Room? = nil
-				local bestDistance = 140
+				local bestScore = math.huge
 				for _, room in MapLayout.current().rooms do
 					local r = room.rect
 					local d =
 						Util.flatDistance(Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2), here)
-					if room.house ~= "" and d < bestDistance and goodHideout(room) then
-						best, bestDistance = room, d
+					if room.house ~= "" and d < 160 and goodHideout(room) then
+						local mates = count(fortOf(room).members, now, 3)
+						local score = d
+							- (if mates > 0 and mates < 4 then 50 else 0)
+							+ (if mates >= 4 then 200 else 0)
+						if score < bestScore then
+							best, bestScore = room, score
+						end
 					end
 				end
 				home = best
 			end
 			local myHome = home
 			if myHome and not threatInside then
+				local fort = fortOf(myHome)
+				fort.members[p.id] = now
 				local r = myHome.rect
 				local middle = Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2)
 				local inside = roomAt(here.X, here.Z) == myHome
@@ -7848,7 +8448,7 @@ local function brain(p: Participant, level: Level, seed: number)
 						handled = true
 					end
 				else
-					-- A zombie at one of our doors: lean on the barricade.
+					-- A zombie at one of our doors: everyone leans on that barricade.
 					for _, entry in roomDoors do
 						if closest and Util.flatDistance(closest.position, entry.center) < 12 then
 							humanoid:MoveTo(entry.center)
@@ -7858,10 +8458,39 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 					-- Otherwise finish the barricades.
 					if not handled and (not closest or closestDistance > 18) then
-						if not barricade then
+						local job = barricade
+						if job and job.done then
+							job = nil
+						end
+						if not job then
+							-- Help a teammate behind a piece too heavy to push alone.
+							local alone = RoundRules.pushStrength(p.scale)
+							for _, other in fort.jobs do
+								if
+									not other.done
+									and other.body.Parent
+									and count(other.pushers, now, 1) == 1
+									and RoundRules.pushFraction(FurniturePush.mass(other.body), alone)
+										< 0.45
+								then
+									job = other
+									break
+								end
+							end
+						end
+						if not job then
+							-- Our own doorway: one no teammate is already blocking.
+							local busy: { [string]: boolean } = {}
+							local used: { [BasePart]: boolean } = {}
+							for _, other in fort.jobs do
+								if not other.done then
+									busy[other.key] = true
+									used[other.body] = true
+								end
+							end
 							for _, entry in roomDoors do
 								local key = doorKey(entry.door)
-								if barricaded[key] then
+								if fort.barricaded[key] or busy[key] then
 									continue
 								end
 								local block = CFrame.new(entry.center + entry.inward * 3)
@@ -7871,52 +8500,84 @@ local function brain(p: Participant, level: Level, seed: number)
 										Vector3.new(entry.door.width + 1, 4, 4)
 									) > 0
 								then
-									barricaded[key] = true -- already blocked
+									fort.barricaded[key] = true -- already blocked
 									continue
 								end
+								-- Close pieces that cover the doorway well (not the
+								-- immovable ones, and not one a teammate is using).
+								local along = if entry.door.horizontal then Vector3.xAxis else Vector3.zAxis
 								local piece: BasePart? = nil
-								local pieceDistance = 30
+								local pieceScore = math.huge
 								for _, body in FurnitureService.piecesNear(entry.center, 30) do
 									local d = Util.flatDistance(body.Position, entry.center)
 									if
-										FurnitureService.weightOf(body) ~= "Massive"
-										and d > 4
-										and d < pieceDistance
-										and MapLayout.inRect(r, body.Position.X, body.Position.Z)
+										used[body]
+										or FurnitureService.weightOf(body) == "Massive"
+										or d <= 4
+										or not MapLayout.inRect(r, body.Position.X, body.Position.Z)
 									then
-										piece, pieceDistance = body, d
+										continue
+									end
+									local cover = FurniturePush.extent(body, along) * 2 / entry.door.width
+									local score = d - 8 * math.min(cover, 1.2)
+									if score < pieceScore then
+										piece, pieceScore = body, score
 									end
 								end
 								if piece then
 									local depth = FurniturePush.extent(piece, entry.inward)
-									barricade = {
+									local made: Job = {
 										body = piece,
 										target = Util.flat(entry.center + entry.inward * (depth + 1.6)),
 										key = key,
 										startedAt = now,
+										pushers = {},
+										done = false,
 									}
+									table.insert(fort.jobs, made)
+									job = made
 									break
 								end
-								barricaded[key] = true -- nothing to block it with
+								fort.barricaded[key] = true -- nothing to block it with
 							end
 						end
-						local job = barricade
+						barricade = job
 						if job then
+							job.pushers[p.id] = now
 							local body = job.body
 							local at = Util.flat(body.Position)
 							local toTarget = job.target - at
-							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 14 then
-								barricaded[job.key] = true
+							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 18 then
+								job.done = true
+								fort.barricaded[job.key] = true
 								barricade = nil
 							else
-								-- Get behind the piece, then walk it to the doorway.
+								-- Get behind the piece (side by side with a helper), then
+								-- walk it to the doorway.
 								local push = toTarget.Unit
-								local behind = at - push * (FurniturePush.extent(body, push) + radius() + 1.2)
+								local side = Vector3.new(-push.Z, 0, push.X)
+								local offset = 0
+								if count(job.pushers, now, 1) >= 2 then
+									local first = true
+									for id, seen in job.pushers do
+										if now - seen < 1 and id < p.id then
+											first = false
+										end
+									end
+									offset = (if first then -1 else 1) * 1.4 * p.scale
+								end
+								local behind = at
+									- push * (FurniturePush.extent(body, push) + FurniturePush.bumperRadius(
+										p.scale
+									) + 0.6)
+									+ side * offset
 								if Util.flatDistance(behind, here) > 2.5 then
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
 								else
 									humanoid:MoveTo(
-										Vector3.new(job.target.X, here.Y, job.target.Z) + push * 2
+										Vector3.new(job.target.X, here.Y, job.target.Z)
+											+ push * 2
+											+ side * offset
 									)
 								end
 								handled = true
@@ -7941,6 +8602,28 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 
 		local hidden = BushService.hidden(p)
+		-- Hiders take a bush of their own just before the outbreak and keep
+		-- still in it; one a zombie flushed them out of is given up.
+		if role == "Hider" then
+			if #threats > 0 and not hidden then
+				myBush = nil
+			elseif
+				not hidden
+				and (phase == "Infection" or (phase == "Prep" and RoundManager.secondsLeft() < 15))
+			then
+				local bush = myBush
+				if not bush or bush.Parent == nil then
+					bush = freeBush(p, here)
+					myBush = bush
+				end
+				if bush then
+					local spot = Vector3.new(bush.Position.X, here.Y, bush.Position.Z)
+					goTo(spot, root, humanoid, false)
+					checkProgress(root, spot, humanoid)
+					continue
+				end
+			end
+		end
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
 			humanoid:MoveTo(here) -- stay still and hope
 		elseif #threats > 0 then
@@ -8082,6 +8765,31 @@ local function addBot(index: number)
 	task.spawn(brain, p, level, nextId * 97 + os.time())
 end
 
+-- Sharp movement, like players get from their own client: full speed the
+-- instant a bot walks, a dead stop the instant it arrives, and it turns on
+-- the spot (a Humanoid alone eases in and out and slides on the floors).
+-- A shove (KnockbackForce) plays out untouched.
+local function drive()
+	for _, p in active do
+		local root, humanoid = Participants.body(p)
+		if not root or not humanoid or root:FindFirstChild("KnockbackForce") then
+			continue
+		end
+		local v = root.AssemblyLinearVelocity
+		local move = Util.flatUnit(humanoid.MoveDirection)
+		local speed = humanoid.WalkSpeed
+		if move and speed > 0 then
+			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+			-- Not aiming a weapon: face where we walk, at once.
+			if humanoid.AutoRotate and root.CFrame.LookVector:Dot(move) < 0.995 then
+				root.CFrame = CFrame.lookAt(root.Position, root.Position + move)
+			end
+		elseif math.abs(v.X) + math.abs(v.Z) > 0.05 then
+			root.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+		end
+	end
+end
+
 -- How many bots this round: a random count in range, leaving room for
 -- real players.
 local function wanted(): number
@@ -8124,6 +8832,7 @@ function BotService.start()
 		return
 	end
 	rebalance()
+	RunService.Heartbeat:Connect(drive)
 	print("[Bots] bots are playing. Set Config.BOTS = false to turn them off.")
 	-- A fresh mix of bots for every round.
 	local state = ReplicatedStorage:WaitForChild("BrainTagState")
@@ -8330,6 +9039,7 @@ end
 -- An invisible cylinder the size of the drawn body. Only other characters'
 -- shells collide with it (see WorldSetup), so characters bump into each
 -- other while the narrow root box still decides what fits through doors.
+-- Furniture hits the wider bumper instead.
 local function addShell(character: Model, root: BasePart, scale: number)
 	local old = character:FindFirstChild("Shell")
 	if old then
@@ -8355,6 +9065,33 @@ local function addShell(character: Model, root: BasePart, scale: number)
 	shell.CollisionGroup = "CharacterShells"
 end
 
+-- A wider invisible cylinder only furniture collides with (see WorldSetup):
+-- it keeps a little space between you and what you push.
+local function addBumper(character: Model, root: BasePart, scale: number)
+	local old = character:FindFirstChild("Bumper")
+	if old then
+		old:Destroy()
+	end
+	local diameter = C.BumperDiameter * scale
+	local bumper = Instance.new("Part")
+	bumper.Name = "Bumper"
+	bumper.Shape = Enum.PartType.Cylinder
+	bumper.Size = Vector3.new(C.RootHeight * scale, diameter, diameter)
+	bumper.CFrame = root.CFrame * Parts.UPRIGHT
+	bumper.Transparency = 1
+	bumper.Massless = true
+	bumper.CanCollide = true
+	bumper.CanQuery = false
+	bumper.CanTouch = false
+	bumper.CastShadow = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = bumper
+	weld.Parent = bumper
+	bumper.Parent = character
+	bumper.CollisionGroup = "Bumpers"
+end
+
 -- Rebuilds the look for the participant's team, skin and size.
 function CharacterService.applyLook(p: Participant)
 	local character = p.character
@@ -8377,6 +9114,7 @@ function CharacterService.applyLook(p: Participant)
 		end
 	end
 	addShell(character, root, p.scale)
+	addBumper(character, root, p.scale)
 	character:SetAttribute("Team", p.team)
 	updateNameTag(p)
 end
@@ -9255,6 +9993,51 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, 0, (c.w - t) * 1.3, t, 0.03, 0.06, "8E5F33", math.rad(45))
 		end,
 	},
+	SmallBox = {
+		body = "D4AE78",
+		draw = function(c)
+			c:top(0, 0, 0.4, c.d, 0.02, 0.04, "EAD7AE") -- tape
+			c:top(0, 0, c.w, 0.06, 0.02, 0.04, "A88350") -- flap seam
+		end,
+	},
+	-- Two cardboard boxes side by side, a third one on top.
+	BoxStack = {
+		body = "C9A06A",
+		draw = function(c)
+			c:top(0, 0, 0.1, c.d, 0.02, 0.04, "A88350") -- gap between the bottom two
+			c:top(-c.w / 4, 0, 0.45, c.d, 0.02, 0.04, "E6CFA1") -- their tape
+			c:top(c.w / 5, 0.1, c.w * 0.55, c.d - 0.3, 1.5, 1.5, "D9B57E") -- the box on top
+			c:top(c.w / 5, 0.1, 0.45, c.d - 0.3, 1.52, 0.04, "EFE0BD") -- its tape
+			c:top(c.w / 5 + 0.7, 0.55, 0.7, 0.45, 1.53, 0.04, "F4F4F4") -- shipping label
+		end,
+	},
+	-- A long shipping crate: planks along its length, battens across.
+	LongCrate = {
+		body = "B98550",
+		draw = function(c)
+			local t = 0.4
+			for _, z in { -c.d / 2 + t / 2, 0, c.d / 2 - t / 2 } do
+				c:top(0, z, c.w, t, 0.03, 0.06, "8E5F33")
+			end
+			for _, x in { -c.w / 2 + t / 2, -c.w / 6, c.w / 6, c.w / 2 - t / 2 } do
+				c:top(x, 0, t, c.d, 0.05, 0.06, "7A5029")
+			end
+		end,
+	},
+	-- A big, heavy crate: a frame, an X brace and a stenciled stripe.
+	BigCrate = {
+		body = "A8733F",
+		draw = function(c)
+			local t = 0.55
+			c:top(0, -c.d / 2 + t / 2, c.w, t, 0.03, 0.06, "6E4824")
+			c:top(0, c.d / 2 - t / 2, c.w, t, 0.03, 0.06, "6E4824")
+			c:top(-c.w / 2 + t / 2, 0, t, c.d, 0.03, 0.06, "6E4824")
+			c:top(c.w / 2 - t / 2, 0, t, c.d, 0.03, 0.06, "6E4824")
+			c:top(0, 0, (c.w - t) * 1.35, t, 0.05, 0.06, "6E4824", math.rad(45))
+			c:top(0, 0, (c.w - t) * 1.35, t, 0.05, 0.06, "6E4824", math.rad(-45))
+			c:top(0, c.d / 2 - 1.1, 2.2, 0.35, 0.07, 0.04, "2E2E2E") -- stencil
+		end,
+	},
 	Barrel = {
 		body = "8B5A2B",
 		transparentBody = true,
@@ -10052,7 +10835,7 @@ local function leanGraph(movers: { Mover }): { Lean }
 		local moving = flat.Magnitude > 0.1 and mover.humanoid.WalkSpeed > 0
 		leans[i] = {
 			dir = if moving then flat.Unit else nil,
-			own = RoundRules.pushStrength(mover.scale),
+			own = RoundRules.pushStrength(mover.scale, mover.zombie),
 			leaners = {},
 		}
 	end
@@ -10847,7 +11630,7 @@ local function shaftStep(dt: number)
 			local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
 			local overlap = radius + guard - offset.Magnitude
 			if overlap > 0 and Combat.lineOfSight(root.Position, oRoot.Position) then
-				local push = other.scale * other.scale
+				local push = RoundRules.pushStrength(other.scale, other.team == "Zombie")
 				local away = Util.flatUnit(offset) or p.aim
 				local step = math.min(overlap, 2) * rate
 				if not other.player then
@@ -13353,6 +14136,10 @@ local function secondsLeft(): number
 	return (state:GetAttribute("PhaseEndsAt") :: number) - workspace:GetServerTimeNow()
 end
 
+function RoundManager.secondsLeft(): number
+	return secondsLeft()
+end
+
 -- Teams --------------------------------------------------------------------------------
 
 function RoundManager.setTeam(p: Participant, team: Participants.Team)
@@ -13402,6 +14189,17 @@ local function award(p: Participant, base: number, includeDrumstick: boolean, re
 			string.format("+%s score  %s", Util.commas(amount), reason),
 			Config.COLORS.Good
 		)
+	end
+end
+
+-- Survival points: a little score for every human still standing.
+local function payStanding()
+	for _, p in Participants.onTeam("Human") do
+		if Participants.body(p) then
+			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
+			CharacterService.refreshSize(p)
+			CharacterService.refreshSpeed(p)
+		end
 	end
 end
 
@@ -13652,10 +14450,15 @@ end
 
 local function runInfection(): Winner?
 	setPhase("Infection", Config.ROUND_SECONDS)
+	local nextPay = os.clock() + Config.SURVIVAL_POINTS_SECONDS
 	while true do
 		task.wait(0.1)
 		if endRequested then
 			return nil
+		end
+		if os.clock() >= nextPay then
+			nextPay += Config.SURVIVAL_POINTS_SECONDS
+			payStanding()
 		end
 		local humans = Participants.onTeam("Human")
 		local zombies = Participants.onTeam("Zombie")
@@ -14390,7 +15193,8 @@ local WorldSetup = {}
 WorldSetup.GROUPS = {
 	Characters = "Characters",
 	Furniture = "Furniture",
-	Shells = "CharacterShells", -- body-sized cylinders that hit each other and furniture
+	Shells = "CharacterShells", -- body-sized cylinders that hit each other
+	Bumpers = "Bumpers", -- wider cylinders that only furniture hits
 	SecretWalls = "SecretWalls", -- fake walls: stop furniture, let people through
 }
 
@@ -14426,16 +15230,21 @@ function WorldSetup.run()
 	PhysicsService:RegisterCollisionGroup(groups.Characters)
 	PhysicsService:RegisterCollisionGroup(groups.Furniture)
 	PhysicsService:RegisterCollisionGroup(groups.Shells)
-	-- Root boxes never hit each other; the shells do the bumping: with each
-	-- other and with furniture (so a body never sinks into a couch), but not
-	-- with walls, so a big player's wide shell never snags a doorway.
+	PhysicsService:RegisterCollisionGroup(groups.Bumpers)
+	PhysicsService:RegisterCollisionGroup(groups.SecretWalls)
+	-- Root boxes never hit each other; the shells do the bumping with each
+	-- other, and the wider bumpers keep furniture a little way off (so a body
+	-- never sinks into a couch). Neither hits walls, so a big player's wide
+	-- shell never snags a doorway.
 	PhysicsService:CollisionGroupSetCollidable(groups.Characters, groups.Characters, false)
-	for _, other in { "Default", groups.Characters } do
+	for _, other in { "Default", groups.Characters, groups.Furniture } do
 		PhysicsService:CollisionGroupSetCollidable(groups.Shells, other, false)
 	end
-	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Furniture, true)
 	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Shells, Config.PLAYERS_COLLIDE)
-	PhysicsService:RegisterCollisionGroup(groups.SecretWalls)
+	for _, other in { "Default", groups.Characters, groups.Shells, groups.Bumpers, groups.SecretWalls } do
+		PhysicsService:CollisionGroupSetCollidable(groups.Bumpers, other, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable(groups.Bumpers, groups.Furniture, true)
 	for _, other in { "Default", groups.Characters, groups.Shells } do
 		PhysicsService:CollisionGroupSetCollidable(groups.SecretWalls, other, false)
 	end
@@ -14876,9 +15685,13 @@ return ClientState
             <string name="Name">DarknessController</string>
             <string name="Source"><![CDATA[-- Dark maps (MapThemes with dark = true, like the haunted house): a lantern
 -- follows your own character, lit only on your screen, so you see what's
--- near you and little beyond. Walls stop its light. Other
--- people's name tags show only within the theme's sight (BushController
--- asks `sees`).
+-- near you and little beyond. Other people's name tags show only within the
+-- theme's sight (BushController asks `sees`).
+--
+-- The lantern is a light on an attachment in Terrain, not on a part: there
+-- is nothing around it that could block it, nothing a respawn, a new look
+-- or a new map can destroy, and it casts no shadows. Every frame it reads
+-- the map's theme again and moves to you, so it can't get stuck off.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14896,43 +15709,48 @@ local function myRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
--- The lantern is its own invisible part on your machine, following you
--- every frame, so nothing that happens to your character (respawns, size
--- changes, a new round on another dark map) can ever switch it off.
-local lanternPart: Part? = nil
+local holder: Attachment? = nil
 local light: PointLight? = nil
 
-local function lantern(): (Part, PointLight)
-	local part, lamp = lanternPart, light
-	if part and lamp and part.Parent then
-		return part, lamp
+local function lantern(): (Attachment, PointLight)
+	local at, lamp = holder, light
+	if at and lamp and at.Parent == workspace.Terrain and lamp.Parent == at then
+		return at, lamp
 	end
-	local made = Instance.new("Part")
+	if at then
+		at:Destroy()
+	end
+	local made = Instance.new("Attachment")
 	made.Name = "MyLantern"
-	made.Anchored = true
-	made.CanCollide = false
-	made.CanQuery = false
-	made.CanTouch = false
-	made.Transparency = 1
-	made.Size = Vector3.new(0.2, 0.2, 0.2)
 	local madeLight = Instance.new("PointLight")
-	madeLight.Shadows = true
+	madeLight.Shadows = false
 	madeLight.Parent = made
-	made.Parent = workspace
-	lanternPart, light = made, madeLight
+	made.Parent = workspace.Terrain
+	holder, light = made, madeLight
 	return made, madeLight
 end
 
+local function currentTheme(): MapThemes.Theme
+	local map = workspace:FindFirstChild("Map")
+	local name = map and map:GetAttribute("Theme")
+	return MapThemes.get(if typeof(name) == "string" then name else nil)
+end
+
 local function updateLantern()
-	local part, lamp = lantern()
-	local root = myRoot()
+	theme = currentTheme()
+	local at, lamp = lantern()
 	local settings = theme.lantern
-	if theme.dark and settings and root then
-		part.CFrame = CFrame.new(root.Position + Vector3.new(0, 2, 0))
-		lamp.Enabled = true
+	local root = myRoot()
+	local camera = workspace.CurrentCamera
+	-- No character for a moment (respawning)? Light where the camera looks.
+	local center = if root then root.Position elseif camera then camera.Focus.Position else nil
+	if theme.dark and settings and center then
+		local scale = if root then math.max(1, root.Size.Y / 2) else 1
+		at.WorldPosition = center + Vector3.new(0, 2 + scale, 0)
 		lamp.Range = settings.range
 		lamp.Brightness = settings.brightness
 		lamp.Color = Color3.fromHex(settings.color)
+		lamp.Enabled = true
 	else
 		lamp.Enabled = false
 	end
@@ -14956,14 +15774,7 @@ function DarknessController.sees(position: Vector3): boolean
 end
 
 function DarknessController.start()
-	local map = workspace:WaitForChild("Map")
-	local function refresh()
-		local name = map:GetAttribute("Theme")
-		theme = MapThemes.get(if typeof(name) == "string" then name else nil)
-		updateLantern()
-	end
-	map:GetAttributeChangedSignal("Theme"):Connect(refresh)
-	refresh()
+	updateLantern()
 	RunService.RenderStepped:Connect(updateLantern)
 end
 
@@ -15542,6 +16353,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Items = require(ReplicatedStorage.Shared.Items)
+local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 
 local ForceField = {}
 
@@ -15650,7 +16462,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 				-- Shared by strength (size squared, times how firm the weapon is):
 				-- a much bigger holder holds you off completely.
 				local hold = scale * scale * (item.firmness or 1)
-				local share = hold / (hold + myScale * myScale)
+				local share = hold / (hold + RoundRules.pushStrength(myScale, myTeam == "Zombie"))
 				local dir = if away.Magnitude > 0.01 then away.Unit else facing.Unit
 				push += dir * math.min(overlap * Config.FIELD_WEAPON * share * 2, Config.FIELD_WEAPON_MAX)
 			end
@@ -15677,7 +16489,8 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 			if overlap > 0 then
 				local back = if offset.Magnitude > 0.01 then offset.Unit else -aim
 				local mine = myScale * myScale * (myItem.firmness or 1)
-				local share = scale * scale / (mine + scale * scale)
+				local theirs = RoundRules.pushStrength(scale, model:GetAttribute("Team") == "Zombie")
+				local share = theirs / (mine + theirs)
 				push += back * math.min(overlap * Config.FIELD_RECOIL * share * 2, Config.FIELD_WEAPON_MAX)
 			end
 		end
@@ -15766,7 +16579,7 @@ local function collect(): FurniturePush.Pushes
 		return pushes
 	end
 	local scale = ClientState.my("Scale") or 1
-	local strength = RoundRules.pushStrength(scale)
+	local strength = RoundRules.pushStrength(scale, ClientState.isZombie())
 	local walk = humanoid.WalkSpeed
 	local move = Vector3.new(humanoid.MoveDirection.X, 0, humanoid.MoveDirection.Z)
 	local moving = move.Magnitude > 0.1 and walk > 0
@@ -17678,6 +18491,7 @@ return Center
 --   left side: buttons       top-center: countdown      top-right: counts + leaderboard
 --   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
+--   over your character: "+10" when your points change
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17695,6 +18509,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.Parent.InputController)
 local MobileButtons = require(script.Parent.MobileButtons)
 local QuickStart = require(script.Parent.QuickStart)
+local ScorePopups = require(script.Parent.ScorePopups)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ShopPanel = require(script.Parent.ShopPanel)
 local SidePanels = require(script.Parent.SidePanels)
@@ -17746,6 +18561,7 @@ function Hud.start()
 	local touchMode = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 	local toast = Center.buildToasts(gui)
+	ScorePopups.start()
 	ShopPanel.build(gui, toast)
 	local openQuick, quickOpen = QuickStart.build(gui, touchMode, function()
 		Remotes.event("TutorialDone"):FireServer()
@@ -18056,6 +18872,98 @@ return QuickStart
             </Properties>
           </Item>
           <Item class="ModuleScript" referent="74">
+            <Properties>
+              <string name="Name">ScorePopups</string>
+              <string name="Source"><![CDATA[-- Little "+10" numbers that float up from your character whenever your
+-- points change (survival points every few seconds, eating someone,
+-- rewards), only on your screen. Losses float up in red.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local ClientState = require(script.Parent.Parent.ClientState)
+local Config = require(ReplicatedStorage.Shared.Config)
+local UIKit = require(script.Parent.UIKit)
+local Util = require(ReplicatedStorage.Shared.Util)
+
+local ScorePopups = {}
+
+local player = Players.LocalPlayer
+local RISE = TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local FADE = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.8)
+local LOSS = Color3.fromHex(Config.COLORS.ZombieText)
+
+local random = Random.new()
+
+local function pop(amount: number)
+	local _, root = ClientState.myCharacter()
+	if not root then
+		return
+	end
+	local board = UIKit.new("BillboardGui", {
+		Name = "ScorePopup",
+		Adornee = root,
+		Size = UDim2.fromOffset(160, 120),
+		AlwaysOnTop = true,
+		LightInfluence = 0,
+		ResetOnSpawn = false,
+		Parent = player:WaitForChild("PlayerGui"),
+	})
+	local x = random:NextInteger(-18, 18)
+	local label = UIKit.label({
+		Text = (if amount > 0 then "+" else "-") .. Util.commas(math.abs(amount)),
+		Font = UIKit.HEAVY,
+		TextSize = if math.abs(amount) >= 100 then 30 else 24,
+		TextColor3 = if amount > 0 then UIKit.LIME else LOSS,
+		TextStrokeTransparency = 0.25,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, x, 0.5, -14),
+		Size = UDim2.new(1, 0, 0, 32),
+		Parent = board,
+	})
+	TweenService:Create(label, RISE, { Position = UDim2.new(0.5, x, 0, 32) }):Play()
+	TweenService:Create(label, FADE, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	task.delay(1.5, function()
+		board:Destroy()
+	end)
+end
+
+function ScorePopups.start()
+	task.spawn(function()
+		local me = ClientState.participants:WaitForChild(ClientState.myId(), 120)
+		if not me then
+			return
+		end
+		local last = (me:GetAttribute("Score") :: number?) or 0
+		local pending = 0
+		me:GetAttributeChangedSignal("Score"):Connect(function()
+			local value = (me:GetAttribute("Score") :: number?) or 0
+			local change = value - last
+			last = value
+			if change == 0 then
+				return
+			end
+			-- Changes in the same moment (a reward and its bonus) show as one.
+			if pending == 0 then
+				task.delay(0.05, function()
+					local total = pending
+					pending = 0
+					if total ~= 0 then
+						pop(total)
+					end
+				end)
+			end
+			pending += change
+		end)
+	end)
+end
+
+return ScorePopups
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">ShopPanel</string>
               <string name="Source"><![CDATA[-- The shop window. Tabs: Items (spend score), Skins (score, Robux or VIP) and
@@ -18586,7 +19494,7 @@ return ShopPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="75">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">SidePanels</string>
               <string name="Source"><![CDATA[-- The settings window (sound, camera height, ping/fps line) and the trophy
@@ -18814,7 +19722,7 @@ return SidePanels
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="76">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">TopLeft</string>
               <string name="Source"><![CDATA[-- Left side bar: five big square icon buttons stacked down the left edge
@@ -18870,7 +19778,7 @@ return TopLeft
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="78">
             <Properties>
               <string name="Name">TopRight</string>
               <string name="Source"><![CDATA[-- Top-right: ping/fps, "N Survivors" (white) over "N Zombies" (red), and a
@@ -19050,7 +19958,7 @@ return TopRight
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">UIKit</string>
               <string name="Source"><![CDATA[-- Tiny UI toolkit: every HUD element is built in code with these helpers.
@@ -19289,7 +20197,7 @@ return UIKit
           </Item>
         </Item>
       </Item>
-      <Item class="LocalScript" referent="79">
+      <Item class="LocalScript" referent="80">
         <Properties>
           <string name="Name">RbxCharacterSounds</string>
           <string name="Source"><![CDATA[-- Intentionally empty. A LocalScript with this name replaces Roblox's default
@@ -19299,13 +20207,13 @@ return UIKit
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="80">
+  <Item class="TextChatService" referent="81">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="81">
+  <Item class="Workspace" referent="82">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

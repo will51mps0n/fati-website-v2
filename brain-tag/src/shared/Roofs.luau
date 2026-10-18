@@ -26,7 +26,7 @@ function Roofs.all(): { BasePart }
 		cached = {}
 		if folder then
 			for _, part in folder:GetChildren() do
-				if part:IsA("BasePart") then
+				if part:IsA("BasePart") and part.Name == "Roof" then -- not the door panels
 					table.insert(cached, part)
 				end
 			end

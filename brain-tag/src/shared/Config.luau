@@ -23,7 +23,7 @@ Config.ROUNDS_PER_MAP = 2
 -- Movement and size ------------------------------------------------------------
 
 Config.BASE_WALKSPEED = 16
-Config.ZOMBIE_SPEED_FACTOR = 1.05
+Config.ZOMBIE_SPEED_FACTOR = 1.15 -- zombies are faster than humans of the same size
 Config.SPEED_MULTIPLIER_CAP = 1.6 -- keeps very high scores from becoming uncatchable
 
 -- 1 + score / 30000, fitted to the two screenshots (500 -> 1.02, 6729 -> 1.22).
@@ -41,6 +41,10 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
+-- Staying alive pays as you go: every human gets this much every few
+-- seconds of the outbreak (a "+10" floats up on their screen).
+Config.SURVIVAL_POINTS = 10
+Config.SURVIVAL_POINTS_SECONDS = 5
 Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
@@ -74,6 +78,10 @@ Config.CHARACTER = {
 	-- Characters bump into each other with an invisible cylinder this wide
 	-- (only other characters collide with it, so doors still fit).
 	ShellDiameter = 3,
+	-- Furniture keeps a little space from you: only furniture collides with
+	-- this wider invisible cylinder, so you never end up right on top of
+	-- what you push.
+	BumperDiameter = 4.4,
 }
 
 Config.COLORS = {
@@ -99,11 +107,16 @@ Config.PUSH_MAX_FRACTION = 0.9
 -- Each person behind the one touching a piece lends this share of their
 -- (already compounded) strength, so five zombies in a queue shove like ~3.7.
 Config.PUSH_CHAIN_SHARE = 0.85
+-- Zombies are stronger than humans of the same size: furniture, a weapon held
+-- out at them, a barricade standoff.
+Config.ZOMBIE_STRENGTH = 1.5
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
 Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
-Config.PUSH_PROBE_DEPTH = 2.2 -- how far in front of a mover we look for furniture
+-- A piece starts moving this far (studs, at size 1) before it reaches your
+-- bumper, so you push it from a little way off instead of walking into it.
+Config.PUSH_REACH = 1.4
 
 -- Bushes ------------------------------------------------------------------------------------
 -- Walk into a bush to hide: it covers you from above, your name tag

@@ -75,19 +75,24 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
   `MAX_PARTICIPANTS`). They have funny names (Mario Robles, Fart Butt, Poop
   Face, Fat Guy, Booger Bob...), a level from 3 to 6, and the classic look
   (only `Config.BOTS_WITH_SKINS` of them, 3 by default, wear special skins); most
-  are 5 or 6, and Mario Robles is a 6. Zombie bots spread out over different
-  humans, lead their target and remember where you hid. A human they can't
-  reach draws a crowd that lines up at one door and shoves through together.
+  are 5 or 6, and Mario Robles is a 6. Bots move as sharply as players: full
+  speed at once, a dead stop, and instant turns. Zombie bots spread out over
+  different humans, lead their target and remember where you hid; a second
+  zombie on the same human cuts in from the side. With nobody in sight they
+  hunt: they split up to check bushes (and rooms on dark maps). A human they
+  can't reach draws a crowd that lines up at one door and shoves through
+  together; a piece that won't budge for one zombie alone, it walks round.
   They circle round a weapon held out at them, and once hit or held off one
-  they stay wary of that human and come at them from behind. On dark maps
-  they go room to room looking for you. Human bots sometimes start with a
-  weapon and hold it out toward zombies; many hole up in a room, shove
-  furniture into its doorways and lean on the barricade when a zombie
-  arrives; others flee toward open ground or through doorways, juke sideways
-  when a zombie is about to grab them, and hide in bushes. Bots check their
-  whole body's width before walking straight anywhere and pathfind
-  otherwise, so they don't walk into walls. Turn them off with
-  `Config.BOTS = false`.
+  they stay wary of that human and come at them from behind. Every round
+  each human bot takes a role. Builders team up in one room (a fort), split
+  its doorways, shove furniture into them (two get behind a piece too heavy
+  for one) and lean on the barricade when a zombie arrives. Hiders pick a
+  bush of their own just before the outbreak and keep still in it. Runners
+  keep away from the zombies. All of them flee toward open ground or through
+  doorways, juke sideways when a zombie is about to grab them, and sometimes
+  start with a weapon they hold out at zombies. Bots check their whole
+  body's width before walking straight anywhere and pathfind otherwise, so
+  they don't walk into walls. Turn them off with `Config.BOTS = false`.
 - **Several players:** Test tab > Clients and Servers > choose 2 or more players > Start.
 - If something breaks, open View > Output and copy the red lines.
 
@@ -141,7 +146,14 @@ even if they find it.
 
 ## Maps
 
-Seven maps take turns (`Config.MAP_ROTATION`, two rounds each):
+Seven maps take turns (`Config.MAP_ROTATION`, two rounds each). Besides
+their own furniture, every room gets extra things to shove (small boxes,
+boxes, box stacks, crates, long crates, big crates, a table or couch in the
+bigger rooms) and yards get crates, barrels and hay bales (pumpkins and
+coffins at night, presents in the snow). These are placed by `clutter` in
+`MapLayout.luau` with a fixed seed, so every server gets the same map, and
+they always leave doorways, lanes into each room and the way to every item
+spot clear.
 
 - **The Neighborhood:** two big houses across a road and a little one on the island.
 - **The Mansion:** one huge house, a pool and a shed.
@@ -313,7 +325,7 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Every human still standing gets +10 points every 5 seconds (a little "+10" floats up over you). Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
@@ -325,8 +337,12 @@ and size). A zombie that eats you takes 75% of your points
 eating a big player is worth a lot and zombies grow as they feed. Speed multiplier =
 1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
 12,000-point player is about 2.5x a newcomer, like in the original. Bigger
-players push heavier furniture faster: each pusher's strength is size squared,
-and a piece moves at walk speed x (1 - mass / total strength). Light, medium,
+players push heavier furniture faster: each pusher's strength is size squared
+(zombies are 1.5x stronger, `ZOMBIE_STRENGTH`, and 15% faster,
+`ZOMBIE_SPEED_FACTOR`), and a piece moves at walk speed x (1 - mass / total
+strength). Furniture keeps a little space from you (an invisible bumper,
+`CHARACTER.BumperDiameter`) and starts moving `PUSH_REACH` studs before it
+reaches it, so you push from a short way off instead of walking into it. Light, medium,
 heavy and massive pieces (piano, wardrobe, pool table, car) need more and more
 strength. Pushing is simulated on your own machine while you are the only one
 pushing a piece, so it responds instantly; when someone pushes back, the server
@@ -477,7 +493,9 @@ Everything lives in `src/shared/Config.luau`:
   much off-center pushes turn a piece). "Can't move the fridge": lower `Heavy`.
 - **Size:** `SIZE_MULTIPLIER` and `MAX_SCALE`.
 - **Maps:** `MAP_ROTATION` and `ROUNDS_PER_MAP` (your own maps from Studio play first; see "Making your own maps").
-- **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards.
+- **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards, `SURVIVAL_POINTS` / `SURVIVAL_POINTS_SECONDS` (points for staying alive).
+- **Zombies:** `ZOMBIE_SPEED_FACTOR`, `ZOMBIE_STRENGTH`.
+- **Push distance:** `PUSH_REACH` and `CHARACTER.BumperDiameter`.
 - **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
 - **Collisions:** `PLAYERS_COLLIDE` (characters bump into each other), `CHARACTER.ShellDiameter`.
 - **Held weapons:** `SHAFT_SOFTNESS`, `FIELD_WEAPON`, `FIELD_RECOIL` (how hard a weapon and the people pressing on it push each other, shared by size), `SHAFT_FURNITURE_FACTOR`, and per item `SOLIDITY` in `Items.luau`.

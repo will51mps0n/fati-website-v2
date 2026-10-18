@@ -252,6 +252,51 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, 0, (c.w - t) * 1.3, t, 0.03, 0.06, "8E5F33", math.rad(45))
 		end,
 	},
+	SmallBox = {
+		body = "D4AE78",
+		draw = function(c)
+			c:top(0, 0, 0.4, c.d, 0.02, 0.04, "EAD7AE") -- tape
+			c:top(0, 0, c.w, 0.06, 0.02, 0.04, "A88350") -- flap seam
+		end,
+	},
+	-- Two cardboard boxes side by side, a third one on top.
+	BoxStack = {
+		body = "C9A06A",
+		draw = function(c)
+			c:top(0, 0, 0.1, c.d, 0.02, 0.04, "A88350") -- gap between the bottom two
+			c:top(-c.w / 4, 0, 0.45, c.d, 0.02, 0.04, "E6CFA1") -- their tape
+			c:top(c.w / 5, 0.1, c.w * 0.55, c.d - 0.3, 1.5, 1.5, "D9B57E") -- the box on top
+			c:top(c.w / 5, 0.1, 0.45, c.d - 0.3, 1.52, 0.04, "EFE0BD") -- its tape
+			c:top(c.w / 5 + 0.7, 0.55, 0.7, 0.45, 1.53, 0.04, "F4F4F4") -- shipping label
+		end,
+	},
+	-- A long shipping crate: planks along its length, battens across.
+	LongCrate = {
+		body = "B98550",
+		draw = function(c)
+			local t = 0.4
+			for _, z in { -c.d / 2 + t / 2, 0, c.d / 2 - t / 2 } do
+				c:top(0, z, c.w, t, 0.03, 0.06, "8E5F33")
+			end
+			for _, x in { -c.w / 2 + t / 2, -c.w / 6, c.w / 6, c.w / 2 - t / 2 } do
+				c:top(x, 0, t, c.d, 0.05, 0.06, "7A5029")
+			end
+		end,
+	},
+	-- A big, heavy crate: a frame, an X brace and a stenciled stripe.
+	BigCrate = {
+		body = "A8733F",
+		draw = function(c)
+			local t = 0.55
+			c:top(0, -c.d / 2 + t / 2, c.w, t, 0.03, 0.06, "6E4824")
+			c:top(0, c.d / 2 - t / 2, c.w, t, 0.03, 0.06, "6E4824")
+			c:top(-c.w / 2 + t / 2, 0, t, c.d, 0.03, 0.06, "6E4824")
+			c:top(c.w / 2 - t / 2, 0, t, c.d, 0.03, 0.06, "6E4824")
+			c:top(0, 0, (c.w - t) * 1.35, t, 0.05, 0.06, "6E4824", math.rad(45))
+			c:top(0, 0, (c.w - t) * 1.35, t, 0.05, 0.06, "6E4824", math.rad(-45))
+			c:top(0, c.d / 2 - 1.1, 2.2, 0.35, 0.07, 0.04, "2E2E2E") -- stencil
+		end,
+	},
 	Barrel = {
 		body = "8B5A2B",
 		transparentBody = true,

@@ -126,6 +126,7 @@ end
 -- An invisible cylinder the size of the drawn body. Only other characters'
 -- shells collide with it (see WorldSetup), so characters bump into each
 -- other while the narrow root box still decides what fits through doors.
+-- Furniture hits the wider bumper instead.
 local function addShell(character: Model, root: BasePart, scale: number)
 	local old = character:FindFirstChild("Shell")
 	if old then
@@ -151,6 +152,33 @@ local function addShell(character: Model, root: BasePart, scale: number)
 	shell.CollisionGroup = "CharacterShells"
 end
 
+-- A wider invisible cylinder only furniture collides with (see WorldSetup):
+-- it keeps a little space between you and what you push.
+local function addBumper(character: Model, root: BasePart, scale: number)
+	local old = character:FindFirstChild("Bumper")
+	if old then
+		old:Destroy()
+	end
+	local diameter = C.BumperDiameter * scale
+	local bumper = Instance.new("Part")
+	bumper.Name = "Bumper"
+	bumper.Shape = Enum.PartType.Cylinder
+	bumper.Size = Vector3.new(C.RootHeight * scale, diameter, diameter)
+	bumper.CFrame = root.CFrame * Parts.UPRIGHT
+	bumper.Transparency = 1
+	bumper.Massless = true
+	bumper.CanCollide = true
+	bumper.CanQuery = false
+	bumper.CanTouch = false
+	bumper.CastShadow = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = bumper
+	weld.Parent = bumper
+	bumper.Parent = character
+	bumper.CollisionGroup = "Bumpers"
+end
+
 -- Rebuilds the look for the participant's team, skin and size.
 function CharacterService.applyLook(p: Participant)
 	local character = p.character
@@ -173,6 +201,7 @@ function CharacterService.applyLook(p: Participant)
 		end
 	end
 	addShell(character, root, p.scale)
+	addBumper(character, root, p.scale)
 	character:SetAttribute("Team", p.team)
 	updateNameTag(p)
 end

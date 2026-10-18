@@ -251,7 +251,7 @@ local function leanGraph(movers: { Mover }): { Lean }
 		local moving = flat.Magnitude > 0.1 and mover.humanoid.WalkSpeed > 0
 		leans[i] = {
 			dir = if moving then flat.Unit else nil,
-			own = RoundRules.pushStrength(mover.scale),
+			own = RoundRules.pushStrength(mover.scale, mover.zombie),
 			leaners = {},
 		}
 	end

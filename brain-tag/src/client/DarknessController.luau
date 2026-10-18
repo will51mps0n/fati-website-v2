@@ -1,8 +1,12 @@
 -- Dark maps (MapThemes with dark = true, like the haunted house): a lantern
 -- follows your own character, lit only on your screen, so you see what's
--- near you and little beyond. Walls stop its light. Other
--- people's name tags show only within the theme's sight (BushController
--- asks `sees`).
+-- near you and little beyond. Other people's name tags show only within the
+-- theme's sight (BushController asks `sees`).
+--
+-- The lantern is a light on an attachment in Terrain, not on a part: there
+-- is nothing around it that could block it, nothing a respawn, a new look
+-- or a new map can destroy, and it casts no shadows. Every frame it reads
+-- the map's theme again and moves to you, so it can't get stuck off.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,43 +24,48 @@ local function myRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
--- The lantern is its own invisible part on your machine, following you
--- every frame, so nothing that happens to your character (respawns, size
--- changes, a new round on another dark map) can ever switch it off.
-local lanternPart: Part? = nil
+local holder: Attachment? = nil
 local light: PointLight? = nil
 
-local function lantern(): (Part, PointLight)
-	local part, lamp = lanternPart, light
-	if part and lamp and part.Parent then
-		return part, lamp
+local function lantern(): (Attachment, PointLight)
+	local at, lamp = holder, light
+	if at and lamp and at.Parent == workspace.Terrain and lamp.Parent == at then
+		return at, lamp
 	end
-	local made = Instance.new("Part")
+	if at then
+		at:Destroy()
+	end
+	local made = Instance.new("Attachment")
 	made.Name = "MyLantern"
-	made.Anchored = true
-	made.CanCollide = false
-	made.CanQuery = false
-	made.CanTouch = false
-	made.Transparency = 1
-	made.Size = Vector3.new(0.2, 0.2, 0.2)
 	local madeLight = Instance.new("PointLight")
-	madeLight.Shadows = true
+	madeLight.Shadows = false
 	madeLight.Parent = made
-	made.Parent = workspace
-	lanternPart, light = made, madeLight
+	made.Parent = workspace.Terrain
+	holder, light = made, madeLight
 	return made, madeLight
 end
 
+local function currentTheme(): MapThemes.Theme
+	local map = workspace:FindFirstChild("Map")
+	local name = map and map:GetAttribute("Theme")
+	return MapThemes.get(if typeof(name) == "string" then name else nil)
+end
+
 local function updateLantern()
-	local part, lamp = lantern()
-	local root = myRoot()
+	theme = currentTheme()
+	local at, lamp = lantern()
 	local settings = theme.lantern
-	if theme.dark and settings and root then
-		part.CFrame = CFrame.new(root.Position + Vector3.new(0, 2, 0))
-		lamp.Enabled = true
+	local root = myRoot()
+	local camera = workspace.CurrentCamera
+	-- No character for a moment (respawning)? Light where the camera looks.
+	local center = if root then root.Position elseif camera then camera.Focus.Position else nil
+	if theme.dark and settings and center then
+		local scale = if root then math.max(1, root.Size.Y / 2) else 1
+		at.WorldPosition = center + Vector3.new(0, 2 + scale, 0)
 		lamp.Range = settings.range
 		lamp.Brightness = settings.brightness
 		lamp.Color = Color3.fromHex(settings.color)
+		lamp.Enabled = true
 	else
 		lamp.Enabled = false
 	end
@@ -80,14 +89,7 @@ function DarknessController.sees(position: Vector3): boolean
 end
 
 function DarknessController.start()
-	local map = workspace:WaitForChild("Map")
-	local function refresh()
-		local name = map:GetAttribute("Theme")
-		theme = MapThemes.get(if typeof(name) == "string" then name else nil)
-		updateLantern()
-	end
-	map:GetAttributeChangedSignal("Theme"):Connect(refresh)
-	refresh()
+	updateLantern()
 	RunService.RenderStepped:Connect(updateLantern)
 end
 

@@ -40,6 +40,11 @@ local Specs: { [string]: Spec } = {
 	Desk = { w = 6, d = 3, h = 3, weight = "Medium" },
 	TVStand = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Crate = { w = 3.4, d = 3.4, h = 3.4, weight = "Medium" },
+	-- Clutter of every size (MapLayout drops these into rooms).
+	SmallBox = { w = 1.7, d = 1.7, h = 1.7, weight = "Light" },
+	BoxStack = { w = 4.4, d = 2.8, h = 3, weight = "Medium" },
+	LongCrate = { w = 7, d = 3, h = 3, weight = "Medium" },
+	BigCrate = { w = 5, d = 5, h = 5, weight = "Heavy" },
 	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
 	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },

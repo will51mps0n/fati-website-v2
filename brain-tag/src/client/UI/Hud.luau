@@ -2,6 +2,7 @@
 --   left side: buttons       top-center: countdown      top-right: counts + leaderboard
 --   bottom-left: points      bottom-center: item slot   bottom-right: chat
 --   center: win text, toasts, shop / settings / trophy / quick start windows
+--   over your character: "+10" when your points change
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +20,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.Parent.InputController)
 local MobileButtons = require(script.Parent.MobileButtons)
 local QuickStart = require(script.Parent.QuickStart)
+local ScorePopups = require(script.Parent.ScorePopups)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ShopPanel = require(script.Parent.ShopPanel)
 local SidePanels = require(script.Parent.SidePanels)
@@ -70,6 +72,7 @@ function Hud.start()
 	local touchMode = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 	local toast = Center.buildToasts(gui)
+	ScorePopups.start()
 	ShopPanel.build(gui, toast)
 	local openQuick, quickOpen = QuickStart.build(gui, touchMode, function()
 		Remotes.event("TutorialDone"):FireServer()
