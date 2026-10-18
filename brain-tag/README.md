@@ -79,7 +79,9 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
   speed at once, a dead stop, and instant turns. Zombie bots spread out over
   different humans, lead their target and remember where you hid; a second
   zombie on the same human cuts in from the side. With nobody in sight they
-  hunt: they split up to check bushes (and rooms on dark maps). A human they
+  wander and now and then check a nearby bush (or a room on dark maps). They
+  are kept a bit dim on purpose: they only see so far, react a moment late,
+  forget you soon and each move at their own pace, so hiding and juking work. A human they
   can't reach draws a crowd that lines up at one door and shoves through
   together; a piece that won't budge for one zombie alone, it walks round.
   They circle round a weapon held out at them, and once hit or held off one
@@ -152,7 +154,7 @@ their own furniture, every room gets extra things to shove (small boxes,
 boxes, box stacks, crates, long crates, big crates, a table or couch in the
 bigger rooms) and yards get crates, barrels and hay bales (pumpkins and
 coffins at night, presents in the snow), and most pieces you can push start
-a few studs out from the wall so you (and the bots) can get behind them and
+up to 7 studs out from the wall so you (and the bots) can get behind them and
 shove them into a doorway. These are placed by `clutter` in
 `MapLayout.luau` with a fixed seed, so every server gets the same map, and
 they always leave doorways, lanes into each room and the way to every item

@@ -66,57 +66,60 @@ type Level = {
 	flank: boolean, -- zombie: circle round a held-out weapon
 }
 
+-- Kept a bit dim on purpose: they don't see across the map, guess only a
+-- little of where you're heading, forget you soon, and react a moment late,
+-- so hiding and juking work.
 local LEVELS: { [number]: Level } = {
 	[3] = {
-		think = 0.25,
-		speed = 1,
-		sight = 120,
-		lead = 0.4,
-		memory = 3,
+		think = 0.3,
+		speed = 0.97,
+		sight = 60,
+		lead = 0.15,
+		memory = 2,
 		stuck = 5,
-		flee = 45,
-		directions = 8,
-		hide = 0.35,
+		flee = 32,
+		directions = 6,
+		hide = 0.45,
 		dodge = 0,
 		flank = false,
 	},
 	[4] = {
-		think = 0.18,
-		speed = 1.02,
-		sight = 200,
-		lead = 0.55,
-		memory = 5,
+		think = 0.25,
+		speed = 1,
+		sight = 75,
+		lead = 0.3,
+		memory = 3,
 		stuck = 4,
-		flee = 55,
-		directions = 10,
-		hide = 0.45,
-		dodge = 7,
+		flee = 38,
+		directions = 8,
+		hide = 0.5,
+		dodge = 5,
 		flank = true,
 	},
 	[5] = {
-		think = 0.14,
-		speed = 1.05,
-		sight = 400,
-		lead = 0.7,
-		memory = 7,
-		stuck = 3,
-		flee = 65,
-		directions = 12,
-		hide = 0.5,
-		dodge = 8,
+		think = 0.21,
+		speed = 1.02,
+		sight = 90,
+		lead = 0.4,
+		memory = 3.5,
+		stuck = 3.5,
+		flee = 45,
+		directions = 8,
+		hide = 0.55,
+		dodge = 6,
 		flank = true,
 	},
 	[6] = {
-		think = 0.11,
-		speed = 1.08,
-		sight = 600,
-		lead = 0.8,
-		memory = 9,
-		stuck = 2.5,
-		flee = 75,
-		directions = 12,
-		hide = 0.55,
-		dodge = 9.5,
+		think = 0.17,
+		speed = 1.04,
+		sight = 105,
+		lead = 0.5,
+		memory = 4.5,
+		stuck = 3,
+		flee = 52,
+		directions = 10,
+		hide = 0.6,
+		dodge = 7,
 		flank = true,
 	},
 }
@@ -361,10 +364,10 @@ end
 -- The nearest bush no zombie has looked in lately (zombies hunting).
 local function bushToCheck(from: Vector3, now: number): BasePart?
 	local best: BasePart? = nil
-	local bestDistance = 110
+	local bestDistance = 60
 	for _, leaves in Bushes.leaves() do
 		local d = Util.flatDistance(leaves.Position, from)
-		if d < bestDistance and now - (bushChecked[leaves] or -math.huge) > 25 then
+		if d < bestDistance and now - (bushChecked[leaves] or -math.huge) > 40 then
 			best, bestDistance = leaves, d
 		end
 	end
@@ -572,6 +575,20 @@ local function brain(p: Participant, level: Level, seed: number)
 	local waryUntil = 0
 	-- Zombies chasing alongside another zombie cut in from this side.
 	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
+	-- People react a moment after they notice someone, each at their own
+	-- pace, and sometimes stop to look around.
+	local reaction = random:NextNumber(0.3, 0.8) * (if level.flank then 0.9 else 1.25)
+	local noticedAt: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any
+	local lastLookAt: { [Participant]: number } = setmetatable({}, { __mode = "k" }) :: any
+	local function noticed(other: Participant, now: number): boolean
+		if now - (lastLookAt[other] or -math.huge) > 1 then
+			noticedAt[other] = now -- just (re)noticed them
+		end
+		lastLookAt[other] = now
+		return now - (noticedAt[other] or now) >= reaction
+	end
+	local startRound = -1
+	local pauseUntil = 0
 
 	local function radius(): number
 		return math.min(0.9 * p.scale, Config.CHARACTER.MaxRootWidth / 2)
@@ -902,7 +919,7 @@ local function brain(p: Participant, level: Level, seed: number)
 	end
 
 	while Participants.get(p.id) == p do
-		task.wait(level.think * random:NextNumber(0.85, 1.15))
+		task.wait(level.think * random:NextNumber(0.7, 1.45)) -- uneven, so bots don't move as one
 		local root, humanoid = Participants.body(p)
 		if not root or not humanoid then
 			continue
@@ -912,6 +929,15 @@ local function brain(p: Participant, level: Level, seed: number)
 		local here = root.Position
 		local phase = RoundManager.phase()
 		teamsFor(RoundManager.roundNumber())
+		-- Each bot gets going at its own moment when a round starts.
+		if RoundManager.roundNumber() ~= startRound then
+			startRound = RoundManager.roundNumber()
+			pauseUntil = now + random:NextNumber(0, 5)
+		end
+		if phase == "Prep" and now < pauseUntil then
+			moveTo(humanoid, here)
+			continue
+		end
 
 		-- Distance from a spot to the nearest zombie we can see.
 		local function zombieGap(spot: Vector3): number
@@ -923,7 +949,18 @@ local function brain(p: Participant, level: Level, seed: number)
 		end
 
 		local function wander()
-			local due = not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4
+			if now < pauseUntil then
+				moveTo(humanoid, here) -- looking around
+				return
+			end
+			local arrived = wanderGoal ~= nil and Util.flatDistance(wanderGoal, here) < 4
+			if arrived and random:NextNumber() < 0.35 then
+				pauseUntil = now + random:NextNumber(0.6, 2.4)
+				wanderGoal = nil
+				moveTo(humanoid, here)
+				return
+			end
+			local due = not wanderGoal or now > wanderUntil or arrived
 			-- A human heading somewhere a zombie now stands picks again.
 			if
 				not due
@@ -940,7 +977,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					-- Hunting: zombies split up to check the bushes, and on roofed
 					-- maps (nobody can see into rooms) they go and look in rooms.
 					local roofed = MapLayout.current().roofs
-					local bush = if random:NextNumber() < (if roofed then 0.4 else 0.65)
+					local bush = if random:NextNumber() < (if roofed then 0.2 else 0.3)
 						then bushToCheck(here, now)
 						else nil
 					if bush then
@@ -1007,7 +1044,12 @@ local function brain(p: Participant, level: Level, seed: number)
 			-- A barricaded human pulls the pack together instead (up to 6).
 			for _, entry in seenHumans do
 				local d = Util.flatDistance(entry.position, here)
-				if d <= level.sight and visible(entry, here) and inSight(here, entry.position, d) then
+				if
+					d <= level.sight
+					and visible(entry, here)
+					and inSight(here, entry.position, d)
+					and noticed(entry.p, now)
+				then
 					local others = chasers(entry.p, p.id)
 					local rally = (fortified[entry.p] or 0) > now and others < 6
 					local score = d
@@ -1101,7 +1143,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 			local d = Util.flatDistance(entry.position, here)
 			local seen = not entry.hidden or d <= Config.BUSH_REVEAL_DISTANCE
-			if seen and inSight(here, entry.position, d) then
+			if seen and inSight(here, entry.position, d) and noticed(entry.p, now) then
 				if d <= level.flee then
 					table.insert(threats, entry)
 				end

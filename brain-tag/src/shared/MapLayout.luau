@@ -2516,7 +2516,7 @@ local CLUTTER_YARD: { [string]: { string } } = {
 CLUTTER_YARD.BloodMoon = CLUTTER_YARD.Haunted
 CLUTTER_YARD.Swamp = CLUTTER_YARD.Haunted
 -- Fixtures stay against their walls; most other pieces you can push move
--- OFF_WALL studs out from the wall (OFF_WALL_SHARE of them, where they fit).
+-- out from the wall (OFF_WALL_SHARE of them, as far as OFF_WALLS allows).
 local FIXTURES: { [string]: boolean } = {
 	Toilet = true,
 	Sink = true,
@@ -2530,8 +2530,8 @@ local FIXTURES: { [string]: boolean } = {
 	Bed = true,
 	Tombstone = true,
 }
-local OFF_WALL = 4.8
-local OFF_WALL_SHARE = 0.75
+local OFF_WALLS = { 7, 5.5, 4 } -- tried in order: as far out as fits
+local OFF_WALL_SHARE = 0.9
 local CLUTTER_LANE = 3 -- half-width of the clear lanes into each room
 local CLUTTER_GAP = 1.8 -- room left between pieces
 
@@ -2696,7 +2696,7 @@ local function clutter(layout: Layout, seed: number)
 		return best
 	end
 
-	-- Off the wallRects: many of the pieces you can push (not fixtures like
+	-- Off the walls: many of the pieces you can push (not fixtures like
 	-- toilets and bookshelves, not the massive ones) start a few studs out
 	-- from the wall, so people and bots can get behind them and shove them
 	-- into a doorway.
@@ -2743,26 +2743,33 @@ local function clutter(layout: Layout, seed: number)
 			if not hits(side, wallRects, 0) then
 				continue -- no wall on this side
 			end
-			local dx, dz = -d[1] * OFF_WALL, -d[2] * OFF_WALL
-			local moved = rect(here.x1 + dx, here.z1 + dz, here.x2 + dx, here.z2 + dz)
-			local fits = moved.x1 >= room.x1 + 0.2
-				and moved.x2 <= room.x2 - 0.2
-				and moved.z1 >= room.z1 + 0.2
-				and moved.z2 <= room.z2 - 0.2
-				and not hits(moved, wallRects, 0.3)
-				and not hits(moved, zones, 0)
-				and not onPath(moved)
-			if fits then
-				for j, other in rects do
-					if j ~= i and MapLayout.rectsOverlap(moved, other, 1.2) then
-						fits = false
-						break
+			local moved: Rect? = nil
+			for _, gap in OFF_WALLS do
+				local dx, dz = -d[1] * gap, -d[2] * gap
+				local candidate = rect(here.x1 + dx, here.z1 + dz, here.x2 + dx, here.z2 + dz)
+				local fits = candidate.x1 >= room.x1 + 0.2
+					and candidate.x2 <= room.x2 - 0.2
+					and candidate.z1 >= room.z1 + 0.2
+					and candidate.z2 <= room.z2 - 0.2
+					and not hits(candidate, wallRects, 0.3)
+					and not hits(candidate, zones, 0)
+					and not onPath(candidate)
+				if fits then
+					for j, other in rects do
+						if j ~= i and MapLayout.rectsOverlap(candidate, other, 1.2) then
+							fits = false
+							break
+						end
 					end
 				end
+				if fits then
+					spot.x += dx
+					spot.z += dz
+					moved = candidate
+					break
+				end
 			end
-			if fits then
-				spot.x += dx
-				spot.z += dz
+			if moved then
 				rects[i] = moved
 				break
 			end
@@ -2882,7 +2889,7 @@ local function clutter(layout: Layout, seed: number)
 					hits(box, placed, CLUTTER_GAP)
 					or hits(box, zones, 0)
 					or hits(box, keep, 0)
-					or hits(box, walls, 0.3)
+					or hits(box, walls, 2) -- off the walls, so you can get behind it
 					or onPath(box)
 				then
 					continue
