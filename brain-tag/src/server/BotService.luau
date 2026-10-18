@@ -491,6 +491,18 @@ local function goodHideout(room: MapLayout.Room): boolean
 		and not string.find(string.lower(room.name), "hall")
 end
 
+-- Where each bot was last told to walk, and when. The drive loop below moves
+-- bots toward it at full speed, so it doesn't depend on what the Humanoid
+-- reports while walking.
+local walkGoal: { [Humanoid]: Vector3 } = setmetatable({}, { __mode = "k" }) :: any
+local walkAt: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+local function moveTo(humanoid: Humanoid, point: Vector3)
+	humanoid:MoveTo(point)
+	walkGoal[humanoid] = point
+	walkAt[humanoid] = os.clock()
+end
+
 -- One bot ---------------------------------------------------------------------------------
 
 local function brain(p: Participant, level: Level, seed: number)
@@ -610,13 +622,13 @@ local function brain(p: Participant, level: Level, seed: number)
 			waypoint = waypoints[waypointIndex]
 		end
 		if waypoint then
-			humanoid:MoveTo(waypoint.Position)
+			moveTo(humanoid, waypoint.Position)
 		elseif pushThrough and Combat.clearWide(root.Position, goal, radius(), true) then
-			humanoid:MoveTo(goal) -- only furniture in the way: shove through it
+			moveTo(humanoid, goal) -- only furniture in the way: shove through it
 		else
 			local step = sidestep(root, goal)
 			if step then
-				humanoid:MoveTo(step)
+				moveTo(humanoid, step)
 			end
 		end
 	end
@@ -625,16 +637,16 @@ local function brain(p: Participant, level: Level, seed: number)
 	local function goTo(goal: Vector3, root: BasePart, humanoid: Humanoid, pushThrough: boolean)
 		local now = os.clock()
 		if detour and now < detourUntil then
-			humanoid:MoveTo(detour)
+			moveTo(humanoid, detour)
 			return
 		end
 		detour = nil
 		local distance = Util.flatDistance(goal, root.Position)
 		if distance < 45 and Combat.clearWide(root.Position, goal, radius()) then
-			humanoid:MoveTo(goal)
+			moveTo(humanoid, goal)
 			pathGoal = nil
 		elseif pushThrough and distance < 18 and Combat.clearWide(root.Position, goal, radius(), true) then
-			humanoid:MoveTo(goal) -- a barricade, not a wall: lean on it
+			moveTo(humanoid, goal) -- a barricade, not a wall: lean on it
 		else
 			followPath(goal, root, humanoid, pushThrough)
 		end
@@ -838,7 +850,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		pushers[p.id] = now
 		leaning[p] = now
 		detour = nil
-		humanoid:MoveTo(s.center + s.across * (5 + r))
+		moveTo(humanoid, s.center + s.across * (5 + r))
 		progressAt = now
 		if (here - s.from).Magnitude > 1 then
 			s.from, s.movedAt = here, now
@@ -1072,7 +1084,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- A zombie about to grab us: juke sideways so it overshoots (then a
 		-- moment before the next juke, or nobody could ever be caught).
 		if dodgeSpot and now < dodgeUntil then
-			humanoid:MoveTo(dodgeSpot)
+			moveTo(humanoid, dodgeSpot)
 			continue
 		end
 		dodgeSpot = nil
@@ -1096,7 +1108,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 				end
 				if dodgeSpot then
-					humanoid:MoveTo(dodgeSpot)
+					moveTo(humanoid, dodgeSpot)
 					pathGoal = nil
 					continue
 				end
@@ -1154,7 +1166,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					-- A zombie at one of our doors: everyone leans on that barricade.
 					for _, entry in roomDoors do
 						if closest and Util.flatDistance(closest.position, entry.center) < 12 then
-							humanoid:MoveTo(entry.center)
+							moveTo(humanoid, entry.center)
 							handled = true
 							break
 						end
@@ -1277,7 +1289,8 @@ local function brain(p: Participant, level: Level, seed: number)
 								if Util.flatDistance(behind, here) > 2.5 then
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
 								else
-									humanoid:MoveTo(
+									moveTo(
+										humanoid,
 										Vector3.new(job.target.X, here.Y, job.target.Z)
 											+ push * 2
 											+ side * offset
@@ -1294,7 +1307,7 @@ local function brain(p: Participant, level: Level, seed: number)
 							away += entry.inward
 						end
 						local spot = middle + (if away.Magnitude > 0.1 then away.Unit else Vector3.zero) * 4
-						humanoid:MoveTo(spot)
+						moveTo(humanoid, spot)
 						handled = true
 					end
 				end
@@ -1328,7 +1341,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
-			humanoid:MoveTo(here) -- stay still and hope
+			moveTo(humanoid, here) -- stay still and hope
 		elseif #threats > 0 then
 			local bush = if hider and not hidden then nearestBush(here, 30) else nil
 			if bush and closest and Util.flatDistance(bush, here) < closestDistance * 0.8 then
@@ -1394,12 +1407,12 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 				end
 				if best then
-					humanoid:MoveTo(best)
+					moveTo(humanoid, best)
 					pathGoal = nil
 				elseif closest then
 					local step = sidestep(root, here + (here - closest.position))
 					if step then
-						humanoid:MoveTo(step)
+						moveTo(humanoid, step)
 					end
 				end
 			end
@@ -1465,7 +1478,22 @@ local function addBot(index: number)
 	end
 	CharacterService.refreshSpeed(p)
 	active[index] = p
-	task.spawn(brain, p, level, nextId * 97 + os.time())
+	-- A bot whose brain hits an error says so and starts thinking again,
+	-- instead of standing still for the rest of the game.
+	local seed = nextId * 97 + os.time()
+	task.spawn(function()
+		while Participants.get(p.id) == p do
+			local ok, err = pcall(function()
+				brain(p, level, seed)
+			end)
+			if ok then
+				break
+			end
+			warn(string.format("[Bots] %s: %s", p.name, tostring(err)))
+			seed += 1
+			task.wait(1)
+		end
+	end)
 end
 
 -- Sharp movement, like players get from their own client: full speed the
@@ -1489,7 +1517,14 @@ local function drive()
 			end
 		end
 		local v = root.AssemblyLinearVelocity
-		local move = Util.flatUnit(humanoid.MoveDirection)
+		-- Toward the spot the bot was last sent to (bots re-aim several times
+		-- a second, so a goal older than that means: stand still).
+		local goal: Vector3? = walkGoal[humanoid]
+		local toGoal = Vector3.zero
+		if goal and os.clock() - (walkAt[humanoid] or 0) < 1.5 then
+			toGoal = Util.flat(goal - root.Position)
+		end
+		local move = if toGoal.Magnitude > 0.6 then toGoal.Unit else nil
 		local speed = humanoid.WalkSpeed
 		if move and speed > 0 then
 			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
