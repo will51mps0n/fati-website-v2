@@ -420,7 +420,9 @@ VIP-only skins), Double Score, Starter Kit (a Bat every round), Lucky (rare roll
 chance 5% to 15%).
 
 **3. Skins.** Human, for score: Chef, Ninja, Pumpkin, Bear, Cat, Frog, Bunny,
-Donkey, Penguin, Cowboy, Pirate, Knight. Human, for Robux: Dog, Panda, Robot, Alien,
+Donkey, Koi, Penguin, Cowboy, Pirate, Knight. Animal skins are whole animals
+seen from above (a fluffy bear, a cream dog with floppy ears and a curled
+tail, an orange and white koi...), not a person in a hat. Human, for Robux: Dog, Panda, Robot, Alien,
 Shark, Awesome Guy, Duck, Astronaut. VIP: Royal. Zombies all look the same (the
 round's first zombies get the alpha look), so there are no zombie skins. Score
 skins give non-paying players something to grind for; Robux skins are pure

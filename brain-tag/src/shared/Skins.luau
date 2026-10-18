@@ -82,10 +82,10 @@ local list: { Skin } = {
 		"Dog",
 		"Dog",
 		"Human",
-		"C8955A",
-		"B07A45",
-		"E8C9A0",
-		{ hat = "Dog", accent = "6B4226", product = "SkinDog" }
+		"F2D2BC",
+		"F2D2BC",
+		"FFF0E4",
+		{ hat = "Dog", accent = "E2B79C", product = "SkinDog" }
 	),
 	skin(
 		"Cat",
@@ -196,6 +196,17 @@ local list: { Skin } = {
 		"FFCF1F",
 		"FFCF1F",
 		{ hat = "Awesome", accent = "7A1F45", product = "SkinAwesome" }
+	),
+
+	-- An orange and white koi, swimming along.
+	skin(
+		"Koi",
+		"Koi",
+		"Human",
+		"F07A1A",
+		"F07A1A",
+		"FFF6EE",
+		{ hat = "Koi", accent = "F59A3C", scorePrice = 13000 }
 	),
 
 	skin(

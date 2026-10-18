@@ -440,62 +440,66 @@ type Animal = {
 	stripe: boolean?, -- dark line down the back
 	whiskers: boolean?,
 	patches: boolean?, -- panda markings
+	furry: boolean?, -- a fluffy, scalloped edge all round (bears)
+	koi: boolean?, -- white and orange patches (the koi)
 }
 
 local ANIMALS: { [string]: Animal } = {
 	Dog = {
 		body = "Quadruped",
-		width = 2.0,
-		length = 3.6,
-		head = 1.7,
-		snout = { 0.8, 0.9 },
+		width = 2.3,
+		length = 3.1,
+		head = 1.9,
+		snout = { 0.85, 0.75 },
 		ears = "Floppy",
 		tail = "Wag",
 	},
 	Cat = {
 		body = "Quadruped",
-		width = 1.75,
-		length = 3.3,
-		head = 1.55,
-		snout = { 0.6, 0.45 },
+		width = 1.9,
+		length = 2.9,
+		head = 1.65,
+		snout = { 0.6, 0.4 },
 		ears = "Pointy",
 		tail = "Long",
 		whiskers = true,
 	},
 	Bunny = {
 		body = "Quadruped",
-		width = 1.95,
-		length = 2.9,
-		head = 1.55,
+		width = 2.0,
+		length = 2.6,
+		head = 1.6,
 		snout = { 0.5, 0.35 },
 		ears = "Tall",
 		tail = "Cotton",
 	},
 	Bear = {
 		body = "Quadruped",
-		width = 2.5,
-		length = 3.6,
-		head = 1.9,
-		snout = { 0.95, 0.8 },
+		width = 2.8,
+		length = 3.5,
+		head = 2.0,
+		snout = { 1.1, 0.85 },
 		ears = "Round",
 		tail = "Stub",
+		furry = true,
 	},
 	Panda = {
 		body = "Quadruped",
-		width = 2.5,
-		length = 3.5,
-		head = 1.9,
-		snout = { 0.85, 0.7 },
+		width = 2.8,
+		length = 3.4,
+		head = 2.0,
+		snout = { 0.85, 0.65 },
 		ears = "Round",
 		tail = "Stub",
 		patches = true,
+		furry = true,
 	},
 	Donkey = {
 		body = "Quadruped",
-		width = 1.8,
-		length = 3.9,
-		head = 1.45,
-		snout = { 0.95, 1.25 },
+		width = 1.9,
+		length = 3.7,
+		head = 1.5,
+		snout = { 0.95, 1.2 },
 		ears = "Long",
 		tail = "Tuft",
 		stripe = true,
@@ -504,6 +508,7 @@ local ANIMALS: { [string]: Animal } = {
 	Penguin = { body = "Bird", width = 2.2, length = 2.8, head = 1.65 },
 	Bill = { body = "Bird", width = 2.2, length = 2.8, head = 1.55, tail = "Duck" }, -- the Duck skin
 	Shark = { body = "Fish", width = 1.9, length = 4.6, head = 1.9 },
+	Koi = { body = "Fish", width = 1.9, length = 4.0, head = 1.8, koi = true },
 }
 
 -- Animals are drawn smaller than people (and a bit slimmer still).
@@ -515,199 +520,221 @@ local function buildAnimal(model: Model, root: BasePart, scale: number, skin: Sk
 	local k = kit(model, root, s)
 	local main, head, light = skin.shirt, skin.hair, skin.skin
 	local dark = skin.accent or darker(main)
-	local edge = darker(main, 0.7)
+	local edge = darker(main, 0.6)
 	local W, L = a.width * ANIMAL_SLIM, a.length
-	local headZ = if a.body == "Frog" then -0.85 elseif a.body == "Fish" then -1.35 else -1.5
-	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.6 else 0.45
+	local headZ = if a.body == "Frog" then -0.85 elseif a.body == "Fish" then -1.35 else -1.45
+	local bodyZ = if a.body == "Frog" then 0.4 elseif a.body == "Fish" then 0.5 else 0.45
 	local back = bodyZ + L / 2 -- rear end of the torso
-	local function torso()
-		local r = W * (if a.body == "Quadruped" then 0.28 else 0.42)
-		k.box(0, bodyZ, W + 0.24, L + 0.24, r + 0.12, 0.47, edge)
-		k.box(0, bodyZ, W, L, r, 0.5, main)
-		if a.body == "Quadruped" then
-			-- Shoulders and hips a touch wider than the waist.
-			k.box(0, bodyZ - L * 0.3, W * 1.07, L * 0.3, r, 0.502, main)
-			k.box(0, bodyZ + L * 0.3, W * 1.09, L * 0.32, r, 0.502, main)
+
+	-- An oval (w across, l long) from overlapping discs, rounder toward the ends.
+	local function oval(x: number, z: number, w: number, l: number, top: number, color: string | Color3)
+		local long, short = math.max(w, l), math.min(w, l)
+		local alongZ = l >= w
+		local n = math.ceil((long - short) / (short * 0.22))
+		for i = 0, n do
+			local t = if n == 0 then 0 else -1 + 2 * i / n
+			local offset = t * (long - short) / 2
+			local d = short * math.sqrt(math.max(0.05, 1 - (t * (long - short) / long) ^ 2))
+			k.dot(if alongZ then x else x + offset, if alongZ then z + offset else z, d, top, color)
 		end
-		k.box(-W * 0.14, bodyZ - L * 0.08, W * 0.36, L * 0.5, W * 0.15, 0.51, lighter(main, 0.14)) -- sheen
+	end
+	-- An oval with a dark outline (and a fluffy, scalloped edge when furry).
+	local function outlined(
+		x: number,
+		z: number,
+		w: number,
+		l: number,
+		top: number,
+		color: string | Color3,
+		line: Color3,
+		furry: boolean?
+	)
+		if furry then
+			local count = math.floor((w + l) * 3.2)
+			for i = 1, count do
+				local angle = i / count * math.pi * 2
+				local px, pz = x + math.cos(angle) * w / 2, z + math.sin(angle) * l / 2
+				k.dot(px, pz, 0.62, top - 0.03, line)
+				k.dot(px, pz, 0.46, top - 0.01, color)
+			end
+		else
+			oval(x, z, w + 0.2, l + 0.2, top - 0.02, line)
+		end
+		oval(x, z, w, l, top, color)
 	end
 	local function eyes(spread: number, z: number, size: number)
 		for side = -1, 1, 2 do
-			k.dot(side * spread, z, size, 0.95, "1C1C1C")
-			k.dot(side * spread - 0.04, z - 0.04, size * 0.35, 0.97, "FFFFFF")
+			k.dot(side * spread, z, size, 0.97, "1C1C1C")
+			k.dot(side * spread - 0.04, z - 0.04, size * 0.35, 0.99, "FFFFFF")
 		end
 	end
 
 	if a.body == "Quadruped" then
-		-- Legs splay out from shoulders and hips (front ones forward, back
-		-- ones back), with a paw or hoof at the end.
-		local spread, legLength = 0.45, 1.0
-		local sx, cz = math.sin(spread), math.cos(spread)
+		-- Stubby legs peeking out under the body, paws at the ends.
+		local paw = if a.patches then dark else main
 		for side = -1, 1, 2 do
-			for _, leg in
-				{
-					{ z = bodyZ - L * 0.3, dz = -1, yaw = -side * spread },
-					{ z = bodyZ + L * 0.3, dz = 1, yaw = side * spread },
-				}
-			do
-				local dx, dz = side * sx, leg.dz * cz
-				local cx, lz = side * W / 2 + dx * 0.3, leg.z + dz * 0.3
-				k.bar(cx, lz, 0.42, legLength, 0.36, if a.patches then dark else main, leg.yaw) -- pandas: black legs
-				k.box(cx + dx * legLength * 0.5, lz + dz * legLength * 0.5, 0.52, 0.44, 0.14, 0.37, dark)
+			for _, legZ in { bodyZ - L * 0.3, bodyZ + L * 0.3 } do
+				outlined(side * (W / 2 - 0.02), legZ, 0.78, 1.0, 0.4, paw, edge)
+				k.dot(side * (W / 2 + 0.08), legZ + (if legZ < bodyZ then -0.32 else 0.32), 0.42, 0.42, dark)
 			end
 		end
 		local tail = a.tail
 		if tail == "Wag" then
-			k.pill(0.2, back + 0.55, 0.42, 1.3, 0.4, main)
+			-- A tail curled up over the rump.
+			k.dot(0.3, back + 0.3, 1.05, 0.44, edge)
+			k.dot(0.3, back + 0.3, 0.85, 0.46, main)
+			k.dot(0.38, back + 0.25, 0.38, 0.47, edge)
+			k.dot(0.38, back + 0.25, 0.2, 0.48, main)
 		elseif tail == "Long" then
-			k.pill(0, back + 0.8, 0.3, 1.7, 0.4, main)
-			k.pill(0.35, back + 1.55, 0.3, 0.7, 0.41, dark)
+			oval(0, back + 0.85, 0.34, 1.8, 0.42, main)
+			oval(0.15, back + 1.6, 0.34, 0.6, 0.43, dark)
 		elseif tail == "Stub" then
-			k.dot(0, back + 0.05, 0.6, 0.4, dark)
+			outlined(0, back + 0.05, 0.75, 0.7, 0.42, main, edge, a.furry)
 		elseif tail == "Tuft" then
-			k.pill(0, back + 0.65, 0.22, 1.4, 0.4, main)
-			k.pill(0, back + 1.35, 0.42, 0.6, 0.41, dark)
+			oval(0, back + 0.7, 0.24, 1.5, 0.42, main)
+			oval(0, back + 1.4, 0.45, 0.7, 0.43, dark)
 		end
-		torso()
+		outlined(0, bodyZ, W, L, 0.5, main, edge, a.furry)
+		oval(-W * 0.12, bodyZ - L * 0.06, W * 0.4, L * 0.55, 0.51, lighter(main, 0.12)) -- sheen
 		if a.stripe then
-			k.pill(0, bodyZ - 0.1, 0.3, L * 0.85, 0.53, dark) -- mane / spine stripe
+			oval(0, bodyZ - 0.1, 0.32, L * 0.85, 0.53, dark) -- mane / spine stripe
 		end
 		if a.patches then
-			k.bar(0, bodyZ - L * 0.22, W, 0.95, 0.52, dark) -- panda shoulder band
+			oval(0, bodyZ - L * 0.2, W * 0.96, 1.05, 0.52, dark) -- panda shoulder band
 		end
 		if tail == "Cotton" then
-			k.dot(0, back - 0.05, 0.85, 0.54, "FFFFFF")
+			k.dot(0, back - 0.05, 0.9, 0.54, "FFFFFF")
 		end
 	elseif a.body == "Bird" then
 		local beak = skin.accent or "F28C1C"
 		for side = -1, 1, 2 do
-			k.pill(side * 0.45, back + 0.2, 0.42, 0.65, 0.36, beak) -- feet
+			oval(side * 0.45, back + 0.2, 0.45, 0.7, 0.36, beak) -- feet
 		end
 		if a.tail == "Duck" then
 			k.bar(0, back + 0.1, 0.75, 0.75, 0.42, main, math.rad(45))
 		end
-		torso()
+		outlined(0, bodyZ, W, L, 0.5, main, edge)
 		for side = -1, 1, 2 do
-			k.pill(side * (W / 2 - 0.05), bodyZ + 0.15, 0.6, L * 0.72, 0.53, darker(main, 0.8)) -- wings
+			oval(side * (W / 2 - 0.12), bodyZ + 0.15, 0.6, L * 0.72, 0.53, darker(main, 0.8)) -- wings
 		end
 	elseif a.body == "Fish" then
 		local fin = skin.accent or darker(main)
 		for side = -1, 1, 2 do
-			k.bar(side * 0.5, back + 0.45, 0.45, 1.35, 0.42, fin, side * 0.6) -- tail fin
-			k.bar(side * (W / 2 + 0.35), headZ + 1.0, 0.5, 1.5, 0.42, fin, side * 0.8) -- side fins
+			-- A flowing, forked tail and side fins swept back.
+			k.bar(side * 0.48, back + 0.55, 0.62, 1.5, 0.42, fin, side * 0.55)
+			k.dot(side * 0.85, back + 1.15, 0.62, 0.42, fin)
+			k.bar(side * (W / 2 + 0.3), headZ + 1.1, 0.55, 1.3, 0.42, fin, side * 0.8)
 		end
-		torso()
-		k.pill(0, headZ - W / 2 + 0.1, W * 0.62, 1.0, 0.5, main) -- pointed nose
-		k.pill(0, bodyZ + 0.2, 0.28, 1.3, 0.56, fin) -- dorsal fin
+		outlined(0, bodyZ - 0.25, W, L + 0.5, 0.5, main, edge)
+		oval(0, bodyZ + 0.3, 0.3, 1.5, 0.56, fin) -- dorsal fin
+		if a.koi then
+			-- White patches and a few dark spots, like a real koi.
+			for _, patch in { { -0.3, -0.5, 0.9, 1.1 }, { 0.35, 0.6, 0.8, 1.0 }, { -0.2, 1.4, 0.7, 0.8 } } do
+				oval(patch[1], bodyZ + patch[2], patch[3], patch[4], 0.54, light)
+			end
+			for _, spot in { { 0.4, -0.2 }, { -0.45, 0.9 }, { 0.15, 1.9 } } do
+				k.dot(spot[1], bodyZ + spot[2], 0.28, 0.55, "1C1C1C")
+			end
+		end
 		for side = -1, 1, 2 do
 			for i = 0, 2 do
-				k.bar(side * W * 0.38, headZ + 0.75 + i * 0.2, 0.05, 0.42, 0.53, edge) -- gills
+				k.bar(side * W * 0.36, headZ + 0.75 + i * 0.2, 0.05, 0.42, 0.57, edge) -- gills
 			end
 		end
 	else -- Frog
 		for side = -1, 1, 2 do
-			k.pill(side * 1.2, bodyZ + 0.55, 0.75, 1.7, 0.38, main) -- folded back legs
+			oval(side * 1.2, bodyZ + 0.55, 0.75, 1.7, 0.38, main) -- folded back legs
 			k.dot(side * 1.45, bodyZ + 1.45, 0.85, 0.39, dark) -- webbed feet
-			k.pill(side * 1.1, -0.55, 0.45, 0.9, 0.38, main) -- front legs
+			oval(side * 1.1, -0.55, 0.45, 0.9, 0.38, main) -- front legs
 			k.dot(side * 1.25, -1.0, 0.5, 0.39, dark)
 		end
-		torso()
+		outlined(0, bodyZ, W, L, 0.5, main, edge)
 		for _, spot in { { -0.5, 0.6 }, { 0.55, 0.9 }, { 0.1, 1.25 } } do
 			k.dot(spot[1], bodyZ + spot[2] - 0.6, 0.4, 0.52, dark)
 		end
 	end
 
-	-- Head, with an outline. Four-legged animals get a squarer skull (with a
-	-- neck); the "Head" part (name tags hang off it) sits hidden under it.
+	-- Head: round, with an outline; the "Head" part (name tags hang off it)
+	-- sits hidden under it. A fish's head is the front of its body.
 	local fish = a.body == "Fish"
-	local headSize = if fish then W else a.head
-	if a.body == "Quadruped" then
-		local neckFrom, neckTo = bodyZ - L / 2 + 0.3, headZ
-		k.box(0, (neckFrom + neckTo) / 2, W * 0.55, neckFrom - neckTo, W * 0.2, 0.6, main) -- neck
-		local hw, hd = a.head * 0.9, a.head * 0.95
-		k.box(0, headZ, hw + 0.2, hd + 0.2, hw * 0.32 + 0.1, 0.86, darker(head, 0.7))
-		k.box(0, headZ, hw, hd, hw * 0.32, 0.88, head)
+	local hr = a.head / 2
+	if not fish then
+		if a.body == "Quadruped" then
+			-- Ears go under the head so only their tips show (floppy ones hang
+			-- over its sides, so they go on top later).
+			for side = -1, 1, 2 do
+				if a.ears == "Round" then
+					local ex, ez = side * hr * 0.86, headZ + hr * 0.62
+					k.dot(ex, ez, 0.92, 0.84, edge)
+					k.dot(ex, ez, 0.74, 0.85, dark)
+					k.dot(ex, ez, 0.36, 0.86, light)
+				elseif a.ears == "Pointy" then
+					k.bar(side * hr * 0.72, headZ + hr * 0.45, 0.75, 0.75, 0.84, dark, math.rad(45))
+					k.bar(side * hr * 0.72, headZ + hr * 0.45, 0.4, 0.4, 0.85, "FFB3C7", math.rad(45))
+				elseif a.ears == "Tall" then
+					oval(side * 0.34, headZ + hr + 0.75, 0.55, 2.0, 0.9, head)
+					oval(side * 0.34, headZ + hr + 0.8, 0.26, 1.45, 0.91, skin.accent or "FFB3C7")
+				elseif a.ears == "Long" then
+					-- Donkey ears stick out to the sides, swept a little back.
+					k.bar(side * (hr + 0.45), headZ + 0.35, 0.42, 1.35, 0.84, dark, side * math.rad(68))
+					k.bar(
+						side * (hr + 0.5),
+						headZ + 0.37,
+						0.18,
+						0.95,
+						0.85,
+						lighter(main, 0.35),
+						side * math.rad(68)
+					)
+				end
+			end
+		end
+		outlined(0, headZ, a.head, a.head * 0.96, 0.88, head, darker(head, 0.6), a.furry)
 		placeHead(model, root, a.head * 0.75 * s, 0.3 * s, head, CFrame.new(0, 0.7 * s, headZ * s))
 	else
-		k.dot(
-			0,
-			headZ,
-			headSize + 0.22,
-			if fish then 0.49 else 0.86,
-			if fish then edge else darker(head, 0.7)
-		)
-		placeHead(
-			model,
-			root,
-			headSize * s,
-			0.3 * s,
-			if fish then main else head,
-			CFrame.new(0, (if fish then 0.36 else 0.72) * s, headZ * s)
-		)
+		placeHead(model, root, W * 0.8 * s, 0.3 * s, main, CFrame.new(0, 0.36 * s, headZ * s))
 	end
 
 	if a.body == "Quadruped" then
-		local ears = a.ears
-		local hr = a.head / 2
-		for side = -1, 1, 2 do
-			if ears == "Floppy" then
-				k.box(side * (hr - 0.02), headZ + 0.2, 0.55, 1.2, 0.2, 0.84, dark)
-			elseif ears == "Pointy" then
-				k.bar(side * hr * 0.78, headZ + hr * 0.5, 0.72, 0.72, 0.84, dark, math.rad(45))
-			elseif ears == "Round" then
-				k.dot(side * hr * 0.8, headZ + hr * 0.45, 0.72, 0.84, dark)
-			elseif ears == "Tall" then
-				k.box(side * 0.32, headZ + hr + 0.7, 0.5, 1.9, 0.22, 0.9, head)
-				k.box(side * 0.32, headZ + hr + 0.75, 0.24, 1.4, 0.1, 0.91, skin.accent or "FFB3C7")
-			elseif ears == "Long" then
-				-- Donkey ears stick out to the sides, swept a little back.
-				k.bar(side * (hr + 0.45), headZ + 0.35, 0.42, 1.35, 0.84, dark, side * math.rad(68))
-				k.bar(
-					side * (hr + 0.5),
-					headZ + 0.37,
-					0.18,
-					0.95,
-					0.85,
-					lighter(main, 0.35),
-					side * math.rad(68)
-				)
+		if a.ears == "Floppy" then
+			for side = -1, 1, 2 do
+				outlined(side * (hr - 0.1), headZ + 0.2, 0.62, 1.3, 0.94, dark, edge)
 			end
 		end
 		if a.patches then
 			for side = -1, 1, 2 do
-				k.pill(side * hr * 0.42, headZ - hr * 0.15, 0.45, 0.6, 0.93, dark) -- eye patches
+				oval(side * hr * 0.42, headZ - hr * 0.12, 0.5, 0.65, 0.93, dark) -- eye patches
 			end
 		end
 		local snout = a.snout
-		local front = headZ - a.head * 0.95 / 2
+		local front = headZ - hr * 0.96
 		if snout then
-			-- A squarish muzzle sticking out past the skull, nose at its tip.
+			-- A rounded muzzle poking out past the face, a black nose at its tip.
 			local sw, sl = snout[1], snout[2]
-			local muzzleZ = front - sl / 2 + 0.3
-			k.box(0, muzzleZ, sw + 0.14, sl + 0.14, sw * 0.3 + 0.07, 0.9, darker(light, 0.75))
-			k.box(0, muzzleZ, sw, sl, sw * 0.3, 0.92, light)
-			k.box(0, muzzleZ - sl / 2 + 0.16, math.min(0.42, sw * 0.55), 0.24, 0.1, 0.95, "2B2B2B") -- nose
+			local muzzleZ = front + sl * 0.2
+			outlined(0, muzzleZ, sw, sl, 0.95, light, darker(light, 0.7))
+			oval(0, muzzleZ - sl / 2 + 0.14, math.min(0.48, sw * 0.6), 0.3, 0.98, "2B2B2B") -- nose
+			k.dot(-0.06, muzzleZ - sl / 2 + 0.1, 0.1, 0.99, "FFFFFF")
 		end
 		if a.whiskers then
 			for side = -1, 1, 2 do
 				for _, tilt in { -0.15, 0.15 } do
-					k.bar(side * 0.5, front + tilt, 0.85, 0.05, 0.96, "1C1C1C", side * tilt)
+					k.bar(side * 0.5, front + 0.2 + tilt, 0.85, 0.05, 0.99, "1C1C1C", side * tilt)
 				end
 			end
 		end
-		eyes(hr * 0.42, headZ - hr * 0.2, 0.2)
+		eyes(hr * 0.42, headZ - hr * 0.3, 0.22)
 	elseif a.body == "Bird" then
-		local hr = a.head / 2
 		local beak = skin.accent or "F28C1C"
 		if a.tail == "Duck" then
-			k.pill(0, headZ - hr - 0.1, 0.95, 0.75, 0.92, beak) -- flat bill
+			oval(0, headZ - hr - 0.1, 0.95, 0.75, 0.92, beak) -- flat bill
 		else
-			k.pill(0, headZ - hr * 0.35, a.head * 0.7, a.head * 0.45, 0.9, light) -- white face
+			oval(0, headZ - hr * 0.35, a.head * 0.7, a.head * 0.45, 0.9, light) -- white face
 			k.bar(0, headZ - hr - 0.05, 0.42, 0.42, 0.92, beak, math.rad(45)) -- pointy beak
 		end
 		eyes(hr * 0.4, headZ - hr * 0.3, 0.2)
 	elseif fish then
-		eyes(W * 0.32, headZ - 0.25, 0.18)
+		eyes(W * 0.3, headZ - 0.35, 0.2)
 	else -- Frog
 		for side = -1, 1, 2 do
 			k.dot(side * 0.62, headZ - 0.45, 0.8, 0.93, light) -- bulging eyes
@@ -6729,10 +6756,10 @@ local list: { Skin } = {
 		"Dog",
 		"Dog",
 		"Human",
-		"C8955A",
-		"B07A45",
-		"E8C9A0",
-		{ hat = "Dog", accent = "6B4226", product = "SkinDog" }
+		"F2D2BC",
+		"F2D2BC",
+		"FFF0E4",
+		{ hat = "Dog", accent = "E2B79C", product = "SkinDog" }
 	),
 	skin(
 		"Cat",
@@ -6843,6 +6870,17 @@ local list: { Skin } = {
 		"FFCF1F",
 		"FFCF1F",
 		{ hat = "Awesome", accent = "7A1F45", product = "SkinAwesome" }
+	),
+
+	-- An orange and white koi, swimming along.
+	skin(
+		"Koi",
+		"Koi",
+		"Human",
+		"F07A1A",
+		"F07A1A",
+		"FFF6EE",
+		{ hat = "Koi", accent = "F59A3C", scorePrice = 13000 }
 	),
 
 	skin(
