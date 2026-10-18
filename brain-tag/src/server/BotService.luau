@@ -215,7 +215,12 @@ type Job = {
 	pushers: { [string]: number }, -- bot id -> last push
 	done: boolean,
 }
-type Fort = { members: { [string]: number }, barricaded: { [string]: boolean }, jobs: { Job } }
+type Fort = {
+	members: { [string]: number },
+	barricaded: { [string]: boolean },
+	jobs: { Job },
+	bad: { [BasePart]: boolean }, -- pieces nobody could get behind
+}
 local forts: { [MapLayout.Room]: Fort } = {}
 local bushTaken: { [BasePart]: string } = {} -- leaves -> the hider bot that picked it
 local bushChecked: { [BasePart]: number } = {} -- leaves -> when a zombie last went to look
@@ -233,7 +238,7 @@ end
 local function fortOf(room: MapLayout.Room): Fort
 	local fort = forts[room]
 	if not fort then
-		fort = { members = {}, barricaded = {}, jobs = {} }
+		fort = { members = {}, barricaded = {}, jobs = {}, bad = {} }
 		forts[room] = fort
 	end
 	return fort
@@ -589,6 +594,8 @@ local function brain(p: Participant, level: Level, seed: number)
 	end
 	local startRound = -1
 	local pauseUntil = 0
+	local approachJob: Job? = nil -- the barricade piece we're walking round to
+	local approachSince = 0
 
 	local function radius(): number
 		return math.min(0.9 * p.scale, Config.CHARACTER.MaxRootWidth / 2)
@@ -1118,7 +1125,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if roleRound ~= round then
 			roleRound = round
 			local roll = random:NextNumber()
-			local builders = if level.flank then 0.5 else 0.25
+			local builders = if level.flank then 0.6 else 0.35
 			role = if roll < builders
 				then "Builder"
 				elseif roll < builders + level.hide * 0.7 then "Hider"
@@ -1312,64 +1319,92 @@ local function brain(p: Participant, level: Level, seed: number)
 									fort.barricaded[key] = true
 									continue
 								end
-								local block = CFrame.new(entry.center + entry.inward * 3)
-								if
-									#FurnitureService.findInBox(
-										block,
-										Vector3.new(entry.door.width + 1, 4, 4)
-									) > 0
-								then
-									fort.barricaded[key] = true -- already blocked
+								-- Already blocked: pieces just inside cover most of it.
+								local along = if entry.door.horizontal then Vector3.xAxis else Vector3.zAxis
+								local half = entry.door.width / 2
+								local zone = if entry.door.horizontal
+									then Vector3.new(entry.door.width + 1, 4, 4)
+									else Vector3.new(4, 4, entry.door.width + 1)
+								local spans: { { number } } = {}
+								for _, body in
+									FurnitureService.findInBox(
+										CFrame.new(entry.center + entry.inward * 3),
+										zone
+									)
+								do
+									local c = (body.Position - entry.center):Dot(along)
+									local e = FurniturePush.extent(body, along)
+									table.insert(spans, { math.max(-half, c - e), math.min(half, c + e) })
+								end
+								table.sort(spans, function(a, c)
+									return a[1] < c[1]
+								end)
+								local covered, upTo = 0, -half
+								for _, span in spans do
+									if span[2] > upTo then
+										covered += span[2] - math.max(span[1], upTo)
+										upTo = span[2]
+									end
+								end
+								if covered >= entry.door.width * 0.6 then
+									fort.barricaded[key] = true
 									continue
 								end
 								-- Close pieces that cover the doorway well (not the
-								-- immovable ones, and not one a teammate is using).
-								local along = if entry.door.horizontal then Vector3.xAxis else Vector3.zAxis
+								-- immovable ones, not one a teammate is using). First
+								-- only ones with room to stand behind; failing that,
+								-- any we could get round to.
 								local piece: BasePart? = nil
 								local pieceScore = math.huge
-								for _, body in FurnitureService.piecesNear(entry.center, 30) do
-									local d = Util.flatDistance(body.Position, entry.center)
-									if
-										used[body]
-										or FurnitureService.weightOf(body) == "Massive"
-										or d <= 4
-										or not MapLayout.inRect(r, body.Position.X, body.Position.Z)
-									then
-										continue
+								for _, strict in { true, false } do
+									if piece then
+										break
 									end
-									-- We have to get behind it (on the far side from the
-									-- door): skip pieces backed against a wall or another piece.
-									local to = Util.flat(entry.center + entry.inward * 3)
-										- Util.flat(body.Position)
-									local push = Util.flatUnit(to)
-									if not push then
-										continue
-									end
-									local behind = Util.flat(body.Position)
-										- push
-											* (FurniturePush.extent(body, push) + FurniturePush.bumperRadius(
-												p.scale
-											) + 0.6)
-									local stand = Vector3.new(behind.X, here.Y, behind.Z)
-									if
-										not MapLayout.inRect(r, stand.X, stand.Z, -1.2)
-										or #FurnitureService.findInBox(
-											CFrame.new(stand),
-											Vector3.new(3, 4, 3)
-										) > 0
-										or not Combat.clearWide(
-											Vector3.new(body.Position.X, here.Y, body.Position.Z),
-											stand,
-											0.5,
-											true
-										)
-									then
-										continue
-									end
-									local cover = FurniturePush.extent(body, along) * 2 / entry.door.width
-									local score = d - 8 * math.min(cover, 1.2)
-									if score < pieceScore then
-										piece, pieceScore = body, score
+									for _, body in FurnitureService.piecesNear(entry.center, 30) do
+										local d = Util.flatDistance(body.Position, entry.center)
+										if
+											used[body]
+											or fort.bad[body]
+											or FurnitureService.weightOf(body) == "Massive"
+											or d <= 4
+											or not MapLayout.inRect(r, body.Position.X, body.Position.Z)
+										then
+											continue
+										end
+										-- We have to get behind it (on the far side from the
+										-- door): skip pieces backed against a wall or another piece.
+										local to = Util.flat(entry.center + entry.inward * 3)
+											- Util.flat(body.Position)
+										local push = Util.flatUnit(to)
+										if not push then
+											continue
+										end
+										local behind = Util.flat(body.Position)
+											- push
+												* (FurniturePush.extent(body, push) + FurniturePush.bumperRadius(
+													p.scale
+												) + 0.6)
+										local stand = Vector3.new(behind.X, here.Y, behind.Z)
+										if
+											not MapLayout.inRect(r, stand.X, stand.Z, -1.2)
+											or (strict and #FurnitureService.findInBox(
+												CFrame.new(stand),
+												Vector3.new(3, 4, 3)
+											) > 0)
+											or not Combat.clearWide(
+												Vector3.new(body.Position.X, here.Y, body.Position.Z),
+												stand,
+												0.5,
+												true
+											)
+										then
+											continue
+										end
+										local cover = FurniturePush.extent(body, along) * 2 / entry.door.width
+										local score = d - 8 * math.min(cover, 1.2)
+										if score < pieceScore then
+											piece, pieceScore = body, score
+										end
 									end
 								end
 								if piece then
@@ -1420,8 +1455,18 @@ local function brain(p: Participant, level: Level, seed: number)
 									) + 0.6)
 									+ side * offset
 								if Util.flatDistance(behind, here) > 2.5 then
+									-- Can't get round to it? Someone picks another piece.
+									if approachJob ~= job then
+										approachJob, approachSince = job, now
+									end
+									if now - approachSince > 7 then
+										fort.bad[body] = true
+										job.done = true
+										barricade = nil
+									end
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
 								else
+									approachJob = nil
 									moveTo(
 										humanoid,
 										Vector3.new(job.target.X, here.Y, job.target.Z)

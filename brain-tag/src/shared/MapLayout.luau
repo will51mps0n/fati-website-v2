@@ -2531,6 +2531,24 @@ local FIXTURES: { [string]: boolean } = {
 	Tombstone = true,
 }
 local OFF_WALLS = { 7, 5.5, 4 } -- tried in order: as far out as fits
+local NO_SQUEEZE = 3.5 -- a gap narrower than this to a wall: nobody gets behind
+-- Small things that are useless (and in the way) stuck in a corner.
+local LOOSE: { [string]: boolean } = {
+	Box = true,
+	SmallBox = true,
+	Crate = true,
+	BoxStack = true,
+	Barrel = true,
+	Present = true,
+	Pumpkin = true,
+	JackOLantern = true,
+	TrashCan = true,
+	Plant = true,
+	Chair = true,
+	Lamp = true,
+	Beanbag = true,
+	Candelabra = true,
+}
 local OFF_WALL_SHARE = 0.9
 local CLUTTER_LANE = 3 -- half-width of the clear lanes into each room
 local CLUTTER_GAP = 1.8 -- room left between pieces
@@ -2712,14 +2730,31 @@ local function clutter(layout: Layout, seed: number)
 			rects[i] = spotRect(spot.kind, spot.x, spot.z, spot.rot)
 		end
 	end
+	-- The sides of a footprint with a wall too close to squeeze in behind
+	-- (closer than NO_SQUEEZE studs).
+	local function wallSides(here: Rect): { { number } }
+		local out: { { number } } = {}
+		local g = NO_SQUEEZE
+		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local side = if d[1] == 1
+				then rect(here.x2, here.z1 + 0.3, here.x2 + g, here.z2 - 0.3)
+				elseif d[1] == -1 then rect(here.x1 - g, here.z1 + 0.3, here.x1, here.z2 - 0.3)
+				elseif d[2] == 1 then rect(here.x1 + 0.3, here.z2, here.x2 - 0.3, here.z2 + g)
+				else rect(here.x1 + 0.3, here.z1 - g, here.x2 - 0.3, here.z1)
+			if hits(side, wallRects, 0) then
+				table.insert(out, d)
+			end
+		end
+		return out
+	end
 	for i, spot in layout.furniture do
 		local here = rects[i]
-		if
-			not here
-			or FurnitureSpecs.get(spot.kind).weight == "Massive"
-			or FIXTURES[spot.kind]
-			or random() > OFF_WALL_SHARE
-		then
+		if not here or FurnitureSpecs.get(spot.kind).weight == "Massive" or FIXTURES[spot.kind] then
+			continue
+		end
+		local touching = wallSides(here)
+		-- Pieces in a corner always try; along one wall, most of them do.
+		if #touching == 0 or (#touching < 2 and random() > OFF_WALL_SHARE) then
 			continue
 		end
 		local inner: Rect? = nil
@@ -2734,18 +2769,26 @@ local function clutter(layout: Layout, seed: number)
 			continue
 		end
 		local room = inner :: Rect
-		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
-			local side = if d[1] == 1
-				then rect(here.x2, here.z1 + 0.3, here.x2 + 1, here.z2 - 0.3)
-				elseif d[1] == -1 then rect(here.x1 - 1, here.z1 + 0.3, here.x1, here.z2 - 0.3)
-				elseif d[2] == 1 then rect(here.x1 + 0.3, here.z2, here.x2 - 0.3, here.z2 + 1)
-				else rect(here.x1 + 0.3, here.z1 - 1, here.x2 - 0.3, here.z1)
-			if not hits(side, wallRects, 0) then
-				continue -- no wall on this side
+		-- Directions to try: straight out of a corner first, then away from
+		-- each wall it's against, each as far as fits.
+		local tries: { { number } } = {}
+		if #touching >= 2 then
+			local sx, sz = 0, 0
+			for _, d in touching do
+				sx -= d[1]
+				sz -= d[2]
 			end
+			if sx ~= 0 or sz ~= 0 then
+				table.insert(tries, { sx, sz })
+			end
+		end
+		for _, d in touching do
+			table.insert(tries, { -d[1], -d[2] })
+		end
+		for _, dir in tries do
 			local moved: Rect? = nil
 			for _, gap in OFF_WALLS do
-				local dx, dz = -d[1] * gap, -d[2] * gap
+				local dx, dz = dir[1] * gap, dir[2] * gap
 				local candidate = rect(here.x1 + dx, here.z1 + dz, here.x2 + dx, here.z2 + dz)
 				local fits = candidate.x1 >= room.x1 + 0.2
 					and candidate.x2 <= room.x2 - 0.2
@@ -2775,6 +2818,18 @@ local function clutter(layout: Layout, seed: number)
 			end
 		end
 	end
+	-- A small box still wedged in a corner can never be pulled out (nobody
+	-- can pull): leave it out rather than have it stuck there all round.
+	local keepList: { FurnitureSpot } = {}
+	for i, spot in layout.furniture do
+		local here = rects[i]
+		if here and LOOSE[spot.kind] and #wallSides(here) >= 2 then
+			rects[i] = nil
+			continue
+		end
+		table.insert(keepList, spot)
+	end
+	layout.furniture = keepList
 	table.clear(placed)
 	for _, r in rects do
 		table.insert(placed, r)

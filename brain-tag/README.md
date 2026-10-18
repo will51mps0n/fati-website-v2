@@ -155,7 +155,9 @@ boxes, box stacks, crates, long crates, big crates, a table or couch in the
 bigger rooms) and yards get crates, barrels and hay bales (pumpkins and
 coffins at night, presents in the snow), and most pieces you can push start
 up to 7 studs out from the wall so you (and the bots) can get behind them and
-shove them into a doorway. These are placed by `clutter` in
+shove them into a doorway. Pieces in a corner move out diagonally, and a
+small box that still can't get out of a corner is left out (nobody can pull,
+so it would only be stuck there). These are placed by `clutter` in
 `MapLayout.luau` with a fixed seed, so every server gets the same map, and
 they always leave doorways, lanes into each room and the way to every item
 spot clear.
