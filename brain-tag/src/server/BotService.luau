@@ -428,7 +428,7 @@ local function flankAround(target: Seen, here: Vector3, wary: boolean?): Vector3
 	end
 	local rel = Util.flat(here - target.position)
 	local d = rel.Magnitude
-	local reach = (item.reach or 5) * math.max(1, target.p.scale * 0.9)
+	local reach = (item.reach or 5) * Items.reachScale(target.p.scale)
 	local front = if d > 0.5 then (rel / d):Dot(aim) else 0
 	if d < 0.5 or d > reach + (if wary then 14 else 8) or front < (if wary then -0.2 else 0.35) then
 		return nil
@@ -542,7 +542,7 @@ local function brain(p: Participant, level: Level, seed: number)
 	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 
 	local function radius(): number
-		return 0.9 * p.scale
+		return math.min(0.9 * p.scale, Config.CHARACTER.MaxRootWidth / 2)
 	end
 
 	-- A short step in the open direction closest to `toward` (unsticking).
@@ -569,7 +569,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if not path or math.abs(p.scale - pathScale) > 0.2 then
 			pathScale = p.scale
 			path = PathfindingService:CreatePath({
-				AgentRadius = 1.4 * p.scale,
+				AgentRadius = math.min(1.4 * p.scale, Config.CHARACTER.MaxRootWidth / 2 + 0.3),
 				AgentHeight = 4,
 				AgentCanJump = false,
 				WaypointSpacing = 4,
@@ -1055,7 +1055,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if closest and item then
 			local reach = if item.kind == "Projectile"
 				then 45
-				else (item.reach or 5) * math.max(1, p.scale * 0.9) + 3
+				else (item.reach or 5) * Items.reachScale(p.scale) + 3
 			if closestDistance <= reach then
 				local aim = Util.flatUnit(closest.position + closest.velocity * 0.15 - here)
 				if aim then
@@ -1477,6 +1477,16 @@ local function drive()
 		local root, humanoid = Participants.body(p)
 		if not root or not humanoid or root:FindFirstChild("KnockbackForce") then
 			continue
+		end
+		-- Never left inside a piece of furniture: out the shortest way.
+		local radius = Config.rootWidth(p.scale) / 2 * 0.9
+		local here = Util.flat(root.Position)
+		local around = Vector3.new(radius * 2 + 2, root.Size.Y + 2, radius * 2 + 2)
+		for _, body in FurnitureService.findInBox(CFrame.new(root.Position), around) do
+			local depth, out = FurniturePush.overlapOut(here, here, radius, body)
+			if out then
+				root.CFrame += out * math.min(depth, 1)
+			end
 		end
 		local v = root.AssemblyLinearVelocity
 		local move = Util.flatUnit(humanoid.MoveDirection)

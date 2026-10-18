@@ -12,6 +12,7 @@ local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local FurnitureService = require(script.Parent.FurnitureService)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
@@ -50,7 +51,7 @@ local function attachHeld(p: Participant)
 	if not root then
 		return
 	end
-	local model = ItemModels.build(p.heldItem)
+	local model = ItemModels.build(p.heldItem, Items.reachScale(p.scale))
 	model.Name = "HeldItem"
 	model:SetAttribute("ItemId", p.heldItem) -- clients read it for weapon force fields
 	local handle = model.PrimaryPart :: BasePart
@@ -322,7 +323,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	end
 	local kind = item.kind
 	if kind == "Melee" or kind == "Blast" then
-		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(p.scale)
 		for _, hit in Combat.peopleInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
@@ -487,11 +488,24 @@ local function shaftStep(dt: number)
 		if not item or item.kind ~= "Melee" or not root then
 			continue
 		end
-		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(p.scale)
 		local guard = item.guard or 0.5
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
 		local hold = p.scale * p.scale * (item.firmness or 1)
+		if not p.player then
+			-- Furniture is solid to the weapon: a bot whose weapon is pressed
+			-- into a piece gets pushed back off it (players' own screens do
+			-- this for them, see ForceField).
+			local grip = CharacterLook.grip(p.scale)
+			local frame, size = FurniturePush.itemProbe(root, grip, p.aim, reach, guard)
+			for _, body in FurnitureService.findInBox(frame, size + Vector3.new(1, 0, 1)) do
+				local depth, out = FurniturePush.overlapOut(start, start + p.aim * reach, guard, body)
+				if out then
+					root.CFrame += out * (math.min(depth, 2) * rate)
+				end
+			end
+		end
 		for _, other in people do
 			local oRoot = if other ~= p then Participants.body(other) else nil
 			if not oRoot or (other.player and p.player) then
@@ -542,7 +556,7 @@ local function streamStep()
 				ItemService.take(p) -- out of water
 			end
 		end
-		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 14) * Items.reachScale(p.scale)
 		for _, hit in Combat.peopleInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)
 			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)

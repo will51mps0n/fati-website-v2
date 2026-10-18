@@ -143,14 +143,21 @@ local function award(p: Participant, base: number, includeDrumstick: boolean, re
 	end
 end
 
--- Survival points: a little score for every human still standing.
+-- Every few seconds of the outbreak: a little score for every human still
+-- standing, and every zombie loses a little (it has to eat to stay big).
 local function payStanding()
-	for _, p in Participants.onTeam("Human") do
-		if Participants.body(p) then
-			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
-			CharacterService.refreshSize(p)
-			CharacterService.refreshSpeed(p)
+	for _, p in Participants.all() do
+		if not Participants.body(p) then
+			continue
 		end
+		if p.team == "Human" then
+			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
+		elseif p.score > 0 then
+			local loss = math.max(Config.ZOMBIE_DECAY_MIN, math.floor(p.score * Config.ZOMBIE_DECAY_FRACTION))
+			Participants.addScore(p, -loss)
+		end
+		CharacterService.refreshSize(p)
+		CharacterService.refreshSpeed(p)
 	end
 end
 

@@ -915,10 +915,25 @@ function Config.SPEED_MULTIPLIER(score: number): number
 end
 
 -- Size also grows with score, much faster than speed: in the original the top
--- player (12,855 points) was about 2.7x the size of a newcomer.
-Config.MAX_SCALE = 2.5
+-- player (12,855 points) was about 2.7x the size of a newcomer, and you keep
+-- growing after that. Only the collision box stops growing
+-- (CHARACTER.MaxRootWidth), so even giants fit through doors.
+Config.MAX_SCALE = 8
 function Config.SIZE_MULTIPLIER(score: number): number
 	return math.min(Config.MAX_SCALE, 1 + math.max(0, score) / 8000)
+end
+
+-- Width of the collision box at a size: grows with you up to MaxRootWidth.
+function Config.rootWidth(scale: number): number
+	return math.min(Config.CHARACTER.RootWidth * scale, Config.CHARACTER.MaxRootWidth)
+end
+
+-- How far furniture is kept from your center (the bumper, BumperDiameter at
+-- size 1). It follows the collision box, so a giant's bumper never reaches
+-- through a wall into the next room.
+function Config.bumperRadius(scale: number): number
+	local C = Config.CHARACTER
+	return Config.rootWidth(scale) / 2 + (C.BumperDiameter - C.RootWidth) / 2 * math.min(scale, 1.5)
 end
 
 -- Rewards (score) --------------------------------------------------------------
@@ -928,6 +943,10 @@ Config.SURVIVOR_WIN_REWARD = 500
 -- seconds of the outbreak (a "+10" floats up on their screen).
 Config.SURVIVAL_POINTS = 10
 Config.SURVIVAL_POINTS_SECONDS = 5
+-- Being a zombie costs you: on the same beat, every zombie loses this share
+-- of its points (at least ZOMBIE_DECAY_MIN), so they shrink unless they eat.
+Config.ZOMBIE_DECAY_FRACTION = 0.02
+Config.ZOMBIE_DECAY_MIN = 5
 Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
@@ -953,6 +972,7 @@ Config.CHARACTER = {
 	-- The collision box is narrower than the drawn body so even the biggest
 	-- players (MAX_SCALE) still fit through a 7-stud doorway.
 	RootWidth = 2.2,
+	MaxRootWidth = 5.5, -- never wider than this, however big you grow (doors are 6+)
 	RootHeight = 2,
 	HipHeight = 1,
 	BodyWidth = 3.6, -- shoulders, side to side
@@ -1029,6 +1049,10 @@ Config.FIELD_BODY_MAX = 14
 Config.FIELD_WEAPON = 14
 Config.FIELD_WEAPON_MAX = 24
 Config.FIELD_RECOIL = 14 -- someone pressing on your weapon pushes you back this hard (by their share)
+-- Furniture is solid to weapons: a piece pressed into your weapon (or your
+-- weapon pressed into one that can't give) pushes you back this hard per
+-- stud, so the weapon bounces off instead of sinking in.
+Config.FIELD_FURNITURE = 30
 
 -- Wizard ------------------------------------------------------------------------------------
 
@@ -1173,17 +1197,18 @@ end
 -- How far furniture is kept from a mover's center (CharacterService's
 -- bumper).
 function FurniturePush.bumperRadius(scale: number): number
-	return Config.CHARACTER.BumperDiameter / 2 * scale
+	return Config.bumperRadius(scale)
 end
 
 -- Box in front of a mover heading `dir`: from just inside the bumper to
 -- PUSH_REACH beyond it, so a piece starts moving before you reach it.
 function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): (CFrame, Vector3)
 	local bumper = FurniturePush.bumperRadius(scale)
-	local from = bumper - 0.6 * scale
-	local to = bumper + Config.PUSH_REACH * scale
+	local grow = math.min(scale, 1.5) -- like the bumper: never reaching through walls
+	local from = bumper - 0.6 * grow
+	local to = bumper + Config.PUSH_REACH * grow
 	local center = root.Position + dir * ((from + to) / 2)
-	local size = Vector3.new(Config.CHARACTER.BumperDiameter * scale * 0.8, root.Size.Y + 1, to - from)
+	local size = Vector3.new(math.max(bumper * 1.6, root.Size.X), root.Size.Y + 1, to - from)
 	return CFrame.lookAt(center, center + dir), size
 end
 
@@ -1213,10 +1238,11 @@ function FurniturePush.armsProbe(
 	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
 	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
 	local from = root.Size.Z / 2 - 0.2
-	local to = reach * scale
+	-- A giant's arms push only just past its bumper, never through a wall.
+	local to = math.min(reach * scale, FurniturePush.bumperRadius(scale) + 1.2)
 	local center = root.Position + look * ((from + to) / 2)
 	return CFrame.lookAt(center, center + look),
-		Vector3.new(span * 2 * scale, root.Size.Y + 1, math.max(0.5, to - from))
+		Vector3.new(span * 2 * math.min(scale, 2.5), root.Size.Y + 1, math.max(0.5, to - from))
 end
 
 -- Held weapons are solid. While you stand still or turn, a piece the shaft
@@ -1262,6 +1288,38 @@ function FurniturePush.resolve(body: BasePart, push: Push): (Vector3, number)
 	local size = math.max(1, body.Size.Magnitude / 4)
 	local spin = math.clamp(push.torque / push.strength * Config.FURNITURE_SPIN * fraction / size, -1.5, 1.5)
 	return velocity, spin
+end
+
+-- How deep the segment a-b (flat; `pad` studs thick: a weapon's shaft, or a
+-- body when a == b) sits inside a piece, and the flat unit direction that
+-- gets it out the shortest way. Depth 0 and no direction when it's clear.
+function FurniturePush.overlapOut(a: Vector3, b: Vector3, pad: number, body: BasePart): (number, Vector3?)
+	local cf = body.CFrame
+	local right = Vector3.new(cf.RightVector.X, 0, cf.RightVector.Z)
+	local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+	if right.Magnitude < 0.5 or look.Magnitude < 0.5 then
+		return 0, nil
+	end
+	right, look = right.Unit, look.Unit
+	local hx, hz = body.Size.X / 2 + pad, body.Size.Z / 2 + pad
+	local samples = if (b - a).Magnitude < 0.05 then 0 else 8
+	local best, out = 0, nil
+	for i = 0, samples do
+		local p = if samples == 0 then a else a + (b - a) * (i / samples)
+		local rel = Vector3.new(p.X - cf.Position.X, 0, p.Z - cf.Position.Z)
+		local lx, lz = rel:Dot(right), rel:Dot(look)
+		local dx, dz = hx - math.abs(lx), hz - math.abs(lz)
+		if dx > 0 and dz > 0 then
+			local depth = math.min(dx, dz)
+			if depth > best then
+				best = depth
+				out = if dx < dz
+					then right * (if lx >= 0 then 1 else -1)
+					else look * (if lz >= 0 then 1 else -1)
+			end
+		end
+	end
+	return best, out
 end
 
 -- How far an oriented piece reaches from its center along a flat direction.
@@ -1492,6 +1550,80 @@ local function yaw(radians: number): CFrame
 	return CFrame.Angles(0, radians, 0)
 end
 
+-- The swordfish, drawn flat on its side like the original's sprite: blue
+-- back, white belly, a spiky sail fin, a forked tail and a long thin bill,
+-- all with a dark outline. Held by the tail, nose forward.
+local function swordfish(): { PieceSpec }
+	local out: { PieceSpec } = {}
+	local LINE, BLUE, BELLY, BILL = "14284A", "2F63B8", "EEF2F7", "D5DCE6"
+	local function bar(length: number, width: number, x: number, z: number, angle: number, color: string)
+		table.insert(
+			out,
+			blockAt(Vector3.new(length + 0.18, 0.1, width + 0.18), x, -0.06, z, LINE, yaw(angle))
+		)
+		table.insert(out, blockAt(Vector3.new(length, 0.12, width), x, 0, z, color, yaw(angle)))
+	end
+	-- A fin growing out of the body at (x, z), swept back toward the tail.
+	local function fin(length: number, width: number, x: number, z: number, out_: number)
+		local dir = Vector3.new(math.cos(0.6) * out_, 0, math.sin(0.6))
+		bar(length, width, x + dir.X * length / 2, z + dir.Z * length / 2, -0.6 * out_, BLUE)
+	end
+	-- Forked tail and the thin stalk you hold it by.
+	bar(1.4, 0.32, 0.56, 0.47, -0.65, BLUE)
+	bar(1.4, 0.32, -0.56, 0.47, 0.65, BLUE)
+	-- Body: a spindle of discs, blue on the back (+X) and white on the belly.
+	local body = {
+		{ 0.05, 0.36 },
+		{ -0.4, 0.42 },
+		{ -0.9, 0.55 },
+		{ -1.35, 0.85 },
+		{ -1.85, 1.15 },
+		{ -2.4, 1.4 },
+		{ -3.0, 1.5 },
+		{ -3.6, 1.45 },
+		{ -4.15, 1.25 },
+		{ -4.6, 0.95 },
+		{ -4.95, 0.62 },
+	}
+	-- Twice as many discs as listed (halfway ones in between) for a smooth edge.
+	local smooth = {}
+	for i, seg in body do
+		table.insert(smooth, seg)
+		local nextSeg = body[i + 1]
+		if nextSeg then
+			table.insert(smooth, { (seg[1] + nextSeg[1]) / 2, (seg[2] + nextSeg[2]) / 2 })
+		end
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2] + 0.18, 0.1, 0, -0.06, seg[1], LINE))
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2], 0.12, 0, 0, seg[1], BLUE))
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2] * 0.56, 0.12, -seg[2] * 0.22, 0.03, seg[1], BELLY))
+	end
+	-- Spiky sail fin on the back, fins underneath, little finlets by the tail.
+	fin(1.5, 0.3, 0.62, -3.6, 1)
+	fin(1.15, 0.28, 0.66, -3.05, 1)
+	fin(0.8, 0.26, 0.6, -2.55, 1)
+	fin(0.5, 0.24, 0.5, -2.1, 1)
+	fin(1.0, 0.3, -0.6, -3.7, -1)
+	fin(0.55, 0.24, -0.45, -1.9, -1)
+	fin(0.35, 0.2, 0.22, -0.95, 1)
+	fin(0.35, 0.2, -0.22, -0.95, -1)
+	-- Gill line and a big eye.
+	table.insert(out, blockAt(Vector3.new(0.9, 0.12, 0.08), -0.05, 0.05, -4.2, LINE))
+	table.insert(out, discAt(0.46, 0.1, 0.12, 0.05, -4.52, LINE))
+	table.insert(out, discAt(0.36, 0.12, 0.12, 0.07, -4.52, "FFFFFF"))
+	table.insert(out, discAt(0.18, 0.12, 0.15, 0.09, -4.55, "111111"))
+	-- The long, thin, sharp bill.
+	bar(3.0, 0.2, 0.12, -6.55, math.pi / 2, BILL)
+	bar(0.7, 0.12, 0.12, -8.4, math.pi / 2, BILL)
+	table.insert(out, blockAt(Vector3.new(0.12, 0.12, 0.12), 0.12, 0, -8.8, BILL, DIAMOND))
+	return out
+end
+
 local DESIGNS: { [string]: { PieceSpec } } = {
 	Stick = {
 		rod(4, 0.35, -2, "8B5A2B"),
@@ -1503,32 +1635,7 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		rod(2.6, 0.75, -2.9, "E0AE6A"),
 		ballAt(0.75, 0, 0, -4.2, "E0AE6A"),
 	},
-	-- Held by the tail: a round, torpedo-shaped fish with a sail fin, side
-	-- fins, big eyes and a long, sharp sword for a nose.
-	Swordfish = {
-		blockAt(Vector3.new(0.38, 0.14, 1.3), 0.4, 0, 0.45, "2B4F73", yaw(0.7)),
-		blockAt(Vector3.new(0.38, 0.14, 1.3), -0.4, 0, 0.45, "2B4F73", yaw(-0.7)),
-		rod(1.1, 0.36, -0.4, "3F73A3"),
-		ballAt(0.62, 0, 0, -1.05, "3F73A3"),
-		ballAt(0.88, 0, 0, -1.45, "3F73A3"),
-		ballAt(1.1, 0, 0, -1.8, "4F86B5"),
-		rod(2.6, 1.1, -3.1, "4F86B5"),
-		ballAt(1.1, 0, 0, -4.4, "4F86B5"),
-		rod(2.8, 0.8, -3.1, "C9DDEC", 0, -0.22),
-		rod(3.0, 0.42, -3.05, "2A527A", 0, 0.38),
-		ballAt(0.82, 0, 0, -4.95, "4F86B5"),
-		ballAt(0.52, 0, 0, -5.35, "4F86B5"),
-		blockAt(Vector3.new(0.12, 0.95, 1.1), 0, 0.75, -3.2, "2B4F73"),
-		blockAt(Vector3.new(0.9, 0.1, 0.4), 0.72, -0.1, -4.0, "2B4F73", yaw(-0.5)),
-		blockAt(Vector3.new(0.9, 0.1, 0.4), -0.72, -0.1, -4.0, "2B4F73", yaw(0.5)),
-		ballAt(0.36, 0.34, 0.16, -4.95, "FFFFFF"),
-		ballAt(0.36, -0.34, 0.16, -4.95, "FFFFFF"),
-		ballAt(0.2, 0.45, 0.2, -5.0, "111111"),
-		ballAt(0.2, -0.45, 0.2, -5.0, "111111"),
-		rod(2.3, 0.26, -6.7, "3A4F63"),
-		rod(0.7, 0.16, -8.1, "3A4F63"),
-		blockAt(Vector3.new(0.13, 0.1, 0.13), 0, 0, -8.5, "3A4F63", DIAMOND),
-	},
+	Swordfish = swordfish(),
 	Spear = {
 		rod(7, 0.3, -3.5, "8B5A2B"),
 		blockAt(Vector3.new(0.75, 0.3, 0.75), 0, 0, -7.25, "B8BEC6", DIAMOND),
@@ -1730,7 +1837,8 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 -- Returns a Model whose PrimaryPart "Handle" (an invisible grip at the
 -- origin) has every visible part welded to it. Parts are anchored; callers
 -- unanchor them when the item goes into a hand.
-function ItemModels.build(itemId: string): Model
+-- `scale` (default 1) draws it bigger, for a big holder (Items.reachScale).
+function ItemModels.build(itemId: string, scale: number?): Model
 	local model = Instance.new("Model")
 	model.Name = itemId
 	local handle = Parts.make({
@@ -1744,11 +1852,13 @@ function ItemModels.build(itemId: string): Model
 		parent = model,
 	})
 	model.PrimaryPart = handle
+	local s = scale or 1
 	for i, spec in DESIGNS[itemId] or DESIGNS.Stick do
+		local at = spec.at
 		local part = Parts.make({
 			name = "Piece" .. i,
-			size = spec.size,
-			cframe = spec.at,
+			size = spec.size * s,
+			cframe = if s == 1 then at else at - at.Position + at.Position * s,
 			color = spec.color,
 			shape = spec.shape,
 			material = spec.material,
@@ -2350,6 +2460,13 @@ function module.get(id: string?): Item?
 		return nil
 	end
 	return Items[id]
+end
+
+-- How much longer (and bigger) a held item gets as its holder grows: the
+-- drawn model and its reach both use this. Capped so a giant's spear stays
+-- a spear.
+function module.reachScale(scale: number): number
+	return math.max(1, math.min(scale, 3) * 0.9)
 end
 
 -- Items that can be scattered on the ground, as { id, weight } pairs.
@@ -4973,7 +5090,7 @@ end
 local function itemPaths(layout: Layout, pieces: { WallPiece }): (Rect) -> boolean
 	local B = layout.bounds
 	local width, height = math.floor(B.x2 - B.x1), math.floor(B.z2 - B.z1)
-	local radius = Config.CHARACTER.RootWidth / 2 * Config.MAX_SCALE
+	local radius = Config.CHARACTER.MaxRootWidth / 2
 	local blocked: { [number]: boolean } = {}
 	local function block(r: Rect)
 		for cz = math.max(0, math.floor(r.z1 - radius - B.z1)), math.min(height - 1, math.ceil(r.z2 + radius - B.z1)) do
@@ -7725,7 +7842,7 @@ local function flankAround(target: Seen, here: Vector3, wary: boolean?): Vector3
 	end
 	local rel = Util.flat(here - target.position)
 	local d = rel.Magnitude
-	local reach = (item.reach or 5) * math.max(1, target.p.scale * 0.9)
+	local reach = (item.reach or 5) * Items.reachScale(target.p.scale)
 	local front = if d > 0.5 then (rel / d):Dot(aim) else 0
 	if d < 0.5 or d > reach + (if wary then 14 else 8) or front < (if wary then -0.2 else 0.35) then
 		return nil
@@ -7839,7 +7956,7 @@ local function brain(p: Participant, level: Level, seed: number)
 	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 
 	local function radius(): number
-		return 0.9 * p.scale
+		return math.min(0.9 * p.scale, Config.CHARACTER.MaxRootWidth / 2)
 	end
 
 	-- A short step in the open direction closest to `toward` (unsticking).
@@ -7866,7 +7983,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if not path or math.abs(p.scale - pathScale) > 0.2 then
 			pathScale = p.scale
 			path = PathfindingService:CreatePath({
-				AgentRadius = 1.4 * p.scale,
+				AgentRadius = math.min(1.4 * p.scale, Config.CHARACTER.MaxRootWidth / 2 + 0.3),
 				AgentHeight = 4,
 				AgentCanJump = false,
 				WaypointSpacing = 4,
@@ -8352,7 +8469,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if closest and item then
 			local reach = if item.kind == "Projectile"
 				then 45
-				else (item.reach or 5) * math.max(1, p.scale * 0.9) + 3
+				else (item.reach or 5) * Items.reachScale(p.scale) + 3
 			if closestDistance <= reach then
 				local aim = Util.flatUnit(closest.position + closest.velocity * 0.15 - here)
 				if aim then
@@ -8775,6 +8892,16 @@ local function drive()
 		if not root or not humanoid or root:FindFirstChild("KnockbackForce") then
 			continue
 		end
+		-- Never left inside a piece of furniture: out the shortest way.
+		local radius = Config.rootWidth(p.scale) / 2 * 0.9
+		local here = Util.flat(root.Position)
+		local around = Vector3.new(radius * 2 + 2, root.Size.Y + 2, radius * 2 + 2)
+		for _, body in FurnitureService.findInBox(CFrame.new(root.Position), around) do
+			local depth, out = FurniturePush.overlapOut(here, here, radius, body)
+			if out then
+				root.CFrame += out * math.min(depth, 1)
+			end
+		end
 		local v = root.AssemblyLinearVelocity
 		local move = Util.flatUnit(humanoid.MoveDirection)
 		local speed = humanoid.WalkSpeed
@@ -9072,7 +9199,7 @@ local function addBumper(character: Model, root: BasePart, scale: number)
 	if old then
 		old:Destroy()
 	end
-	local diameter = C.BumperDiameter * scale
+	local diameter = Config.bumperRadius(scale) * 2
 	local bumper = Instance.new("Part")
 	bumper.Name = "Bumper"
 	bumper.Shape = Enum.PartType.Cylinder
@@ -9103,7 +9230,8 @@ function CharacterService.applyLook(p: Participant)
 	if not root or not humanoid then
 		return
 	end
-	root.Size = Vector3.new(C.RootWidth, C.RootHeight, C.RootWidth) * p.scale
+	local width = Config.rootWidth(p.scale)
+	root.Size = Vector3.new(width, C.RootHeight * p.scale, width)
 	-- Hip height stays fixed while the body grows, so even giant players keep
 	-- their collision box low enough to bump into benches and coffee tables.
 	humanoid.HipHeight = C.HipHeight
@@ -9879,20 +10007,43 @@ local DESIGNS: { [string]: Design } = {
 			end
 		end,
 	},
+	-- White, with a gray basin, like the original's.
 	Sink = {
-		body = "C9D1D9",
+		body = "EEF6F2",
 		draw = function(c)
-			c:top(0, 0.25, c.w - 1.4, c.d - 1.2, 0.03, 0.06, "8FA6BC") -- basin
-			c:top(0, -c.d / 2 + 0.35, 0.3, 0.7, 0.4, 0.4, "8A939C") -- faucet
+			c:top(0, 0.2, c.w - 1.3, c.d - 1.3, 0.03, 0.06, "C9D3CF") -- basin
+			c:top(0, 0.25, c.w - 1.7, c.d - 1.7, 0.05, 0.06, "B5C0BC")
+			c:top(0, -c.d / 2 + 0.6, 0.3, 1.0, 0.4, 0.4, "8A939C") -- faucet
+			c:disc(-0.45, -c.d / 2 + 0.45, 0.25, 0.42, 0.1, "8A939C") -- taps
+			c:disc(0.45, -c.d / 2 + 0.45, 0.25, 0.42, 0.1, "8A939C")
 		end,
 	},
+	-- Seen from above like the original's: a round white bowl with a gray
+	-- seat ring and basin, a rounded white tank behind it, and a little brown
+	-- splat beside it.
 	Toilet = {
 		body = "F2F4F6",
+		transparentBody = true,
 		draw = function(c)
-			c:top(0, -c.d / 2 + 0.5, c.w, 1.0, 0.5, 0.6, "E1E6EB") -- tank
-			c:disc(0, 0.45, 2.1, 0.04, 0.08, "DCE3E9") -- seat
-			c:disc(0, 0.45, 1.3, 0.06, 0.08, "A8D4EE") -- water
-			c:disc(c.w / 2 + 0.2, -c.d / 2 + 0.6, 0.7, -0.4, 0.5, "FFFFFF") -- paper roll
+			local tz = -c.d / 2 + 0.55
+			local span = c.w - 1.4
+			-- The tank: a rounded pill, gray rim under white.
+			local function pill(size: number, raise: number, thick: number, color: string)
+				c:top(0, tz, span, size, raise, thick, color)
+				c:disc(-span / 2, tz, size, raise, thick, color)
+				c:disc(span / 2, tz, size, raise, thick, color)
+			end
+			pill(1.1, 0.45, c.h + 0.4, "D3DAE1")
+			pill(0.9, 0.5, 0.1, "FFFFFF")
+			local bz = 0.45
+			c:disc(0, bz, 2.75, 0, c.h, "D3DAE1") -- bowl rim
+			c:disc(0, bz, 2.55, 0.03, 0.06, "FFFFFF")
+			c:disc(0, bz, 1.95, 0.05, 0.04, "E3E7EB") -- seat
+			c:disc(0, bz, 1.45, 0.07, 0.04, "CDD3D9") -- basin
+			c:top(0, bz - 0.4, 0.18, 0.4, 0.09, 0.04, "9AA2AB")
+			c:disc(c.w / 2 - 0.25, bz - 0.55, 0.55, 0.12, 0.04, "A0581C") -- splat
+			c:disc(c.w / 2 - 0.05, bz - 0.9, 0.28, 0.12, 0.04, "A0581C")
+			c:disc(c.w / 2 - 0.08, bz - 0.2, 0.2, 0.12, 0.04, "A0581C")
 		end,
 	},
 	Bathtub = {
@@ -11139,6 +11290,7 @@ local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local FurnitureService = require(script.Parent.FurnitureService)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
@@ -11177,7 +11329,7 @@ local function attachHeld(p: Participant)
 	if not root then
 		return
 	end
-	local model = ItemModels.build(p.heldItem)
+	local model = ItemModels.build(p.heldItem, Items.reachScale(p.scale))
 	model.Name = "HeldItem"
 	model:SetAttribute("ItemId", p.heldItem) -- clients read it for weapon force fields
 	local handle = model.PrimaryPart :: BasePart
@@ -11449,7 +11601,7 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	end
 	local kind = item.kind
 	if kind == "Melee" or kind == "Blast" then
-		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(p.scale)
 		for _, hit in Combat.peopleInCone(p, aim, reach, item.arc or 90) do
 			local direction = if item.straight then aim else hit.direction
 			Combat.knockback(hit.target, direction * (item.knockback or 50), item.stun or 0.3)
@@ -11614,11 +11766,24 @@ local function shaftStep(dt: number)
 		if not item or item.kind ~= "Melee" or not root then
 			continue
 		end
-		local reach = (item.reach or 5) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(p.scale)
 		local guard = item.guard or 0.5
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
 		local hold = p.scale * p.scale * (item.firmness or 1)
+		if not p.player then
+			-- Furniture is solid to the weapon: a bot whose weapon is pressed
+			-- into a piece gets pushed back off it (players' own screens do
+			-- this for them, see ForceField).
+			local grip = CharacterLook.grip(p.scale)
+			local frame, size = FurniturePush.itemProbe(root, grip, p.aim, reach, guard)
+			for _, body in FurnitureService.findInBox(frame, size + Vector3.new(1, 0, 1)) do
+				local depth, out = FurniturePush.overlapOut(start, start + p.aim * reach, guard, body)
+				if out then
+					root.CFrame += out * (math.min(depth, 2) * rate)
+				end
+			end
+		end
 		for _, other in people do
 			local oRoot = if other ~= p then Participants.body(other) else nil
 			if not oRoot or (other.player and p.player) then
@@ -11669,7 +11834,7 @@ local function streamStep()
 				ItemService.take(p) -- out of water
 			end
 		end
-		local reach = (item.reach or 14) * math.max(1, p.scale * 0.9)
+		local reach = (item.reach or 14) * Items.reachScale(p.scale)
 		for _, hit in Combat.peopleInCone(p, p.aim, reach, item.arc or 30) do
 			local falloff = 1 - hit.distance / (reach * 1.5)
 			Combat.knockback(hit.target, p.aim * (item.knockback or 15) * falloff, item.stun or 0.1)
@@ -11800,7 +11965,7 @@ FurnitureService.start(function()
 				id = p.id,
 				scale = p.scale,
 				aim = p.aim,
-				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
+				reach = if melee and item then (item.reach or 5) * Items.reachScale(p.scale) else nil,
 				firmness = if melee and item then item.firmness else nil,
 				guard = if melee and item then item.guard else nil,
 				zombie = p.team == "Zombie",
@@ -14192,14 +14357,21 @@ local function award(p: Participant, base: number, includeDrumstick: boolean, re
 	end
 end
 
--- Survival points: a little score for every human still standing.
+-- Every few seconds of the outbreak: a little score for every human still
+-- standing, and every zombie loses a little (it has to eat to stay big).
 local function payStanding()
-	for _, p in Participants.onTeam("Human") do
-		if Participants.body(p) then
-			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
-			CharacterService.refreshSize(p)
-			CharacterService.refreshSpeed(p)
+	for _, p in Participants.all() do
+		if not Participants.body(p) then
+			continue
 		end
+		if p.team == "Human" then
+			Participants.addScore(p, RoundRules.reward(Config.SURVIVAL_POINTS, bonusesFor(p, false)))
+		elseif p.score > 0 then
+			local loss = math.max(Config.ZOMBIE_DECAY_MIN, math.floor(p.score * Config.ZOMBIE_DECAY_FRACTION))
+			Participants.addScore(p, -loss)
+		end
+		CharacterService.refreshSize(p)
+		CharacterService.refreshSpeed(p)
 	end
 end
 
@@ -16352,6 +16524,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local Items = require(ReplicatedStorage.Shared.Items)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 
@@ -16405,8 +16578,54 @@ end
 -- A held melee weapon's shaft: from the hand along where the holder faces.
 local function shaft(root: BasePart, scale: number, item: Items.Item, facing: Vector3): (Vector3, Vector3)
 	local hand = flat((root.CFrame * CharacterLook.grip(scale)).Position)
-	local reach = (item.reach or 5) * math.max(1, scale * 0.9)
+	local reach = (item.reach or 5) * Items.reachScale(scale)
 	return hand, hand + facing * reach
+end
+
+local furnitureQuery = OverlapParams.new()
+furnitureQuery.FilterType = Enum.RaycastFilterType.Include
+
+local function solidPieces(center: Vector3, look: Vector3, size: Vector3): { BasePart }
+	local folder = workspace:FindFirstChild("Furniture")
+	if not folder then
+		return {}
+	end
+	furnitureQuery.FilterDescendantsInstances = { folder }
+	local found = {}
+	local frame = CFrame.lookAt(center, center + look)
+	for _, part in workspace:GetPartBoundsInBox(frame, size, furnitureQuery) do
+		if part.Name == "Body" and not part.Anchored and part.CanCollide then
+			table.insert(found, part)
+		end
+	end
+	return found
+end
+
+-- Furniture is solid: your weapon bounces off a piece pushed into it (or one
+-- it's pressed into that won't give), and your body is never left inside one.
+local function furniturePush(root: BasePart, scale: number, a: Vector3?, b: Vector3?, guard: number): Vector3
+	local push = Vector3.zero
+	local y = root.Position.Y
+	if a and b and (b - a).Magnitude > 0.1 then
+		local mid = Vector3.new((a.X + b.X) / 2, y, (a.Z + b.Z) / 2)
+		local size = Vector3.new(guard * 2 + 1, root.Size.Y + 2, (b - a).Magnitude + guard * 2 + 1)
+		for _, body in solidPieces(mid, (b - a).Unit, size) do
+			local depth, out = FurniturePush.overlapOut(a, b, guard, body)
+			if out then
+				push += out * math.min(depth * Config.FIELD_FURNITURE, Config.FIELD_WEAPON_MAX)
+			end
+		end
+	end
+	local me = flat(root.Position)
+	local radius = Config.rootWidth(scale) / 2 * 0.9
+	local around = Vector3.new(radius * 2 + 2, root.Size.Y + 2, radius * 2 + 2)
+	for _, body in solidPieces(root.Position, Vector3.new(0, 0, -1), around) do
+		local depth, out = FurniturePush.overlapOut(me, me, radius, body)
+		if out then
+			push += out * math.min(depth * 40, 40)
+		end
+	end
+	return push
 end
 
 local function heldMelee(model: Model): Items.Item?
@@ -16418,7 +16637,7 @@ end
 
 -- Extra velocity (studs/second, flat) for your character this frame.
 function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, myTeam: any): Vector3
-	local myScale = root.Size.X / C.RootWidth
+	local myScale = root.Size.Y / C.RootHeight -- (the width stops growing)
 	local myRadius = C.ShellDiameter / 2 * myScale
 	local me = flat(root.Position)
 	local myItem = Items.get(myItemId)
@@ -16426,7 +16645,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 	if myItem and myItem.kind == "Melee" then
 		myA, myB = shaft(root, myScale, myItem, aim)
 	end
-	local push = Vector3.zero
+	local push = furniturePush(root, myScale, myA, myB, if myItem then myItem.guard or 0.5 else 0.5)
 
 	for _, model in others() do
 		local other = model:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -16438,7 +16657,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 		if offset.Magnitude > 40 then
 			continue
 		end
-		local scale = other.Size.X / C.RootWidth
+		local scale = other.Size.Y / C.RootHeight
 		local radius = C.ShellDiameter / 2 * scale
 
 		-- Body to body (same team only: a zombie touching you should infect).
@@ -16624,7 +16843,7 @@ local function collect(): FurniturePush.Pushes
 	local item = Items.get(ClientState.my("HeldItem"))
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
-		local reach = (item.reach or 5) * math.max(1, scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(scale)
 		local grip = CharacterLook.grip(scale)
 		local hand = (root.CFrame * grip).Position
 		local probe, size = FurniturePush.itemProbe(root, grip, aim, reach, item.guard)
@@ -19131,6 +19350,103 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		Parent = window,
 	})
 
+	-- Hovering a card shows a tooltip like the original's: what it does, then
+	-- "Price:" and the price, green if you can afford it and red if not. It
+	-- sits above the card (below when there's no room), arrow pointing at it.
+	local TIP_COLOR = Color3.fromRGB(26, 27, 31)
+	local tipArrow = UIKit.new("Frame", {
+		Name = "TipArrow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = TIP_COLOR,
+		BorderSizePixel = 0,
+		Rotation = 45,
+		Size = UDim2.fromOffset(16, 16),
+		Visible = false,
+		ZIndex = 39,
+		Parent = window,
+	}, { UIKit.stroke(UIKit.WHITE, 2, 0) })
+	local tip = UIKit.new("Frame", {
+		Name = "Tooltip",
+		BackgroundColor3 = TIP_COLOR,
+		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(330, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Visible = false,
+		ZIndex = 40,
+		Parent = window,
+	}, {
+		UIKit.corner(10),
+		UIKit.stroke(UIKit.WHITE, 2, 0),
+		UIKit.padding(18, 14),
+		UIKit.list(Enum.FillDirection.Vertical, 4),
+	})
+	local tipText = UIKit.label({
+		LayoutOrder = 1,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Font = UIKit.FONT,
+		TextSize = 18,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipHead = UIKit.label({
+		LayoutOrder = 2,
+		Text = "Price:",
+		Size = UDim2.new(1, 0, 0, 30),
+		Font = UIKit.HEAVY,
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Bottom,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipPrice = UIKit.label({
+		LayoutOrder = 3,
+		Size = UDim2.new(1, 0, 0, 26),
+		Font = UIKit.HEAVY,
+		TextSize = 22,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipOwner: GuiObject? = nil
+	local function hideTip(owner: GuiObject?)
+		if owner == nil or owner == tipOwner then
+			tipOwner = nil
+			tip.Visible = false
+			tipArrow.Visible = false
+		end
+	end
+	local function showTip(owner: GuiObject, text: string, price: string, priceColor: Color3)
+		tipOwner = owner
+		tipText.Text = text
+		tipHead.Visible = price ~= ""
+		tipPrice.Visible = price ~= ""
+		tipPrice.Text = price
+		tipPrice.TextColor3 = priceColor
+		-- Screen pixels -> this window's units (the HUD's UIScale).
+		local uiScale = parent:FindFirstChildOfClass("UIScale")
+		local scale = if uiScale then (uiScale :: UIScale).Scale else 1
+		local rel = (owner.AbsolutePosition - window.AbsolutePosition) / scale
+		local size = owner.AbsoluteSize / scale
+		local x = rel.X + size.X / 2
+		if rel.Y > 230 then
+			tip.AnchorPoint = Vector2.new(0.5, 1)
+			tip.Position = UDim2.fromOffset(x, rel.Y - 14)
+			tipArrow.Position = UDim2.fromOffset(x, rel.Y - 14)
+		else
+			tip.AnchorPoint = Vector2.new(0.5, 0)
+			tip.Position = UDim2.fromOffset(x, rel.Y + size.Y + 14)
+			tipArrow.Position = UDim2.fromOffset(x, rel.Y + size.Y + 14)
+		end
+		tip.Visible = true
+		tipArrow.Visible = true
+	end
+	local PRICE_GREEN = Color3.fromRGB(46, 204, 113)
+
 	local tabBar = UIKit.new("Frame", {
 		Name = "Tabs",
 		BackgroundTransparency = 1,
@@ -19174,7 +19490,12 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		end)
 	end
 
+	body:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		hideTip(nil)
+	end)
+
 	local function clearBody()
+		hideTip(nil)
 		for _, child in body:GetChildren() do
 			child:Destroy()
 		end
@@ -19192,6 +19513,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		price: string,
 		priceColor: Color3?,
 		description: string,
+		tip: string?, -- the hover tooltip's text (the description if nil)
+		tipPrice: string?, -- the price as the tooltip shows it (the price if nil)
+		affordable: boolean?, -- tooltip price in green (red if false)
 		preview: Model?,
 		button: string,
 		buttonColor: Color3?,
@@ -19199,14 +19523,33 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		onClick: (() -> ())?,
 	}
 
+	local CARD = Color3.fromRGB(44, 46, 52)
+	local CARD_HOVER = Color3.fromRGB(58, 61, 69)
 	local function card(spec: CardSpec)
+		local outline = UIKit.stroke(Color3.fromRGB(215, 219, 226), 2, 1)
 		local frame = UIKit.new("Frame", {
 			LayoutOrder = spec.order,
-			BackgroundColor3 = Color3.fromRGB(44, 46, 52),
+			BackgroundColor3 = CARD,
 			BorderSizePixel = 0,
 			ZIndex = 22,
 			Parent = body,
-		}, { UIKit.corner(10) })
+		}, { UIKit.corner(10), outline })
+		-- Hover: the card lights up and the tooltip shows.
+		frame.MouseEnter:Connect(function()
+			frame.BackgroundColor3 = CARD_HOVER;
+			(outline :: UIStroke).Transparency = 0.1
+			showTip(
+				frame,
+				spec.tip or spec.description,
+				spec.tipPrice or spec.price,
+				if spec.affordable == false then UIKit.RED else PRICE_GREEN
+			)
+		end)
+		frame.MouseLeave:Connect(function()
+			frame.BackgroundColor3 = CARD;
+			(outline :: UIStroke).Transparency = 1
+			hideTip(frame)
+		end)
 		local previewBox = UIKit.new("Frame", {
 			Name = "Preview",
 			BackgroundColor3 = Color3.fromRGB(60, 63, 70),
@@ -19286,6 +19629,14 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				price = Util.commas(price) .. " score",
 				priceColor = if affordable then UIKit.GOLD else UIKit.RED,
 				description = item.description .. (if item.rare then "  (5% chance: rare!)" else ""),
+				tip = item.description .. (if item.rare
+					then string.format(
+						"\n• %d%% chance to be rare",
+						math.floor(Config.RARE_CHANCE * 100 + 0.5)
+					)
+					else ""),
+				tipPrice = Util.commas(price) .. " Score",
+				affordable = affordable,
 				preview = ItemModels.build(id),
 				button = "Buy",
 				enabled = affordable,
@@ -19348,6 +19699,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				price = price,
 				priceColor = if owned then UIKit.LIME else UIKit.GOLD,
 				description = if skin.team == "Zombie" then "Zombie skin" else "Human skin",
+				affordable = owned or enabled,
 				preview = CharacterLook.preview(skin.id, skin.team),
 				button = button,
 				buttonColor = if skin.product or skin.pass then UIKit.ACCENT else UIKit.GOOD,
@@ -19471,6 +19823,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	end
 
 	ShopPanel.close = function()
+		hideTip(nil)
 		window.Visible = false
 	end
 

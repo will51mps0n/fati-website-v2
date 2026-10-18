@@ -117,7 +117,7 @@ local function collect(): FurniturePush.Pushes
 	local item = Items.get(ClientState.my("HeldItem"))
 	if item and item.kind == "Melee" and not ClientState.isZombie() then
 		local aim = MovementController.aim()
-		local reach = (item.reach or 5) * math.max(1, scale * 0.9)
+		local reach = (item.reach or 5) * Items.reachScale(scale)
 		local grip = CharacterLook.grip(scale)
 		local hand = (root.CFrame * grip).Position
 		local probe, size = FurniturePush.itemProbe(root, grip, aim, reach, item.guard)

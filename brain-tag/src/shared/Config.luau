@@ -32,10 +32,25 @@ function Config.SPEED_MULTIPLIER(score: number): number
 end
 
 -- Size also grows with score, much faster than speed: in the original the top
--- player (12,855 points) was about 2.7x the size of a newcomer.
-Config.MAX_SCALE = 2.5
+-- player (12,855 points) was about 2.7x the size of a newcomer, and you keep
+-- growing after that. Only the collision box stops growing
+-- (CHARACTER.MaxRootWidth), so even giants fit through doors.
+Config.MAX_SCALE = 8
 function Config.SIZE_MULTIPLIER(score: number): number
 	return math.min(Config.MAX_SCALE, 1 + math.max(0, score) / 8000)
+end
+
+-- Width of the collision box at a size: grows with you up to MaxRootWidth.
+function Config.rootWidth(scale: number): number
+	return math.min(Config.CHARACTER.RootWidth * scale, Config.CHARACTER.MaxRootWidth)
+end
+
+-- How far furniture is kept from your center (the bumper, BumperDiameter at
+-- size 1). It follows the collision box, so a giant's bumper never reaches
+-- through a wall into the next room.
+function Config.bumperRadius(scale: number): number
+	local C = Config.CHARACTER
+	return Config.rootWidth(scale) / 2 + (C.BumperDiameter - C.RootWidth) / 2 * math.min(scale, 1.5)
 end
 
 -- Rewards (score) --------------------------------------------------------------
@@ -45,6 +60,10 @@ Config.SURVIVOR_WIN_REWARD = 500
 -- seconds of the outbreak (a "+10" floats up on their screen).
 Config.SURVIVAL_POINTS = 10
 Config.SURVIVAL_POINTS_SECONDS = 5
+-- Being a zombie costs you: on the same beat, every zombie loses this share
+-- of its points (at least ZOMBIE_DECAY_MIN), so they shrink unless they eat.
+Config.ZOMBIE_DECAY_FRACTION = 0.02
+Config.ZOMBIE_DECAY_MIN = 5
 Config.INFECT_REWARD = 50 -- flat bonus for any infection, on top of the points eaten
 Config.ZOMBIE_WIN_REWARD = 250
 -- Getting eaten costs you this share of your points, and the zombie that
@@ -70,6 +89,7 @@ Config.CHARACTER = {
 	-- The collision box is narrower than the drawn body so even the biggest
 	-- players (MAX_SCALE) still fit through a 7-stud doorway.
 	RootWidth = 2.2,
+	MaxRootWidth = 5.5, -- never wider than this, however big you grow (doors are 6+)
 	RootHeight = 2,
 	HipHeight = 1,
 	BodyWidth = 3.6, -- shoulders, side to side
@@ -146,6 +166,10 @@ Config.FIELD_BODY_MAX = 14
 Config.FIELD_WEAPON = 14
 Config.FIELD_WEAPON_MAX = 24
 Config.FIELD_RECOIL = 14 -- someone pressing on your weapon pushes you back this hard (by their share)
+-- Furniture is solid to weapons: a piece pressed into your weapon (or your
+-- weapon pressed into one that can't give) pushes you back this hard per
+-- stud, so the weapon bounces off instead of sinking in.
+Config.FIELD_FURNITURE = 30
 
 -- Wizard ------------------------------------------------------------------------------------
 

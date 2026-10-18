@@ -30,17 +30,18 @@ end
 -- How far furniture is kept from a mover's center (CharacterService's
 -- bumper).
 function FurniturePush.bumperRadius(scale: number): number
-	return Config.CHARACTER.BumperDiameter / 2 * scale
+	return Config.bumperRadius(scale)
 end
 
 -- Box in front of a mover heading `dir`: from just inside the bumper to
 -- PUSH_REACH beyond it, so a piece starts moving before you reach it.
 function FurniturePush.moverProbe(root: BasePart, dir: Vector3, scale: number): (CFrame, Vector3)
 	local bumper = FurniturePush.bumperRadius(scale)
-	local from = bumper - 0.6 * scale
-	local to = bumper + Config.PUSH_REACH * scale
+	local grow = math.min(scale, 1.5) -- like the bumper: never reaching through walls
+	local from = bumper - 0.6 * grow
+	local to = bumper + Config.PUSH_REACH * grow
 	local center = root.Position + dir * ((from + to) / 2)
-	local size = Vector3.new(Config.CHARACTER.BumperDiameter * scale * 0.8, root.Size.Y + 1, to - from)
+	local size = Vector3.new(math.max(bumper * 1.6, root.Size.X), root.Size.Y + 1, to - from)
 	return CFrame.lookAt(center, center + dir), size
 end
 
@@ -70,10 +71,11 @@ function FurniturePush.armsProbe(
 	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
 	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
 	local from = root.Size.Z / 2 - 0.2
-	local to = reach * scale
+	-- A giant's arms push only just past its bumper, never through a wall.
+	local to = math.min(reach * scale, FurniturePush.bumperRadius(scale) + 1.2)
 	local center = root.Position + look * ((from + to) / 2)
 	return CFrame.lookAt(center, center + look),
-		Vector3.new(span * 2 * scale, root.Size.Y + 1, math.max(0.5, to - from))
+		Vector3.new(span * 2 * math.min(scale, 2.5), root.Size.Y + 1, math.max(0.5, to - from))
 end
 
 -- Held weapons are solid. While you stand still or turn, a piece the shaft
@@ -119,6 +121,38 @@ function FurniturePush.resolve(body: BasePart, push: Push): (Vector3, number)
 	local size = math.max(1, body.Size.Magnitude / 4)
 	local spin = math.clamp(push.torque / push.strength * Config.FURNITURE_SPIN * fraction / size, -1.5, 1.5)
 	return velocity, spin
+end
+
+-- How deep the segment a-b (flat; `pad` studs thick: a weapon's shaft, or a
+-- body when a == b) sits inside a piece, and the flat unit direction that
+-- gets it out the shortest way. Depth 0 and no direction when it's clear.
+function FurniturePush.overlapOut(a: Vector3, b: Vector3, pad: number, body: BasePart): (number, Vector3?)
+	local cf = body.CFrame
+	local right = Vector3.new(cf.RightVector.X, 0, cf.RightVector.Z)
+	local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+	if right.Magnitude < 0.5 or look.Magnitude < 0.5 then
+		return 0, nil
+	end
+	right, look = right.Unit, look.Unit
+	local hx, hz = body.Size.X / 2 + pad, body.Size.Z / 2 + pad
+	local samples = if (b - a).Magnitude < 0.05 then 0 else 8
+	local best, out = 0, nil
+	for i = 0, samples do
+		local p = if samples == 0 then a else a + (b - a) * (i / samples)
+		local rel = Vector3.new(p.X - cf.Position.X, 0, p.Z - cf.Position.Z)
+		local lx, lz = rel:Dot(right), rel:Dot(look)
+		local dx, dz = hx - math.abs(lx), hz - math.abs(lz)
+		if dx > 0 and dz > 0 then
+			local depth = math.min(dx, dz)
+			if depth > best then
+				best = depth
+				out = if dx < dz
+					then right * (if lx >= 0 then 1 else -1)
+					else look * (if lz >= 0 then 1 else -1)
+			end
+		end
+	end
+	return best, out
 end
 
 -- How far an oriented piece reaches from its center along a flat direction.

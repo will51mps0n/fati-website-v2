@@ -163,6 +163,103 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		Parent = window,
 	})
 
+	-- Hovering a card shows a tooltip like the original's: what it does, then
+	-- "Price:" and the price, green if you can afford it and red if not. It
+	-- sits above the card (below when there's no room), arrow pointing at it.
+	local TIP_COLOR = Color3.fromRGB(26, 27, 31)
+	local tipArrow = UIKit.new("Frame", {
+		Name = "TipArrow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = TIP_COLOR,
+		BorderSizePixel = 0,
+		Rotation = 45,
+		Size = UDim2.fromOffset(16, 16),
+		Visible = false,
+		ZIndex = 39,
+		Parent = window,
+	}, { UIKit.stroke(UIKit.WHITE, 2, 0) })
+	local tip = UIKit.new("Frame", {
+		Name = "Tooltip",
+		BackgroundColor3 = TIP_COLOR,
+		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(330, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Visible = false,
+		ZIndex = 40,
+		Parent = window,
+	}, {
+		UIKit.corner(10),
+		UIKit.stroke(UIKit.WHITE, 2, 0),
+		UIKit.padding(18, 14),
+		UIKit.list(Enum.FillDirection.Vertical, 4),
+	})
+	local tipText = UIKit.label({
+		LayoutOrder = 1,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Font = UIKit.FONT,
+		TextSize = 18,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipHead = UIKit.label({
+		LayoutOrder = 2,
+		Text = "Price:",
+		Size = UDim2.new(1, 0, 0, 30),
+		Font = UIKit.HEAVY,
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Bottom,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipPrice = UIKit.label({
+		LayoutOrder = 3,
+		Size = UDim2.new(1, 0, 0, 26),
+		Font = UIKit.HEAVY,
+		TextSize = 22,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 41,
+		Parent = tip,
+	})
+	local tipOwner: GuiObject? = nil
+	local function hideTip(owner: GuiObject?)
+		if owner == nil or owner == tipOwner then
+			tipOwner = nil
+			tip.Visible = false
+			tipArrow.Visible = false
+		end
+	end
+	local function showTip(owner: GuiObject, text: string, price: string, priceColor: Color3)
+		tipOwner = owner
+		tipText.Text = text
+		tipHead.Visible = price ~= ""
+		tipPrice.Visible = price ~= ""
+		tipPrice.Text = price
+		tipPrice.TextColor3 = priceColor
+		-- Screen pixels -> this window's units (the HUD's UIScale).
+		local uiScale = parent:FindFirstChildOfClass("UIScale")
+		local scale = if uiScale then (uiScale :: UIScale).Scale else 1
+		local rel = (owner.AbsolutePosition - window.AbsolutePosition) / scale
+		local size = owner.AbsoluteSize / scale
+		local x = rel.X + size.X / 2
+		if rel.Y > 230 then
+			tip.AnchorPoint = Vector2.new(0.5, 1)
+			tip.Position = UDim2.fromOffset(x, rel.Y - 14)
+			tipArrow.Position = UDim2.fromOffset(x, rel.Y - 14)
+		else
+			tip.AnchorPoint = Vector2.new(0.5, 0)
+			tip.Position = UDim2.fromOffset(x, rel.Y + size.Y + 14)
+			tipArrow.Position = UDim2.fromOffset(x, rel.Y + size.Y + 14)
+		end
+		tip.Visible = true
+		tipArrow.Visible = true
+	end
+	local PRICE_GREEN = Color3.fromRGB(46, 204, 113)
+
 	local tabBar = UIKit.new("Frame", {
 		Name = "Tabs",
 		BackgroundTransparency = 1,
@@ -206,7 +303,12 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		end)
 	end
 
+	body:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		hideTip(nil)
+	end)
+
 	local function clearBody()
+		hideTip(nil)
 		for _, child in body:GetChildren() do
 			child:Destroy()
 		end
@@ -224,6 +326,9 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		price: string,
 		priceColor: Color3?,
 		description: string,
+		tip: string?, -- the hover tooltip's text (the description if nil)
+		tipPrice: string?, -- the price as the tooltip shows it (the price if nil)
+		affordable: boolean?, -- tooltip price in green (red if false)
 		preview: Model?,
 		button: string,
 		buttonColor: Color3?,
@@ -231,14 +336,33 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 		onClick: (() -> ())?,
 	}
 
+	local CARD = Color3.fromRGB(44, 46, 52)
+	local CARD_HOVER = Color3.fromRGB(58, 61, 69)
 	local function card(spec: CardSpec)
+		local outline = UIKit.stroke(Color3.fromRGB(215, 219, 226), 2, 1)
 		local frame = UIKit.new("Frame", {
 			LayoutOrder = spec.order,
-			BackgroundColor3 = Color3.fromRGB(44, 46, 52),
+			BackgroundColor3 = CARD,
 			BorderSizePixel = 0,
 			ZIndex = 22,
 			Parent = body,
-		}, { UIKit.corner(10) })
+		}, { UIKit.corner(10), outline })
+		-- Hover: the card lights up and the tooltip shows.
+		frame.MouseEnter:Connect(function()
+			frame.BackgroundColor3 = CARD_HOVER;
+			(outline :: UIStroke).Transparency = 0.1
+			showTip(
+				frame,
+				spec.tip or spec.description,
+				spec.tipPrice or spec.price,
+				if spec.affordable == false then UIKit.RED else PRICE_GREEN
+			)
+		end)
+		frame.MouseLeave:Connect(function()
+			frame.BackgroundColor3 = CARD;
+			(outline :: UIStroke).Transparency = 1
+			hideTip(frame)
+		end)
 		local previewBox = UIKit.new("Frame", {
 			Name = "Preview",
 			BackgroundColor3 = Color3.fromRGB(60, 63, 70),
@@ -318,6 +442,14 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				price = Util.commas(price) .. " score",
 				priceColor = if affordable then UIKit.GOLD else UIKit.RED,
 				description = item.description .. (if item.rare then "  (5% chance: rare!)" else ""),
+				tip = item.description .. (if item.rare
+					then string.format(
+						"\n• %d%% chance to be rare",
+						math.floor(Config.RARE_CHANCE * 100 + 0.5)
+					)
+					else ""),
+				tipPrice = Util.commas(price) .. " Score",
+				affordable = affordable,
 				preview = ItemModels.build(id),
 				button = "Buy",
 				enabled = affordable,
@@ -380,6 +512,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 				price = price,
 				priceColor = if owned then UIKit.LIME else UIKit.GOLD,
 				description = if skin.team == "Zombie" then "Zombie skin" else "Human skin",
+				affordable = owned or enabled,
 				preview = CharacterLook.preview(skin.id, skin.team),
 				button = button,
 				buttonColor = if skin.product or skin.pass then UIKit.ACCENT else UIKit.GOOD,
@@ -503,6 +636,7 @@ function ShopPanel.build(parent: Instance, toast: (string, string?) -> ())
 	end
 
 	ShopPanel.close = function()
+		hideTip(nil)
 		window.Visible = false
 	end
 

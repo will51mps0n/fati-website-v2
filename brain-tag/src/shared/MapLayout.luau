@@ -2534,7 +2534,7 @@ end
 local function itemPaths(layout: Layout, pieces: { WallPiece }): (Rect) -> boolean
 	local B = layout.bounds
 	local width, height = math.floor(B.x2 - B.x1), math.floor(B.z2 - B.z1)
-	local radius = Config.CHARACTER.RootWidth / 2 * Config.MAX_SCALE
+	local radius = Config.CHARACTER.MaxRootWidth / 2
 	local blocked: { [number]: boolean } = {}
 	local function block(r: Rect)
 		for cz = math.max(0, math.floor(r.z1 - radius - B.z1)), math.min(height - 1, math.ceil(r.z2 + radius - B.z1)) do

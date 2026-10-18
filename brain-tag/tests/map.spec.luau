@@ -335,7 +335,7 @@ for _, mapName in MapLayout.names do
 	end)
 
 	test("the biggest players still fit through every door", function()
-		local reachable = reachableGrid(Config.CHARACTER.RootWidth / 2 * Config.MAX_SCALE)
+		local reachable = reachableGrid(Config.CHARACTER.MaxRootWidth / 2)
 		for _, p in layout.itemSpots do
 			expect(reachable(p.x, p.z), string.format("item spot (%d, %d) reachable at max size", p.x, p.z))
 		end

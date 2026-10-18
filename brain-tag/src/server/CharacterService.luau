@@ -159,7 +159,7 @@ local function addBumper(character: Model, root: BasePart, scale: number)
 	if old then
 		old:Destroy()
 	end
-	local diameter = C.BumperDiameter * scale
+	local diameter = Config.bumperRadius(scale) * 2
 	local bumper = Instance.new("Part")
 	bumper.Name = "Bumper"
 	bumper.Shape = Enum.PartType.Cylinder
@@ -190,7 +190,8 @@ function CharacterService.applyLook(p: Participant)
 	if not root or not humanoid then
 		return
 	end
-	root.Size = Vector3.new(C.RootWidth, C.RootHeight, C.RootWidth) * p.scale
+	local width = Config.rootWidth(p.scale)
+	root.Size = Vector3.new(width, C.RootHeight * p.scale, width)
 	-- Hip height stays fixed while the body grows, so even giant players keep
 	-- their collision box low enough to bump into benches and coffee tables.
 	humanoid.HipHeight = C.HipHeight

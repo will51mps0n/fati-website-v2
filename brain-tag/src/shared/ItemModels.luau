@@ -92,6 +92,80 @@ local function yaw(radians: number): CFrame
 	return CFrame.Angles(0, radians, 0)
 end
 
+-- The swordfish, drawn flat on its side like the original's sprite: blue
+-- back, white belly, a spiky sail fin, a forked tail and a long thin bill,
+-- all with a dark outline. Held by the tail, nose forward.
+local function swordfish(): { PieceSpec }
+	local out: { PieceSpec } = {}
+	local LINE, BLUE, BELLY, BILL = "14284A", "2F63B8", "EEF2F7", "D5DCE6"
+	local function bar(length: number, width: number, x: number, z: number, angle: number, color: string)
+		table.insert(
+			out,
+			blockAt(Vector3.new(length + 0.18, 0.1, width + 0.18), x, -0.06, z, LINE, yaw(angle))
+		)
+		table.insert(out, blockAt(Vector3.new(length, 0.12, width), x, 0, z, color, yaw(angle)))
+	end
+	-- A fin growing out of the body at (x, z), swept back toward the tail.
+	local function fin(length: number, width: number, x: number, z: number, out_: number)
+		local dir = Vector3.new(math.cos(0.6) * out_, 0, math.sin(0.6))
+		bar(length, width, x + dir.X * length / 2, z + dir.Z * length / 2, -0.6 * out_, BLUE)
+	end
+	-- Forked tail and the thin stalk you hold it by.
+	bar(1.4, 0.32, 0.56, 0.47, -0.65, BLUE)
+	bar(1.4, 0.32, -0.56, 0.47, 0.65, BLUE)
+	-- Body: a spindle of discs, blue on the back (+X) and white on the belly.
+	local body = {
+		{ 0.05, 0.36 },
+		{ -0.4, 0.42 },
+		{ -0.9, 0.55 },
+		{ -1.35, 0.85 },
+		{ -1.85, 1.15 },
+		{ -2.4, 1.4 },
+		{ -3.0, 1.5 },
+		{ -3.6, 1.45 },
+		{ -4.15, 1.25 },
+		{ -4.6, 0.95 },
+		{ -4.95, 0.62 },
+	}
+	-- Twice as many discs as listed (halfway ones in between) for a smooth edge.
+	local smooth = {}
+	for i, seg in body do
+		table.insert(smooth, seg)
+		local nextSeg = body[i + 1]
+		if nextSeg then
+			table.insert(smooth, { (seg[1] + nextSeg[1]) / 2, (seg[2] + nextSeg[2]) / 2 })
+		end
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2] + 0.18, 0.1, 0, -0.06, seg[1], LINE))
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2], 0.12, 0, 0, seg[1], BLUE))
+	end
+	for _, seg in smooth do
+		table.insert(out, discAt(seg[2] * 0.56, 0.12, -seg[2] * 0.22, 0.03, seg[1], BELLY))
+	end
+	-- Spiky sail fin on the back, fins underneath, little finlets by the tail.
+	fin(1.5, 0.3, 0.62, -3.6, 1)
+	fin(1.15, 0.28, 0.66, -3.05, 1)
+	fin(0.8, 0.26, 0.6, -2.55, 1)
+	fin(0.5, 0.24, 0.5, -2.1, 1)
+	fin(1.0, 0.3, -0.6, -3.7, -1)
+	fin(0.55, 0.24, -0.45, -1.9, -1)
+	fin(0.35, 0.2, 0.22, -0.95, 1)
+	fin(0.35, 0.2, -0.22, -0.95, -1)
+	-- Gill line and a big eye.
+	table.insert(out, blockAt(Vector3.new(0.9, 0.12, 0.08), -0.05, 0.05, -4.2, LINE))
+	table.insert(out, discAt(0.46, 0.1, 0.12, 0.05, -4.52, LINE))
+	table.insert(out, discAt(0.36, 0.12, 0.12, 0.07, -4.52, "FFFFFF"))
+	table.insert(out, discAt(0.18, 0.12, 0.15, 0.09, -4.55, "111111"))
+	-- The long, thin, sharp bill.
+	bar(3.0, 0.2, 0.12, -6.55, math.pi / 2, BILL)
+	bar(0.7, 0.12, 0.12, -8.4, math.pi / 2, BILL)
+	table.insert(out, blockAt(Vector3.new(0.12, 0.12, 0.12), 0.12, 0, -8.8, BILL, DIAMOND))
+	return out
+end
+
 local DESIGNS: { [string]: { PieceSpec } } = {
 	Stick = {
 		rod(4, 0.35, -2, "8B5A2B"),
@@ -103,32 +177,7 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		rod(2.6, 0.75, -2.9, "E0AE6A"),
 		ballAt(0.75, 0, 0, -4.2, "E0AE6A"),
 	},
-	-- Held by the tail: a round, torpedo-shaped fish with a sail fin, side
-	-- fins, big eyes and a long, sharp sword for a nose.
-	Swordfish = {
-		blockAt(Vector3.new(0.38, 0.14, 1.3), 0.4, 0, 0.45, "2B4F73", yaw(0.7)),
-		blockAt(Vector3.new(0.38, 0.14, 1.3), -0.4, 0, 0.45, "2B4F73", yaw(-0.7)),
-		rod(1.1, 0.36, -0.4, "3F73A3"),
-		ballAt(0.62, 0, 0, -1.05, "3F73A3"),
-		ballAt(0.88, 0, 0, -1.45, "3F73A3"),
-		ballAt(1.1, 0, 0, -1.8, "4F86B5"),
-		rod(2.6, 1.1, -3.1, "4F86B5"),
-		ballAt(1.1, 0, 0, -4.4, "4F86B5"),
-		rod(2.8, 0.8, -3.1, "C9DDEC", 0, -0.22),
-		rod(3.0, 0.42, -3.05, "2A527A", 0, 0.38),
-		ballAt(0.82, 0, 0, -4.95, "4F86B5"),
-		ballAt(0.52, 0, 0, -5.35, "4F86B5"),
-		blockAt(Vector3.new(0.12, 0.95, 1.1), 0, 0.75, -3.2, "2B4F73"),
-		blockAt(Vector3.new(0.9, 0.1, 0.4), 0.72, -0.1, -4.0, "2B4F73", yaw(-0.5)),
-		blockAt(Vector3.new(0.9, 0.1, 0.4), -0.72, -0.1, -4.0, "2B4F73", yaw(0.5)),
-		ballAt(0.36, 0.34, 0.16, -4.95, "FFFFFF"),
-		ballAt(0.36, -0.34, 0.16, -4.95, "FFFFFF"),
-		ballAt(0.2, 0.45, 0.2, -5.0, "111111"),
-		ballAt(0.2, -0.45, 0.2, -5.0, "111111"),
-		rod(2.3, 0.26, -6.7, "3A4F63"),
-		rod(0.7, 0.16, -8.1, "3A4F63"),
-		blockAt(Vector3.new(0.13, 0.1, 0.13), 0, 0, -8.5, "3A4F63", DIAMOND),
-	},
+	Swordfish = swordfish(),
 	Spear = {
 		rod(7, 0.3, -3.5, "8B5A2B"),
 		blockAt(Vector3.new(0.75, 0.3, 0.75), 0, 0, -7.25, "B8BEC6", DIAMOND),
@@ -330,7 +379,8 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 -- Returns a Model whose PrimaryPart "Handle" (an invisible grip at the
 -- origin) has every visible part welded to it. Parts are anchored; callers
 -- unanchor them when the item goes into a hand.
-function ItemModels.build(itemId: string): Model
+-- `scale` (default 1) draws it bigger, for a big holder (Items.reachScale).
+function ItemModels.build(itemId: string, scale: number?): Model
 	local model = Instance.new("Model")
 	model.Name = itemId
 	local handle = Parts.make({
@@ -344,11 +394,13 @@ function ItemModels.build(itemId: string): Model
 		parent = model,
 	})
 	model.PrimaryPart = handle
+	local s = scale or 1
 	for i, spec in DESIGNS[itemId] or DESIGNS.Stick do
+		local at = spec.at
 		local part = Parts.make({
 			name = "Piece" .. i,
-			size = spec.size,
-			cframe = spec.at,
+			size = spec.size * s,
+			cframe = if s == 1 then at else at - at.Position + at.Position * s,
 			color = spec.color,
 			shape = spec.shape,
 			material = spec.material,

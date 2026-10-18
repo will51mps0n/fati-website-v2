@@ -138,20 +138,43 @@ local DESIGNS: { [string]: Design } = {
 			end
 		end,
 	},
+	-- White, with a gray basin, like the original's.
 	Sink = {
-		body = "C9D1D9",
+		body = "EEF6F2",
 		draw = function(c)
-			c:top(0, 0.25, c.w - 1.4, c.d - 1.2, 0.03, 0.06, "8FA6BC") -- basin
-			c:top(0, -c.d / 2 + 0.35, 0.3, 0.7, 0.4, 0.4, "8A939C") -- faucet
+			c:top(0, 0.2, c.w - 1.3, c.d - 1.3, 0.03, 0.06, "C9D3CF") -- basin
+			c:top(0, 0.25, c.w - 1.7, c.d - 1.7, 0.05, 0.06, "B5C0BC")
+			c:top(0, -c.d / 2 + 0.6, 0.3, 1.0, 0.4, 0.4, "8A939C") -- faucet
+			c:disc(-0.45, -c.d / 2 + 0.45, 0.25, 0.42, 0.1, "8A939C") -- taps
+			c:disc(0.45, -c.d / 2 + 0.45, 0.25, 0.42, 0.1, "8A939C")
 		end,
 	},
+	-- Seen from above like the original's: a round white bowl with a gray
+	-- seat ring and basin, a rounded white tank behind it, and a little brown
+	-- splat beside it.
 	Toilet = {
 		body = "F2F4F6",
+		transparentBody = true,
 		draw = function(c)
-			c:top(0, -c.d / 2 + 0.5, c.w, 1.0, 0.5, 0.6, "E1E6EB") -- tank
-			c:disc(0, 0.45, 2.1, 0.04, 0.08, "DCE3E9") -- seat
-			c:disc(0, 0.45, 1.3, 0.06, 0.08, "A8D4EE") -- water
-			c:disc(c.w / 2 + 0.2, -c.d / 2 + 0.6, 0.7, -0.4, 0.5, "FFFFFF") -- paper roll
+			local tz = -c.d / 2 + 0.55
+			local span = c.w - 1.4
+			-- The tank: a rounded pill, gray rim under white.
+			local function pill(size: number, raise: number, thick: number, color: string)
+				c:top(0, tz, span, size, raise, thick, color)
+				c:disc(-span / 2, tz, size, raise, thick, color)
+				c:disc(span / 2, tz, size, raise, thick, color)
+			end
+			pill(1.1, 0.45, c.h + 0.4, "D3DAE1")
+			pill(0.9, 0.5, 0.1, "FFFFFF")
+			local bz = 0.45
+			c:disc(0, bz, 2.75, 0, c.h, "D3DAE1") -- bowl rim
+			c:disc(0, bz, 2.55, 0.03, 0.06, "FFFFFF")
+			c:disc(0, bz, 1.95, 0.05, 0.04, "E3E7EB") -- seat
+			c:disc(0, bz, 1.45, 0.07, 0.04, "CDD3D9") -- basin
+			c:top(0, bz - 0.4, 0.18, 0.4, 0.09, 0.04, "9AA2AB")
+			c:disc(c.w / 2 - 0.25, bz - 0.55, 0.55, 0.12, 0.04, "A0581C") -- splat
+			c:disc(c.w / 2 - 0.05, bz - 0.9, 0.28, 0.12, 0.04, "A0581C")
+			c:disc(c.w / 2 - 0.08, bz - 0.2, 0.2, 0.12, 0.04, "A0581C")
 		end,
 	},
 	Bathtub = {

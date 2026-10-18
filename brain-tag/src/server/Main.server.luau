@@ -53,7 +53,7 @@ FurnitureService.start(function()
 				id = p.id,
 				scale = p.scale,
 				aim = p.aim,
-				reach = if melee and item then (item.reach or 5) * math.max(1, p.scale * 0.9) else nil,
+				reach = if melee and item then (item.reach or 5) * Items.reachScale(p.scale) else nil,
 				firmness = if melee and item then item.firmness else nil,
 				guard = if melee and item then item.guard else nil,
 				zombie = p.team == "Zombie",

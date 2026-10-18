@@ -575,6 +575,13 @@ function module.get(id: string?): Item?
 	return Items[id]
 end
 
+-- How much longer (and bigger) a held item gets as its holder grows: the
+-- drawn model and its reach both use this. Capped so a giant's spear stays
+-- a spear.
+function module.reachScale(scale: number): number
+	return math.max(1, math.min(scale, 3) * 0.9)
+end
+
 -- Items that can be scattered on the ground, as { id, weight } pairs.
 function module.groundTable(): { { id: string, weight: number } }
 	local list = {}

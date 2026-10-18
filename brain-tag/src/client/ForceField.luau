@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Config = require(ReplicatedStorage.Shared.Config)
+local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local Items = require(ReplicatedStorage.Shared.Items)
 local RoundRules = require(ReplicatedStorage.Shared.RoundRules)
 
@@ -66,8 +67,54 @@ end
 -- A held melee weapon's shaft: from the hand along where the holder faces.
 local function shaft(root: BasePart, scale: number, item: Items.Item, facing: Vector3): (Vector3, Vector3)
 	local hand = flat((root.CFrame * CharacterLook.grip(scale)).Position)
-	local reach = (item.reach or 5) * math.max(1, scale * 0.9)
+	local reach = (item.reach or 5) * Items.reachScale(scale)
 	return hand, hand + facing * reach
+end
+
+local furnitureQuery = OverlapParams.new()
+furnitureQuery.FilterType = Enum.RaycastFilterType.Include
+
+local function solidPieces(center: Vector3, look: Vector3, size: Vector3): { BasePart }
+	local folder = workspace:FindFirstChild("Furniture")
+	if not folder then
+		return {}
+	end
+	furnitureQuery.FilterDescendantsInstances = { folder }
+	local found = {}
+	local frame = CFrame.lookAt(center, center + look)
+	for _, part in workspace:GetPartBoundsInBox(frame, size, furnitureQuery) do
+		if part.Name == "Body" and not part.Anchored and part.CanCollide then
+			table.insert(found, part)
+		end
+	end
+	return found
+end
+
+-- Furniture is solid: your weapon bounces off a piece pushed into it (or one
+-- it's pressed into that won't give), and your body is never left inside one.
+local function furniturePush(root: BasePart, scale: number, a: Vector3?, b: Vector3?, guard: number): Vector3
+	local push = Vector3.zero
+	local y = root.Position.Y
+	if a and b and (b - a).Magnitude > 0.1 then
+		local mid = Vector3.new((a.X + b.X) / 2, y, (a.Z + b.Z) / 2)
+		local size = Vector3.new(guard * 2 + 1, root.Size.Y + 2, (b - a).Magnitude + guard * 2 + 1)
+		for _, body in solidPieces(mid, (b - a).Unit, size) do
+			local depth, out = FurniturePush.overlapOut(a, b, guard, body)
+			if out then
+				push += out * math.min(depth * Config.FIELD_FURNITURE, Config.FIELD_WEAPON_MAX)
+			end
+		end
+	end
+	local me = flat(root.Position)
+	local radius = Config.rootWidth(scale) / 2 * 0.9
+	local around = Vector3.new(radius * 2 + 2, root.Size.Y + 2, radius * 2 + 2)
+	for _, body in solidPieces(root.Position, Vector3.new(0, 0, -1), around) do
+		local depth, out = FurniturePush.overlapOut(me, me, radius, body)
+		if out then
+			push += out * math.min(depth * 40, 40)
+		end
+	end
+	return push
 end
 
 local function heldMelee(model: Model): Items.Item?
@@ -79,7 +126,7 @@ end
 
 -- Extra velocity (studs/second, flat) for your character this frame.
 function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, myTeam: any): Vector3
-	local myScale = root.Size.X / C.RootWidth
+	local myScale = root.Size.Y / C.RootHeight -- (the width stops growing)
 	local myRadius = C.ShellDiameter / 2 * myScale
 	local me = flat(root.Position)
 	local myItem = Items.get(myItemId)
@@ -87,7 +134,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 	if myItem and myItem.kind == "Melee" then
 		myA, myB = shaft(root, myScale, myItem, aim)
 	end
-	local push = Vector3.zero
+	local push = furniturePush(root, myScale, myA, myB, if myItem then myItem.guard or 0.5 else 0.5)
 
 	for _, model in others() do
 		local other = model:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -99,7 +146,7 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 		if offset.Magnitude > 40 then
 			continue
 		end
-		local scale = other.Size.X / C.RootWidth
+		local scale = other.Size.Y / C.RootHeight
 		local radius = C.ShellDiameter / 2 * scale
 
 		-- Body to body (same team only: a zombie touching you should infect).

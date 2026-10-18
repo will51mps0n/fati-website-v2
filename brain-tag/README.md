@@ -108,8 +108,9 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
    (`INVENTORY_SLOTS`): press **1**, **2**, **3** (or click a slot) to choose which
    one is in your hand, **G** drops it.
    A held weapon is solid: walk or turn so it touches furniture to push it.
-5. Press **B** to open the shop. When the wizard arrives (chat message), stand
-   next to him and press **B** for his rare items.
+5. Press **B** to open the shop (hover a card for what it does and its price,
+   green if you can afford it, red if not). When the wizard arrives (chat
+   message), stand next to him and press **B** for his rare items.
 6. As a zombie, press **Z** to jump back to the zombie spawn.
 
 Furniture weight and push feel will need a round or two of tuning. The numbers
@@ -325,7 +326,7 @@ hiccup can't wipe real progress.
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
 | Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
-| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Every human still standing gets +10 points every 5 seconds (a little "+10" floats up over you). Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
+| Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Every human still standing gets +10 points every 5 seconds (a little "+10" floats up over you), and every zombie loses 2% of its points on the same beat (`ZOMBIE_DECAY_FRACTION`), so zombies shrink unless they eat. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
@@ -335,14 +336,20 @@ update the moment your points change (bottom-left shows points, speed boost
 and size). A zombie that eats you takes 75% of your points
 (`INFECT_STEAL_FRACTION`) plus a small flat bonus (`INFECT_REWARD`), so
 eating a big player is worth a lot and zombies grow as they feed. Speed multiplier =
-1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 (capped at 2.5), so a
-12,000-point player is about 2.5x a newcomer, like in the original. Bigger
+1 + score / 30,000 (capped at 1.6). Size = 1 + score / 8,000 and keeps growing
+(up to `MAX_SCALE` = 8, at 56,000 points), so a 12,000-point player is about
+2.5x a newcomer, like in the original, and the top players get huge. Only the
+collision box stops growing (`CHARACTER.MaxRootWidth`), so giants still fit
+through every door; held items grow with you up to 2.7x. Bigger
 players push heavier furniture faster: each pusher's strength is size squared
 (zombies are 1.5x stronger, `ZOMBIE_STRENGTH`, and 15% faster,
 `ZOMBIE_SPEED_FACTOR`), and a piece moves at walk speed x (1 - mass / total
 strength). Furniture keeps a little space from you (an invisible bumper,
 `CHARACTER.BumperDiameter`) and starts moving `PUSH_REACH` studs before it
-reaches it, so you push from a short way off instead of walking into it. Light, medium,
+reaches it, so you push from a short way off instead of walking into it.
+Furniture is solid to weapons too: a piece pushed into your weapon (or your
+weapon pressed into one that can't move) pushes you back, so the weapon
+bounces off instead of sinking in, and nobody is ever left inside a piece. Light, medium,
 heavy and massive pieces (piano, wardrobe, pool table, car) need more and more
 strength. Pushing is simulated on your own machine while you are the only one
 pushing a piece, so it responds instantly; when someone pushes back, the server
