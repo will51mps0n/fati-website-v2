@@ -186,7 +186,8 @@ local function look()
 				velocity = Util.flat(root.AssemblyLinearVelocity),
 				hidden = BushService.hidden(p),
 			}
-			table.insert(if p.team == "Zombie" then seenZombies else seenHumans, entry)
+			-- Someone turning into a zombie is as good as one already.
+			table.insert(if p.team == "Zombie" or p.turning then seenZombies else seenHumans, entry)
 		end
 	end
 end
@@ -1095,6 +1096,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		local closest: Seen? = nil
 		local closestDistance = math.huge
 		for _, entry in seenZombies do
+			if entry.p == p then
+				continue -- ourselves, while turning
+			end
 			local d = Util.flatDistance(entry.position, here)
 			local seen = not entry.hidden or d <= Config.BUSH_REVEAL_DISTANCE
 			if seen and inSight(here, entry.position, d) then

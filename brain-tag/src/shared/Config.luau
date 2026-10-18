@@ -12,7 +12,12 @@ Config.PREP_SECONDS = 60 -- "Outbreak happening in N seconds"
 Config.ROUND_SECONDS = 180 -- survival timer after the outbreak (undocumented in the original)
 Config.END_SCREEN_SECONDS = 6
 Config.ZOMBIE_RATIO = 0.2 -- first zombies = max(1, floor(players * ratio))
-Config.FIRST_ZOMBIES_TO_SPAWN = true -- teleport first zombies to the zombie spawn at outbreak
+Config.FIRST_ZOMBIES_TO_SPAWN = false -- true: send the first zombies to the zombie spawn at outbreak
+-- The first zombies are picked this long before the outbreak: their names go
+-- red for everyone and they slow down (TURNING_SLOW), then they turn right
+-- where they stand.
+Config.TURNING_SECONDS = 10
+Config.TURNING_SLOW = 0.6
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.

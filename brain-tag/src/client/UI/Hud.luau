@@ -185,13 +185,14 @@ function Hud.start()
 				end
 			end
 
-			-- Your own name tag is lime green (only on your screen).
+			-- Your own name tag is lime green (only on your screen), red while
+			-- you're turning into a zombie.
 			local character = player.Character
 			local head = character and character:FindFirstChild("Head")
 			local tag = head and head:FindFirstChild("NameTag")
 			local label = tag and tag:FindFirstChild("Label") :: TextLabel?
 			if label then
-				label.TextColor3 = UIKit.LIME
+				label.TextColor3 = if ClientState.my("Turning") == true then UIKit.RED else UIKit.LIME
 			end
 
 			task.wait(0.1)

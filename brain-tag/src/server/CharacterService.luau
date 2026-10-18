@@ -69,6 +69,9 @@ function CharacterService.buildTemplate()
 end
 
 local function nameColor(p: Participant): Color3
+	if p.turning then
+		return Color3.fromHex(Config.COLORS.ZombieText) -- about to turn: red for everyone
+	end
 	if p.passes.VIP then
 		return Color3.fromHex(Config.COLORS.VipName)
 	end
@@ -240,6 +243,9 @@ function CharacterService.refreshSpeed(p: Participant)
 	end
 	if now < p.slowUntil then
 		speed *= p.slowFactor
+	end
+	if p.turning then
+		speed *= Config.TURNING_SLOW
 	end
 	humanoid.WalkSpeed = speed
 end

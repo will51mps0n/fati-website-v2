@@ -327,7 +327,8 @@ hiccup can't wipe real progress.
 | --- | --- |
 | Waiting | Fewer than 2 players (bots count): "Waiting for players". |
 | Prep (60 s) | Everyone is human. "Outbreak happening in N seconds". Shop, grab items, push furniture into doorways. The wizard shows up at a random moment. |
-| Outbreak | First zombies are picked at random, weighted by immunity (pills), and sent to the zombie spawn. |
+| Turning (last 10 s of prep) | The first zombies are picked at random, weighted by immunity (pills). Their names go red for everyone, they slow down (`TURNING_SLOW`), their own screen says "You turn into a zombie in N seconds!", and chat warns everyone. Bots run from them. |
+| Outbreak | They turn into zombies right where they stand (set `FIRST_ZOMBIES_TO_SPAWN` to send them to the zombie spawn instead). |
 | Infection (180 s) | The first zombies get the alpha look (orange, gray face, red claws). A single touch from any part of a zombie (body or arms) converts a human and takes 75% of their points; the human's item is lost. Every human still standing gets +10 points every 5 seconds (a little "+10" floats up over you), and every zombie loses 2% of its points on the same beat (`ZOMBIE_DECAY_FRACTION`), so zombies shrink unless they eat. Late joiners spawn as zombies. Weapons only shove and stun. Walk into a bush to hide: it covers you, your name tag disappears, and bots can't see you unless they come close. |
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |

@@ -922,7 +922,12 @@ Config.PREP_SECONDS = 60 -- "Outbreak happening in N seconds"
 Config.ROUND_SECONDS = 180 -- survival timer after the outbreak (undocumented in the original)
 Config.END_SCREEN_SECONDS = 6
 Config.ZOMBIE_RATIO = 0.2 -- first zombies = max(1, floor(players * ratio))
-Config.FIRST_ZOMBIES_TO_SPAWN = true -- teleport first zombies to the zombie spawn at outbreak
+Config.FIRST_ZOMBIES_TO_SPAWN = false -- true: send the first zombies to the zombie spawn at outbreak
+-- The first zombies are picked this long before the outbreak: their names go
+-- red for everyone and they slow down (TURNING_SLOW), then they turn right
+-- where they stand.
+Config.TURNING_SECONDS = 10
+Config.TURNING_SLOW = 0.6
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.
@@ -7732,7 +7737,8 @@ local function look()
 				velocity = Util.flat(root.AssemblyLinearVelocity),
 				hidden = BushService.hidden(p),
 			}
-			table.insert(if p.team == "Zombie" then seenZombies else seenHumans, entry)
+			-- Someone turning into a zombie is as good as one already.
+			table.insert(if p.team == "Zombie" or p.turning then seenZombies else seenHumans, entry)
 		end
 	end
 end
@@ -8641,6 +8647,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		local closest: Seen? = nil
 		local closestDistance = math.huge
 		for _, entry in seenZombies do
+			if entry.p == p then
+				continue -- ourselves, while turning
+			end
 			local d = Util.flatDistance(entry.position, here)
 			local seen = not entry.hidden or d <= Config.BUSH_REVEAL_DISTANCE
 			if seen and inSight(here, entry.position, d) then
@@ -9387,6 +9396,9 @@ function CharacterService.buildTemplate()
 end
 
 local function nameColor(p: Participant): Color3
+	if p.turning then
+		return Color3.fromHex(Config.COLORS.ZombieText) -- about to turn: red for everyone
+	end
 	if p.passes.VIP then
 		return Color3.fromHex(Config.COLORS.VipName)
 	end
@@ -9558,6 +9570,9 @@ function CharacterService.refreshSpeed(p: Participant)
 	end
 	if now < p.slowUntil then
 		speed *= p.slowFactor
+	end
+	if p.turning then
+		speed *= Config.TURNING_SLOW
 	end
 	humanoid.WalkSpeed = speed
 end
@@ -14012,6 +14027,7 @@ export type Participant = {
 	slowUntil: number, -- snowball freeze
 	adminSpeed: number, -- speed multiplier set from the admin panel (1 = normal)
 	alpha: boolean, -- one of this round's first zombies (special look)
+	turning: boolean, -- picked to be a first zombie: red name, slowed, until the outbreak
 	knockedUntil: number, -- a real hit's shove lasts until then (see Combat.knockback)
 	pressedUntil: number, -- bots: being held off someone's weapon (ItemService.shaftStep)
 	slowFactor: number,
@@ -14134,6 +14150,7 @@ function Participants.add(info: NewParticipant): Participant
 		slowUntil = 0,
 		adminSpeed = 1,
 		alpha = false,
+		turning = false,
 		knockedUntil = 0,
 		pressedUntil = 0,
 		slowFactor = 1,
@@ -14781,6 +14798,8 @@ local function resetWorld()
 		p.stunUntil = 0
 		p.boostUntil, p.slowUntil = 0, 0
 		p.alpha = false
+		p.turning = false
+		p.state:SetAttribute("Turning", false)
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
 		p.state:SetAttribute("Scale", p.scale)
@@ -14811,20 +14830,8 @@ local function waitForPlayers()
 	end
 end
 
--- Waits until the phase timer ends. Returns false if players dropped below
--- the minimum (round aborted).
 -- An admin ended the round: it stops with no winner and the next one starts.
 local endRequested = false
-
-local function waitPhase(): boolean
-	while secondsLeft() > 0 do
-		if not enoughPlayers() or endRequested then
-			return false
-		end
-		task.wait(0.2)
-	end
-	return not endRequested
-end
 
 local function pickFirstZombies(): { Participant }
 	local candidates = {}
@@ -14846,6 +14853,68 @@ local function pickFirstZombies(): { Participant }
 	)
 end
 
+-- The first zombies-to-be, picked TURNING_SECONDS before the outbreak.
+local turning: { Participant } = {}
+
+local function setTurning(p: Participant, on: boolean)
+	p.turning = on
+	p.state:SetAttribute("Turning", on)
+	CharacterService.refreshNameTag(p)
+	CharacterService.refreshSpeed(p)
+end
+
+local function clearTurning()
+	for _, p in turning do
+		if Participants.get(p.id) == p then
+			setTurning(p, false)
+		end
+	end
+	table.clear(turning)
+end
+
+-- Waits out the prep timer; TURNING_SECONDS before the end it picks the
+-- first zombies, turns their names red and slows them down. Returns false
+-- if players dropped below the minimum or an admin ended the round.
+local function waitPrep(): boolean
+	local picked = false
+	while secondsLeft() > 0 do
+		if not enoughPlayers() or endRequested then
+			clearTurning()
+			return false
+		end
+		if not picked and secondsLeft() <= Config.TURNING_SECONDS then
+			picked = true
+			clearTurning()
+			for _, p in pickFirstZombies() do
+				table.insert(turning, p)
+				setTurning(p, true)
+				if p.player then
+					Announcer.toast(
+						p.player,
+						string.format("You're turning into a zombie in %d seconds!", Config.TURNING_SECONDS),
+						Config.COLORS.ZombieText
+					)
+				end
+			end
+			local names = {}
+			for _, p in turning do
+				table.insert(names, p.name)
+			end
+			if #names > 0 then
+				Announcer.chat(
+					"* "
+						.. table.concat(names, ", ")
+						.. (if #names == 1 then " is" else " are")
+						.. " turning into a zombie... run! *",
+					"E0303A"
+				)
+			end
+		end
+		task.wait(0.2)
+	end
+	return not endRequested
+end
+
 local function turnFirstZombie(p: Participant)
 	p.alpha = true -- the alpha look (see Skins "Alpha")
 	RoundManager.setTeam(p, "Zombie")
@@ -14858,7 +14927,18 @@ end
 
 local function outbreak()
 	Wizard.leave()
-	local picked = pickFirstZombies()
+	-- The ones turning since the countdown (if they're still here); a fresh
+	-- pick if nobody is (an admin skipped ahead, or they all left).
+	local picked = {}
+	for _, p in turning do
+		if Participants.get(p.id) == p and p.team == "Human" and Participants.body(p) then
+			table.insert(picked, p)
+		end
+	end
+	clearTurning()
+	if #picked == 0 then
+		picked = pickFirstZombies()
+	end
 	local names = {}
 	for _, p in picked do
 		turnFirstZombie(p)
@@ -14979,7 +15059,7 @@ local function runRound()
 			.. Config.PREP_SECONDS
 			.. " seconds. Barricade a room and grab items!"
 	)
-	if waitPhase() then
+	if waitPrep() then
 		outbreak()
 		local winner = runInfection()
 		if winner then
@@ -18531,6 +18611,8 @@ function Banner.build(parent: Instance): () -> ()
 			local count = #ClientState.participants:GetChildren()
 			local needed = ClientState.attr("Needed") or 2
 			text = string.format("Waiting for players (%d/%d)", count, needed)
+		elseif phase == "Prep" and ClientState.my("Turning") == true then
+			text = string.format("You turn into a zombie in %d seconds!", math.ceil(left))
 		elseif phase == "Prep" then
 			text = string.format("Outbreak happening in %d seconds", math.ceil(left))
 		elseif phase == "Infection" then
@@ -18543,7 +18625,10 @@ function Banner.build(parent: Instance): () -> ()
 			text = "Next round starting..."
 		end
 		label.Text = text
-		label.TextColor3 = if phase == "Infection" and left <= 10 then UIKit.RED else UIKit.WHITE
+		label.TextColor3 = if (phase == "Infection" and left <= 10)
+				or ClientState.my("Turning") == true
+			then UIKit.RED
+			else UIKit.WHITE
 	end
 end
 
@@ -19171,13 +19256,14 @@ function Hud.start()
 				end
 			end
 
-			-- Your own name tag is lime green (only on your screen).
+			-- Your own name tag is lime green (only on your screen), red while
+			-- you're turning into a zombie.
 			local character = player.Character
 			local head = character and character:FindFirstChild("Head")
 			local tag = head and head:FindFirstChild("NameTag")
 			local label = tag and tag:FindFirstChild("Label") :: TextLabel?
 			if label then
-				label.TextColor3 = UIKit.LIME
+				label.TextColor3 = if ClientState.my("Turning") == true then UIKit.RED else UIKit.LIME
 			end
 
 			task.wait(0.1)

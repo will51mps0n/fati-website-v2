@@ -289,6 +289,8 @@ local function resetWorld()
 		p.stunUntil = 0
 		p.boostUntil, p.slowUntil = 0, 0
 		p.alpha = false
+		p.turning = false
+		p.state:SetAttribute("Turning", false)
 		p.scale = RoundRules.scaleForScore(p.score) -- you grow as your score grows
 		p.state:SetAttribute("Team", "Human")
 		p.state:SetAttribute("Scale", p.scale)
@@ -319,20 +321,8 @@ local function waitForPlayers()
 	end
 end
 
--- Waits until the phase timer ends. Returns false if players dropped below
--- the minimum (round aborted).
 -- An admin ended the round: it stops with no winner and the next one starts.
 local endRequested = false
-
-local function waitPhase(): boolean
-	while secondsLeft() > 0 do
-		if not enoughPlayers() or endRequested then
-			return false
-		end
-		task.wait(0.2)
-	end
-	return not endRequested
-end
 
 local function pickFirstZombies(): { Participant }
 	local candidates = {}
@@ -354,6 +344,68 @@ local function pickFirstZombies(): { Participant }
 	)
 end
 
+-- The first zombies-to-be, picked TURNING_SECONDS before the outbreak.
+local turning: { Participant } = {}
+
+local function setTurning(p: Participant, on: boolean)
+	p.turning = on
+	p.state:SetAttribute("Turning", on)
+	CharacterService.refreshNameTag(p)
+	CharacterService.refreshSpeed(p)
+end
+
+local function clearTurning()
+	for _, p in turning do
+		if Participants.get(p.id) == p then
+			setTurning(p, false)
+		end
+	end
+	table.clear(turning)
+end
+
+-- Waits out the prep timer; TURNING_SECONDS before the end it picks the
+-- first zombies, turns their names red and slows them down. Returns false
+-- if players dropped below the minimum or an admin ended the round.
+local function waitPrep(): boolean
+	local picked = false
+	while secondsLeft() > 0 do
+		if not enoughPlayers() or endRequested then
+			clearTurning()
+			return false
+		end
+		if not picked and secondsLeft() <= Config.TURNING_SECONDS then
+			picked = true
+			clearTurning()
+			for _, p in pickFirstZombies() do
+				table.insert(turning, p)
+				setTurning(p, true)
+				if p.player then
+					Announcer.toast(
+						p.player,
+						string.format("You're turning into a zombie in %d seconds!", Config.TURNING_SECONDS),
+						Config.COLORS.ZombieText
+					)
+				end
+			end
+			local names = {}
+			for _, p in turning do
+				table.insert(names, p.name)
+			end
+			if #names > 0 then
+				Announcer.chat(
+					"* "
+						.. table.concat(names, ", ")
+						.. (if #names == 1 then " is" else " are")
+						.. " turning into a zombie... run! *",
+					"E0303A"
+				)
+			end
+		end
+		task.wait(0.2)
+	end
+	return not endRequested
+end
+
 local function turnFirstZombie(p: Participant)
 	p.alpha = true -- the alpha look (see Skins "Alpha")
 	RoundManager.setTeam(p, "Zombie")
@@ -366,7 +418,18 @@ end
 
 local function outbreak()
 	Wizard.leave()
-	local picked = pickFirstZombies()
+	-- The ones turning since the countdown (if they're still here); a fresh
+	-- pick if nobody is (an admin skipped ahead, or they all left).
+	local picked = {}
+	for _, p in turning do
+		if Participants.get(p.id) == p and p.team == "Human" and Participants.body(p) then
+			table.insert(picked, p)
+		end
+	end
+	clearTurning()
+	if #picked == 0 then
+		picked = pickFirstZombies()
+	end
 	local names = {}
 	for _, p in picked do
 		turnFirstZombie(p)
@@ -487,7 +550,7 @@ local function runRound()
 			.. Config.PREP_SECONDS
 			.. " seconds. Barricade a room and grab items!"
 	)
-	if waitPhase() then
+	if waitPrep() then
 		outbreak()
 		local winner = runInfection()
 		if winner then

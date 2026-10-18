@@ -33,6 +33,8 @@ function Banner.build(parent: Instance): () -> ()
 			local count = #ClientState.participants:GetChildren()
 			local needed = ClientState.attr("Needed") or 2
 			text = string.format("Waiting for players (%d/%d)", count, needed)
+		elseif phase == "Prep" and ClientState.my("Turning") == true then
+			text = string.format("You turn into a zombie in %d seconds!", math.ceil(left))
 		elseif phase == "Prep" then
 			text = string.format("Outbreak happening in %d seconds", math.ceil(left))
 		elseif phase == "Infection" then
@@ -45,7 +47,10 @@ function Banner.build(parent: Instance): () -> ()
 			text = "Next round starting..."
 		end
 		label.Text = text
-		label.TextColor3 = if phase == "Infection" and left <= 10 then UIKit.RED else UIKit.WHITE
+		label.TextColor3 = if (phase == "Infection" and left <= 10)
+				or ClientState.my("Turning") == true
+			then UIKit.RED
+			else UIKit.WHITE
 	end
 end
 

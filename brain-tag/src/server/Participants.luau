@@ -41,6 +41,7 @@ export type Participant = {
 	slowUntil: number, -- snowball freeze
 	adminSpeed: number, -- speed multiplier set from the admin panel (1 = normal)
 	alpha: boolean, -- one of this round's first zombies (special look)
+	turning: boolean, -- picked to be a first zombie: red name, slowed, until the outbreak
 	knockedUntil: number, -- a real hit's shove lasts until then (see Combat.knockback)
 	pressedUntil: number, -- bots: being held off someone's weapon (ItemService.shaftStep)
 	slowFactor: number,
@@ -163,6 +164,7 @@ function Participants.add(info: NewParticipant): Participant
 		slowUntil = 0,
 		adminSpeed = 1,
 		alpha = false,
+		turning = false,
 		knockedUntil = 0,
 		pressedUntil = 0,
 		slowFactor = 1,
