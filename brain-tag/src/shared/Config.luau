@@ -195,8 +195,8 @@ Config.TOP_SCORES_REFRESH_SECONDS = 120
 -- Bots join every server, live games included (see BotService for their
 -- names and difficulty levels; Mario Robles is the hardest).
 Config.BOTS = true
-Config.BOTS_MIN = 20 -- each round picks a bot count in this range
-Config.BOTS_MAX = 30
+Config.BOTS_MIN = 10 -- each round picks a bot count in this range
+Config.BOTS_MAX = 14
 Config.MAX_PARTICIPANTS = 40 -- bots make room as real players join
 Config.BOTS_WITH_SKINS = 3 -- how many bots wear special skins; the rest look classic
 Config.BOT_WEAPON_CHANCE = 0.2 -- chance a bot starts a round with a (cheap) weapon

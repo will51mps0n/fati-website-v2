@@ -2515,6 +2515,23 @@ local CLUTTER_YARD: { [string]: { string } } = {
 }
 CLUTTER_YARD.BloodMoon = CLUTTER_YARD.Haunted
 CLUTTER_YARD.Swamp = CLUTTER_YARD.Haunted
+-- Fixtures stay against their walls; most other pieces you can push move
+-- OFF_WALL studs out from the wall (OFF_WALL_SHARE of them, where they fit).
+local FIXTURES: { [string]: boolean } = {
+	Toilet = true,
+	Sink = true,
+	Bathtub = true,
+	Fridge = true,
+	Stove = true,
+	Washer = true,
+	Bookshelf = true,
+	Picture = true,
+	Aquarium = true,
+	Bed = true,
+	Tombstone = true,
+}
+local OFF_WALL = 4.8
+local OFF_WALL_SHARE = 0.75
 local CLUTTER_LANE = 3 -- half-width of the clear lanes into each room
 local CLUTTER_GAP = 1.8 -- room left between pieces
 
@@ -2677,6 +2694,83 @@ local function clutter(layout: Layout, seed: number)
 			end
 		end
 		return best
+	end
+
+	-- Off the wallRects: many of the pieces you can push (not fixtures like
+	-- toilets and bookshelves, not the massive ones) start a few studs out
+	-- from the wall, so people and bots can get behind them and shove them
+	-- into a doorway.
+	local wallRects: { Rect } = {}
+	for _, piece in pieces do
+		if not piece.secret then
+			table.insert(wallRects, piece.rect)
+		end
+	end
+	local rects: { [number]: Rect } = {}
+	for i, spot in layout.furniture do
+		if not FurnitureSpecs.get(spot.kind).decor then
+			rects[i] = spotRect(spot.kind, spot.x, spot.z, spot.rot)
+		end
+	end
+	for i, spot in layout.furniture do
+		local here = rects[i]
+		if
+			not here
+			or FurnitureSpecs.get(spot.kind).weight == "Massive"
+			or FIXTURES[spot.kind]
+			or random() > OFF_WALL_SHARE
+		then
+			continue
+		end
+		local inner: Rect? = nil
+		for _, room in layout.rooms do
+			local r = MapLayout.roomInterior(room)
+			if here.x1 >= r.x1 and here.x2 <= r.x2 and here.z1 >= r.z1 and here.z2 <= r.z2 then
+				inner = r
+				break
+			end
+		end
+		if not inner then
+			continue
+		end
+		local room = inner :: Rect
+		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local side = if d[1] == 1
+				then rect(here.x2, here.z1 + 0.3, here.x2 + 1, here.z2 - 0.3)
+				elseif d[1] == -1 then rect(here.x1 - 1, here.z1 + 0.3, here.x1, here.z2 - 0.3)
+				elseif d[2] == 1 then rect(here.x1 + 0.3, here.z2, here.x2 - 0.3, here.z2 + 1)
+				else rect(here.x1 + 0.3, here.z1 - 1, here.x2 - 0.3, here.z1)
+			if not hits(side, wallRects, 0) then
+				continue -- no wall on this side
+			end
+			local dx, dz = -d[1] * OFF_WALL, -d[2] * OFF_WALL
+			local moved = rect(here.x1 + dx, here.z1 + dz, here.x2 + dx, here.z2 + dz)
+			local fits = moved.x1 >= room.x1 + 0.2
+				and moved.x2 <= room.x2 - 0.2
+				and moved.z1 >= room.z1 + 0.2
+				and moved.z2 <= room.z2 - 0.2
+				and not hits(moved, wallRects, 0.3)
+				and not hits(moved, zones, 0)
+				and not onPath(moved)
+			if fits then
+				for j, other in rects do
+					if j ~= i and MapLayout.rectsOverlap(moved, other, 1.2) then
+						fits = false
+						break
+					end
+				end
+			end
+			if fits then
+				spot.x += dx
+				spot.z += dz
+				rects[i] = moved
+				break
+			end
+		end
+	end
+	table.clear(placed)
+	for _, r in rects do
+		table.insert(placed, r)
 	end
 
 	for _, room in layout.rooms do

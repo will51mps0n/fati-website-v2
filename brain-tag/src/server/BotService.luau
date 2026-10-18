@@ -1257,6 +1257,15 @@ local function brain(p: Participant, level: Level, seed: number)
 								if fort.barricaded[key] or busy[key] then
 									continue
 								end
+								-- A doorway into a teammate's fort is ours to share,
+								-- not to wall up from both sides.
+								local beyond = entry.center - entry.inward * 4
+								local nextRoom = roomAt(beyond.X, beyond.Z)
+								local nextFort = nextRoom and forts[nextRoom]
+								if nextFort and count(nextFort.members, now, 3) > 0 then
+									fort.barricaded[key] = true
+									continue
+								end
 								local block = CFrame.new(entry.center + entry.inward * 3)
 								if
 									#FurnitureService.findInBox(
@@ -1279,6 +1288,35 @@ local function brain(p: Participant, level: Level, seed: number)
 										or FurnitureService.weightOf(body) == "Massive"
 										or d <= 4
 										or not MapLayout.inRect(r, body.Position.X, body.Position.Z)
+									then
+										continue
+									end
+									-- We have to get behind it (on the far side from the
+									-- door): skip pieces backed against a wall or another piece.
+									local to = Util.flat(entry.center + entry.inward * 3)
+										- Util.flat(body.Position)
+									local push = Util.flatUnit(to)
+									if not push then
+										continue
+									end
+									local behind = Util.flat(body.Position)
+										- push
+											* (FurniturePush.extent(body, push) + FurniturePush.bumperRadius(
+												p.scale
+											) + 0.6)
+									local stand = Vector3.new(behind.X, here.Y, behind.Z)
+									if
+										not MapLayout.inRect(r, stand.X, stand.Z, -1.2)
+										or #FurnitureService.findInBox(
+											CFrame.new(stand),
+											Vector3.new(3, 4, 3)
+										) > 0
+										or not Combat.clearWide(
+											Vector3.new(body.Position.X, here.Y, body.Position.Z),
+											stand,
+											0.5,
+											true
+										)
 									then
 										continue
 									end

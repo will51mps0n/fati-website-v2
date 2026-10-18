@@ -70,7 +70,7 @@ For live editing: run `rojo plugin install` once, then `rojo serve` and click
 
 ## Testing
 
-- **Alone:** press **Play**. Every round fills up with 20 to 30 bots (Studio and
+- **Alone:** press **Play**. Every round fills up with 10 to 14 bots (Studio and
   live games; fewer as real players join, `Config.BOTS_MIN`, `BOTS_MAX`,
   `MAX_PARTICIPANTS`). They have funny names (Mario Robles, Fart Butt, Poop
   Face, Fat Guy, Booger Bob...), a level from 3 to 6, and the classic look
@@ -151,7 +151,9 @@ Seven maps take turns (`Config.MAP_ROTATION`, two rounds each). Besides
 their own furniture, every room gets extra things to shove (small boxes,
 boxes, box stacks, crates, long crates, big crates, a table or couch in the
 bigger rooms) and yards get crates, barrels and hay bales (pumpkins and
-coffins at night, presents in the snow). These are placed by `clutter` in
+coffins at night, presents in the snow), and most pieces you can push start
+a few studs out from the wall so you (and the bots) can get behind them and
+shove them into a doorway. These are placed by `clutter` in
 `MapLayout.luau` with a fixed seed, so every server gets the same map, and
 they always leave doorways, lanes into each room and the way to every item
 spot clear.
