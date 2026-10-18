@@ -509,11 +509,17 @@ end
 -- reports while walking.
 local walkGoal: { [Humanoid]: Vector3 } = setmetatable({}, { __mode = "k" }) :: any
 local walkAt: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
+local stopped: { [Humanoid]: boolean } = setmetatable({}, { __mode = "k" }) :: any -- arrived and standing
 
 local function moveTo(humanoid: Humanoid, point: Vector3)
+	walkAt[humanoid] = os.clock()
+	local old = walkGoal[humanoid]
+	if old and stopped[humanoid] and Util.flatDistance(old, point) < 0.8 then
+		return -- already standing there: stay put instead of twitching
+	end
 	humanoid:MoveTo(point)
 	walkGoal[humanoid] = point
-	walkAt[humanoid] = os.clock()
+	stopped[humanoid] = nil
 end
 
 -- One bot ---------------------------------------------------------------------------------
@@ -628,7 +634,12 @@ local function brain(p: Participant, level: Level, seed: number)
 		local waypoint = waypoints[waypointIndex]
 		if
 			waypoint
-			and Util.flatDistance(waypoint.Position, root.Position) < 2
+			-- Next waypoint well before reaching this one, so a bot never
+			-- arrives (and stops) between two decisions.
+			and Util.flatDistance(waypoint.Position, root.Position) < math.max(
+				2,
+				humanoid.WalkSpeed * level.think * 1.6
+			)
 			and waypointIndex < #waypoints
 		then
 			waypointIndex += 1
@@ -1580,13 +1591,22 @@ local function drive()
 		local move = if toGoal.Magnitude > 0.6 then toGoal.Unit else nil
 		local speed = humanoid.WalkSpeed
 		if move and speed > 0 then
+			stopped[humanoid] = nil
 			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
-			-- Not aiming a weapon: face where we walk, at once.
-			if humanoid.AutoRotate and root.CFrame.LookVector:Dot(move) < 0.995 then
-				root.CFrame = CFrame.lookAt(root.Position, root.Position + move)
+			-- Not aiming a weapon: turn quickly toward where we walk. A spin,
+			-- not a teleport of the rotation, so it replicates smoothly.
+			local look = Util.flatUnit(root.CFrame.LookVector)
+			if humanoid.AutoRotate and look then
+				local angle = math.atan2(look.Z * move.X - look.X * move.Z, look:Dot(move))
+				root.AssemblyAngularVelocity = Vector3.new(0, math.clamp(angle * 14, -24, 24), 0)
 			end
-		elseif math.abs(v.X) + math.abs(v.Z) > 0.05 then
+		elseif not stopped[humanoid] then
+			-- Arrived (or nothing new for a while): stop dead, and tell the
+			-- Humanoid too so it doesn't keep nudging toward the old spot.
+			stopped[humanoid] = true
+			humanoid:MoveTo(root.Position)
 			root.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+			root.AssemblyAngularVelocity = Vector3.zero
 		end
 	end
 end
