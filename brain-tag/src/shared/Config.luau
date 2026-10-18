@@ -120,10 +120,10 @@ Config.GROUND_ITEMS_MIN = 1 -- items are rare: mostly you buy them
 Config.GROUND_ITEMS_MAX = 2
 Config.RARE_CHANCE = 0.05
 Config.KNOCKBACK_SECONDS = 0.3 -- how long a shove lasts (stun is per item)
--- Held melee weapons are solid: zombies touching the shaft are shoved off it
--- (this fast, in short pulses), and furniture it overlaps is pushed aside.
-Config.SHAFT_ZOMBIE_PUSH = 22
-Config.SHAFT_PULSE_SHARE = 0.75 -- share of each push tick a firm weapon pushes; the rest the zombie can steer
+-- Held melee weapons are solid but not bouncy: someone pressing on the
+-- shaft is held off it and pushes the holder back, shared by size squared
+-- (times the weapon's firmness). This is how fast an overlap is undone.
+Config.SHAFT_SOFTNESS = 12
 Config.SHAFT_FURNITURE_FACTOR = 0.8 -- push speed while standing still / turning, as a share of walk speed
 -- Soft force fields you feel on your own screen (client ForceField): how
 -- fast people / weapons push you apart per stud of overlap, and the caps.
@@ -131,7 +131,7 @@ Config.FIELD_BODY = 10
 Config.FIELD_BODY_MAX = 14
 Config.FIELD_WEAPON = 14
 Config.FIELD_WEAPON_MAX = 24
-Config.FIELD_RECOIL = 6 -- your weapon pressing into someone pushes you back this hard
+Config.FIELD_RECOIL = 14 -- someone pressing on your weapon pushes you back this hard (by their share)
 
 -- Wizard ------------------------------------------------------------------------------------
 

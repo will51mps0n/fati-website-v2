@@ -472,16 +472,15 @@ end
 -- (bat, pan) hold people completely; soft ones (pool noodle) give, so they
 -- squeeze past. A bigger holder holds harder, a bigger person pushes
 -- through easier.
-local SHAFT_INTERVAL = 1 / 15
-local nextShaftStep = 0
-
-local function shaftStep()
-	local now = os.clock()
-	if now < nextShaftStep then
-		return
-	end
-	nextShaftStep = now + SHAFT_INTERVAL
+-- Held melee weapons are solid but not bouncy. Someone pressing on the
+-- shaft is held off it, and leans on the holder in turn, shared by strength
+-- (size squared; a firm bat counts for more than a pool noodle): equal sizes
+-- share the push, so a zombie can walk you backwards and slide round the
+-- end, while a much bigger holder doesn't budge. Bots are moved here;
+-- players feel it on their own screen (client ForceField).
+local function shaftStep(dt: number)
 	local people = Participants.all()
+	local rate = math.min(1, dt * Config.SHAFT_SOFTNESS)
 	for _, p in Participants.onTeam("Human") do
 		local item = Items.get(p.heldItem)
 		local root = Participants.body(p)
@@ -492,25 +491,26 @@ local function shaftStep()
 		local guard = item.guard or 0.5
 		local hand = (root.CFrame * CharacterLook.grip(p.scale)).Position
 		local start = Vector3.new(hand.X, 0, hand.Z)
+		local hold = p.scale * p.scale * (item.firmness or 1)
 		for _, other in people do
-			-- Players feel weapons through their own client's force field
-			-- (smooth, no lag); the server pushes bots.
-			local zRoot = if other ~= p and not other.player then Participants.body(other) else nil
-			if zRoot then
-				local z = Vector3.new(zRoot.Position.X, 0, zRoot.Position.Z)
-				local along = math.clamp((z - start):Dot(p.aim), 0, reach)
-				local offset = z - (start + p.aim * along)
-				local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
-				if
-					offset.Magnitude < radius + guard and Combat.lineOfSight(root.Position, zRoot.Position)
-				then
-					local firmness = (item.firmness or 1) * math.clamp(p.scale / other.scale, 0.5, 2)
-					local away = Util.flatUnit(offset) or p.aim
-					-- Each pulse covers part of the tick: soft weapons leave long gaps
-					-- the zombie walks through, firm ones short gaps to steer around.
-					local seconds = SHAFT_INTERVAL * Config.SHAFT_PULSE_SHARE * math.min(1, firmness)
-					local speed = Config.SHAFT_ZOMBIE_PUSH * math.min(firmness, 1.5)
-					Combat.knockback(other, away * speed, 0, seconds, true)
+			local oRoot = if other ~= p then Participants.body(other) else nil
+			if not oRoot or (other.player and p.player) then
+				continue -- two players: their own screens handle it
+			end
+			local o = Vector3.new(oRoot.Position.X, 0, oRoot.Position.Z)
+			local along = math.clamp((o - start):Dot(p.aim), 0, reach)
+			local offset = o - (start + p.aim * along)
+			local radius = Config.CHARACTER.ShellDiameter / 2 * other.scale
+			local overlap = radius + guard - offset.Magnitude
+			if overlap > 0 and Combat.lineOfSight(root.Position, oRoot.Position) then
+				local push = other.scale * other.scale
+				local away = Util.flatUnit(offset) or p.aim
+				local step = math.min(overlap, 2) * rate
+				if not other.player then
+					oRoot.CFrame += away * (step * hold / (hold + push))
+				end
+				if not p.player then
+					root.CFrame -= away * (step * push / (hold + push))
 				end
 			end
 		end

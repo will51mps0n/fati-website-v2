@@ -27,7 +27,7 @@ export type Mark = {
 	id: string?, -- House: its name; Floor: the room's name
 	floor: string?, -- Floor: Brick, Tile, Wood, Concrete or Dirt
 	outline: string?, -- House: Blue or Orange wall trim
-	color: string?, -- Bush: Green or Orange
+	color: string?, -- Bush: Green, Orange or Cobweb
 }
 
 -- Every kind of mark besides furniture (any furniture name is a mark too).
@@ -40,13 +40,17 @@ MapMarks.KINDS = {
 	{ kind = "Wall", about = "A wall. Long and thin; it is always rebuilt 3 studs thick." },
 	{ kind = "Door", about = "Put it on a wall to cut a doorway as wide as the part." },
 	{ kind = "Window", about = "Put it on a wall: that stretch becomes a (breakable) window." },
+	{
+		kind = "SecretWall",
+		about = "Put it on a wall: that stretch looks solid but anyone walks through (bots don't know).",
+	},
 	{ kind = "Floor", about = "A room's floor (Floor attribute: Brick, Tile, Wood, Concrete or Dirt)." },
 	{ kind = "HumanSpawn", about = "Where humans appear after the first spawn." },
 	{ kind = "ZombieSpawn", about = "Where zombies appear (a red pit)." },
 	{ kind = "Start", about = "Where everyone starts the round, together." },
 	{ kind = "ItemSpot", about = "Where an item can lie on the ground." },
 	{ kind = "WizardSpot", about = "Where the wizard can show up." },
-	{ kind = "Bush", about = "A bush to hide in (Color attribute: Green or Orange)." },
+	{ kind = "Bush", about = "A bush to hide in (Color attribute: Green, Orange or Cobweb for indoors)." },
 	{ kind = "Road", about = "Asphalt." },
 	{ kind = "Sidewalk", about = "Pale pavement." },
 	{ kind = "CenterLine", about = "Yellow road line." },
@@ -169,12 +173,13 @@ function MapMarks.toLayout(name: string, title: string, marks: { Mark }): (Layou
 			horizontal = horizontal,
 			gaps = {},
 			windows = {},
+			secrets = {},
 			house = houseAt(m.x, m.z, T),
 		})
 	end
 
-	-- Doors and windows cut into the wall they sit on.
-	local function cut(m: Mark, isDoor: boolean)
+	-- Doors, windows and secret walls cut into the wall they sit on.
+	local function cut(m: Mark, into: string)
 		local best: MapLayout.Wall? = nil
 		local bestScore = math.huge
 		local long = m.w >= m.d
@@ -197,17 +202,21 @@ function MapMarks.toLayout(name: string, title: string, marks: { Mark }): (Layou
 		end
 		local half = (if best.horizontal then m.w else m.d) / 2
 		local along = if best.horizontal then m.x else m.z
-		table.insert(if isDoor then best.gaps else best.windows, { along - half, along + half })
+		local list = if into == "Door"
+			then best.gaps
+			elseif into == "Window" then best.windows
+			else best.secrets
+		table.insert(list, { along - half, along + half })
 	end
-	for _, m in all("Door") do
-		cut(m, true)
-	end
-	for _, m in all("Window") do
-		cut(m, false)
+	for _, kind in { "Door", "Window", "SecretWall" } do
+		for _, m in all(kind) do
+			cut(m, kind)
+		end
 	end
 	for _, w in layout.walls do
 		w.gaps = merged(w.gaps)
 		w.windows = merged(w.windows)
+		w.secrets = merged(w.secrets)
 	end
 
 	for i, m in all("Floor") do
@@ -266,7 +275,7 @@ function MapMarks.toLayout(name: string, title: string, marks: { Mark }): (Layou
 			x = m.x,
 			z = m.z,
 			r = math.max(m.w, m.d) / 2,
-			color = if m.color == "Orange" then "Orange" else "Green",
+			color = if m.color == "Orange" or m.color == "Cobweb" then m.color :: string else "Green",
 		})
 	end
 
@@ -367,6 +376,9 @@ function MapMarks.fromLayout(layout: Layout): { Mark }
 		end
 		for _, window in w.windows do
 			add("Window", span(window[1], window[2]))
+		end
+		for _, secret in w.secrets do
+			add("SecretWall", span(secret[1], secret[2]))
 		end
 	end
 	for _, spot in layout.furniture do

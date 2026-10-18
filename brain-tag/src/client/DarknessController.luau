@@ -1,6 +1,6 @@
 -- Dark maps (MapThemes with dark = true, like the haunted house): a lantern
 -- hangs on your own character, lit only on your screen, so you see what's
--- near you and little beyond. Walls and closed doors stop its light. Other
+-- near you and little beyond. Walls stop its light. Other
 -- people's name tags show only within the theme's sight (BushController
 -- asks `sees`).
 
@@ -36,6 +36,7 @@ local function updateLantern()
 			lamp = made
 		end
 		assert(lamp, "lamp")
+		lamp.Enabled = true
 		lamp.Range = lantern.range
 		lamp.Brightness = lantern.brightness
 		lamp.Color = Color3.fromHex(lantern.color)
@@ -70,12 +71,12 @@ function DarknessController.start()
 	end
 	map:GetAttributeChangedSignal("Theme"):Connect(refresh)
 	refresh()
-	-- Characters (and their root) are rebuilt on respawn and resize: check
-	-- now and then that the lantern is still on the current one.
+	-- Characters (and their root) are rebuilt on respawn and resize: keep
+	-- checking that the lantern is on the current one, so it never drops out.
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)
 		elapsed += dt
-		if elapsed >= 0.5 then
+		if elapsed >= 0.1 then
 			elapsed = 0
 			updateLantern()
 		end

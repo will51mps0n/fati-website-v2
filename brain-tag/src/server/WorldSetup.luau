@@ -14,6 +14,7 @@ WorldSetup.GROUPS = {
 	Characters = "Characters",
 	Furniture = "Furniture",
 	Shells = "CharacterShells", -- body-sized cylinders that only hit each other
+	SecretWalls = "SecretWalls", -- fake walls: stop furniture, let people through
 }
 
 local function folder(name: string, parent: Instance): Folder
@@ -55,6 +56,10 @@ function WorldSetup.run()
 		PhysicsService:CollisionGroupSetCollidable(groups.Shells, other, false)
 	end
 	PhysicsService:CollisionGroupSetCollidable(groups.Shells, groups.Shells, Config.PLAYERS_COLLIDE)
+	PhysicsService:RegisterCollisionGroup(groups.SecretWalls)
+	for _, other in { "Default", groups.Characters, groups.Shells } do
+		PhysicsService:CollisionGroupSetCollidable(groups.SecretWalls, other, false)
+	end
 
 	for _, name in { "Map", "Furniture", "GroundItems", "Projectiles", "Traps", "Effects", "Bots" } do
 		folder(name, workspace)

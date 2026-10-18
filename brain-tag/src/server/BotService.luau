@@ -11,8 +11,8 @@
 --     toward close zombies (weapons are solid; a few can swing), flee
 --     toward open ground or through doorways away from every zombie, juke
 --     sideways when one is about to grab them, and hide in bushes
---   * on dark maps (MapThemes) nobody sees far, and walls and closed doors
---     block the view
+--   * on dark maps (MapThemes) nobody sees far and walls block the view; on
+--     roofed maps nobody sees into a room they aren't in
 -- Movement never aims through walls: straight lines are checked with a
 -- body-wide sweep, everything else uses pathfinding, and a bot that stops
 -- making progress steps sideways and replans.
@@ -33,6 +33,7 @@ local Items = require(ReplicatedStorage.Shared.Items)
 local MapLayout = require(ReplicatedStorage.Shared.MapLayout)
 local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 local Participants = require(script.Parent.Participants)
+local Roofs = require(ReplicatedStorage.Shared.Roofs)
 local RoundManager = require(script.Parent.RoundManager)
 local Skins = require(ReplicatedStorage.Shared.Skins)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -301,8 +302,12 @@ local function visible(entry: Seen, from: Vector3): boolean
 	return not entry.hidden or Util.flatDistance(entry.position, from) <= Config.BUSH_REVEAL_DISTANCE
 end
 
--- On a dark map nobody sees far, and walls and closed doors block the view.
+-- On a dark map nobody sees far and walls block the view; on a roofed map
+-- nobody sees into a room they aren't in.
 local function inSight(from: Vector3, to: Vector3, distance: number): boolean
+	if not Roofs.canSee(from, to) then
+		return false
+	end
 	local theme = MapThemes.get(MapLayout.current().theme)
 	if not theme.dark then
 		return true

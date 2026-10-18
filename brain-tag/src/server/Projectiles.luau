@@ -188,9 +188,9 @@ function Projectiles.fire(shooter: Participant, item: Items.Item, aim: Vector3)
 		workspace:WaitForChild("Effects"),
 	}
 	local map = workspace:WaitForChild("Map")
-	-- Shots stop at the boundary wall, but fly over the ground and through
-	-- swinging doors and non-solid scenery.
-	for _, name in { "Ground", "Road", "Floors", "Doors", "Custom" } do
+	-- Shots stop at the boundary wall, but fly over the ground, under roofs
+	-- and through non-solid scenery.
+	for _, name in { "Ground", "Road", "Floors", "Roofs", "Custom" } do
 		local child = map:FindFirstChild(name)
 		if child then
 			table.insert(ignored, child)

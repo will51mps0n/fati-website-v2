@@ -7,8 +7,20 @@ local Config = require(script.Parent.Config)
 local EXTERIOR_DOORS: { [string]: { [string]: number } } = {
 	Neighborhood = { North = 3, South = 3, Island = 2 },
 	Mansion = { Mansion = 4, Shed = 2 },
-	ChristmasTown = { North = 3, South = 3, Island = 2 },
-	Haunted = { Manor = 4, Crypt = 1, Shed = 1 },
+	ChristmasTown = { Workshop = 3, CottageA = 2, CottageB = 2, CottageC = 2, CottageD = 2, Gingerbread = 1 },
+	Haunted = {
+		Manor = 4,
+		Crypt = 1,
+		Shed = 1,
+		Outhouse1 = 1,
+		Outhouse2 = 1,
+		Outhouse3 = 1,
+		Outhouse4 = 1,
+		Outhouse5 = 1,
+		Outhouse6 = 1,
+		Outhouse7 = 1,
+		Outhouse8 = 1,
+	},
 }
 
 local function furnitureRect(spot)
@@ -169,6 +181,11 @@ for _, mapName in MapLayout.names do
 			expect(math.abs(thickness - T) < 1e-6 or length < T + 1e-6, "piece thickness " .. thickness)
 		end
 		for _, w in layout.walls do
+			for _, secret in w.secrets do
+				for _, gap in w.gaps do
+					expect(secret[2] <= gap[1] or secret[1] >= gap[2], "secret wall overlaps a door")
+				end
+			end
 			for _, win in w.windows do
 				for _, gap in w.gaps do
 					expect(win[2] <= gap[1] or win[1] >= gap[2], "window overlaps a door")
@@ -220,8 +237,10 @@ for _, mapName in MapLayout.names do
 			end
 		end
 		for _, piece in pieces do
-			local r = piece.rect
-			block(r.x1, r.z1, r.x2, r.z2)
+			if not piece.secret then -- fake walls: people walk through
+				local r = piece.rect
+				block(r.x1, r.z1, r.x2, r.z2)
+			end
 		end
 		for _, spot in layout.furniture do
 			if not FurnitureSpecs.get(spot.kind).decor then
@@ -336,6 +355,9 @@ for _, mapName in MapLayout.names do
 			end
 		end
 		for _, bush in layout.bushes do
+			if bush.color == "Cobweb" then
+				continue -- cobwebs are indoor hiding spots
+			end
 			local r =
 				{ x1 = bush.x - bush.r, z1 = bush.z - bush.r, x2 = bush.x + bush.r, z2 = bush.z + bush.r }
 			for _, path in layout.paths do

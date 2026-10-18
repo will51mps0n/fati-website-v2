@@ -1,7 +1,8 @@
 -- Hiding in bushes, on your screen: the bush you stand in fades so you can
 -- see yourself (and anyone hiding with you), and the name tags of players
 -- hiding in other bushes disappear. On dark maps, name tags also show only
--- for people close enough to see (DarknessController).
+-- for people close enough to see (DarknessController), and on roofed maps
+-- only for people in the same room as you (Roofs).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local DarknessController = require(script.Parent.DarknessController)
+local Roofs = require(ReplicatedStorage.Shared.Roofs)
 
 local BushController = {}
 
@@ -61,7 +63,9 @@ local function step()
 			local root = rootOf(model)
 			if tag and tag:IsA("BillboardGui") and root then
 				local theirs = Bushes.coverAt(root.Position)
-				local show = (theirs == nil or theirs == mine) and DarknessController.sees(root.Position)
+				local show = (theirs == nil or theirs == mine)
+					and DarknessController.sees(root.Position)
+					and (myRoot == nil or Roofs.canSee(myRoot.Position, root.Position))
 				if tag.Enabled ~= show then
 					tag.Enabled = show
 				end

@@ -1,8 +1,10 @@
 -- Builds a map from MapLayout: grass with little details, dirt paths, the
 -- road, house floors with patterns, outlined walls split into breakable
 -- segments, windows, bushes and an invisible boundary, all in the map's
--- theme colors (MapThemes), with its lighting. Maps with swingDoors get a
--- walk-through door in every doorway (DoorController swings them).
+-- theme colors (MapThemes), with its lighting. Fake (secret) wall pieces
+-- look like the rest but people walk through them. Roofed maps put a roof
+-- over every room, hiding it except on the screen of whoever is inside
+-- (RoofController).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -24,7 +26,6 @@ type Layout = MapLayout.Layout
 
 local mapFolder: Folder
 local wallsFolder: Folder? = nil
-local doorsFolder: Folder? = nil
 local brokenSegments: { Model } = {}
 
 local function sub(name: string, parent: Instance): Folder
@@ -363,6 +364,12 @@ local function buildWalls(parent: Instance, layout: Layout)
 				parent = segment,
 			})
 		end
+		if piece.secret then
+			-- Looks like any other wall and blocks furniture, shots and the bots'
+			-- view (and their pathfinding), but people walk straight through.
+			wall.CollisionGroup = "SecretWalls"
+			segment:SetAttribute("Secret", true)
+		end
 		segment.PrimaryPart = wall
 		segment:SetAttribute("House", piece.house)
 		CollectionService:AddTag(segment, "Breakable")
@@ -389,9 +396,12 @@ local function buildBushes(parent: Instance, layout: Layout)
 	local classic = layout.theme == "Classic"
 	for _, bush in layout.bushes do
 		local orange = bush.color == "Orange"
-		local base = if orange then COLORS.BushOrange else COLORS.BushGreen
+		local cobweb = bush.color == "Cobweb" -- an indoor hiding spot: a big clump of webs
+		local base = if cobweb then "C3C9CF" elseif orange then COLORS.BushOrange else COLORS.BushGreen
 		-- Classic keeps its hand-picked shades; other themes derive them.
-		local light = if classic then (if orange then "F2AC62" else "5CBF67") else shade(base, 1.3)
+		local light = if classic and not cobweb
+			then (if orange then "F2AC62" else "5CBF67")
+			else shade(base, 1.3)
 		local model = Instance.new("Model")
 		model.Name = "Bush"
 		local blobs = {
@@ -399,7 +409,9 @@ local function buildBushes(parent: Instance, layout: Layout)
 			{ math.cos(0.7) * bush.r * 0.6, math.sin(0.7) * bush.r * 0.6, bush.r * 1.4 },
 			{ math.cos(3.5) * bush.r * 0.6, math.sin(3.5) * bush.r * 0.6, bush.r * 1.3 },
 		}
-		local outline = if classic then (if orange then "B5651E" else "2E7D3E") else shade(base, 0.65)
+		local outline = if classic and not cobweb
+			then (if orange then "B5651E" else "2E7D3E")
+			else shade(base, 0.65)
 		for _, blob in blobs do
 			-- A darker, slightly bigger, slightly lower disc draws the outline.
 			Parts.disc(
@@ -428,6 +440,19 @@ local function buildBushes(parent: Instance, layout: Layout)
 				light,
 				model
 			)
+		end
+		if cobweb then
+			-- Strands across the top.
+			for k = 0, 3 do
+				local strand = Parts.make({
+					name = "Strand",
+					size = Vector3.new(bush.r * 2.2, 0.05, 0.12),
+					cframe = CFrame.new(bush.x, height + 0.08, bush.z) * CFrame.Angles(0, k * math.pi / 4, 0),
+					color = "F4F6F8",
+					parent = model,
+				})
+				strand.Transparency = 0.3
+			end
 		end
 		-- Walk-through and shoot-through: bushes only hide what's inside.
 		for _, part in model:GetDescendants() do
@@ -545,41 +570,45 @@ local function buildDecor(layout: Layout, walls: Folder)
 	end
 end
 
--- Swinging doors: a panel across every doorway that anyone walks straight
--- through. Closed, it hides the room beyond (it blocks light and the bots'
--- view); each player's DoorController swings it open as people pass.
-local function buildSwingDoors(parent: Folder, layout: Layout)
-	local height = WALL_HEIGHT - 1.5
-	for _, door in MapLayout.doors(layout) do
-		local length = door.width - 0.3
-		local size = if door.horizontal
-			then Vector3.new(length, height, 0.5)
-			else Vector3.new(0.5, height, length)
-		local panel = Parts.make({
-			name = "SwingDoor",
-			size = size,
-			cframe = CFrame.new(door.x, H.Floor + height / 2, door.z),
-			color = COLORS.Door,
+-- Roofs: one over every room of every house, just under the wall tops so
+-- the walls still draw the floor plan. Each player's RoofController hides
+-- the roof of the room they stand in, so you see inside only once you're in.
+local function buildRoofs(parent: Folder, layout: Layout)
+	for _, room in layout.rooms do
+		if room.house == "" then
+			continue -- yards (a graveyard, a pumpkin patch) stay open
+		end
+		local r = room.rect
+		local roof = Parts.make({
+			name = "Roof",
+			size = Vector3.new(r.x2 - r.x1, 0.3, r.z2 - r.z1),
+			cframe = CFrame.new((r.x1 + r.x2) / 2, WALL_HEIGHT - 0.2, (r.z1 + r.z2) / 2),
+			color = COLORS.Roof,
+			canCollide = false,
+			canQuery = false,
 			parent = parent,
 		})
-		panel.CanCollide = false
-		panel.CanTouch = false
-		panel.CastShadow = true
-		panel:SetAttribute("Horizontal", door.horizontal)
-		-- The knob, near the free end.
-		local along = if door.horizontal then Vector3.xAxis else Vector3.zAxis
-		local knob = Parts.make({
-			name = "Knob",
-			size = Vector3.new(0.7, 0.2, 0.7),
-			cframe = CFrame.new(
-				panel.Position + along * (length / 2 - 0.9) + Vector3.new(0, height / 2 + 0.1, 0)
-			),
-			color = COLORS.DoorKnob,
-			parent = panel,
+		roof.CanTouch = false
+		roof.CastShadow = false
+		roof:SetAttribute("Room", room.house .. " " .. room.name)
+	end
+	-- A shut-looking door in every doorway, poking up through the roofs. It's
+	-- only a look: walk straight through.
+	for _, door in MapLayout.doors(layout) do
+		local length = door.width - 0.2
+		local height = WALL_HEIGHT + 0.1
+		local panel = Parts.make({
+			name = "Door",
+			size = if door.horizontal
+				then Vector3.new(length, height, 0.8)
+				else Vector3.new(0.8, height, length),
+			cframe = CFrame.new(door.x, height / 2, door.z),
+			color = COLORS.Door,
+			canCollide = false,
+			canQuery = false,
+			parent = parent,
 		})
-		knob.CanCollide = false
-		knob.CanQuery = false
-		knob.CanTouch = false
+		panel.CanTouch = false
 	end
 end
 
@@ -590,7 +619,7 @@ local function applyLighting(theme: MapThemes.Theme)
 	Lighting.OutdoorAmbient = Color3.fromHex(l.outdoor)
 	Lighting.Brightness = l.brightness
 	Lighting.ClockTime = l.clock
-	-- Dark maps need shadows so walls and closed doors stop your lantern.
+	-- Dark maps need shadows so walls stop your lantern.
 	Lighting.GlobalShadows = theme.dark == true
 	local tint = Lighting:FindFirstChild("ThemeColor") :: ColorCorrectionEffect?
 	if not tint then
@@ -612,15 +641,12 @@ function MapBuilder.build(layout: Layout)
 	applyLighting(theme)
 	local walls = wallsFolder or sub("Walls", mapFolder)
 	wallsFolder = walls
-	local doors = doorsFolder or sub("Doors", mapFolder)
-	doorsFolder = doors
 	for _, child in mapFolder:GetChildren() do
-		if child ~= walls and child ~= doors then
+		if child ~= walls then
 			child:Destroy()
 		end
 	end
 	walls:ClearAllChildren()
-	doors:ClearAllChildren()
 	table.clear(brokenSegments)
 
 	local ground = sub("Ground", mapFolder)
@@ -636,8 +662,8 @@ function MapBuilder.build(layout: Layout)
 	buildBushes(bushes, layout)
 	buildBoundary(sub("Boundary", mapFolder), layout)
 	buildDecor(layout, walls)
-	if layout.swingDoors then
-		buildSwingDoors(doors, layout)
+	if layout.roofs then
+		buildRoofs(sub("Roofs", mapFolder), layout)
 	end
 	for _, folder in { ground, road, floors } do
 		setPhysics(folder, SLIPPERY)
@@ -651,12 +677,6 @@ end
 function MapBuilder.wallsFolder(): Folder
 	assert(wallsFolder, "MapBuilder.build has not run yet")
 	return wallsFolder
-end
-
--- Swinging door panels (empty on maps without them).
-function MapBuilder.doorsFolder(): Folder
-	assert(doorsFolder, "MapBuilder.build has not run yet")
-	return doorsFolder
 end
 
 -- Shotgun hit: hide a wall segment until the next round.

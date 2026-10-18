@@ -76,12 +76,12 @@ local THEMES: { [string]: Theme } = {
 			BushGreen = "2C4430",
 			BushOrange = "5E3427",
 			ZombiePit = "3A0F14",
-			Door = "2E2019",
-			DoorKnob = "8C7A55",
+			Roof = "060509", -- pitch black: you can't see into rooms you're not in
+			Door = "3A2A20",
 		},
 		lighting = {
-			ambient = "3A3150",
-			outdoor = "3A3150",
+			ambient = "2C2540",
+			outdoor = "2C2540",
 			brightness = 0,
 			clock = 0,
 			tint = "C9C0E8",

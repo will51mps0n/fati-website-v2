@@ -21,8 +21,9 @@
 --   Maps.check()                      -- what each map has, and any mistakes
 --   Maps.unlock()                     -- unlock parts made by older versions
 --
--- Map folder attributes: Title, Enabled, Theme (see MapThemes) and
--- SwingDoors (walk-through doors in every doorway that block the view).
+-- Map folder attributes: Title, Enabled, Theme (see MapThemes) and Roofs
+-- (every room gets a pitch black roof hiding it, except on the screen of
+-- whoever is inside, plus a shut-looking door in each doorway).
 
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -83,6 +84,13 @@ local LOOKS: { [string]: Look } = {
 		group = "Buildings",
 	},
 	Window = { color = "Window", top = WALL_H + 0.5, height = WALL_H + 0.5, group = "Buildings" },
+	SecretWall = {
+		color = "B05CFF",
+		top = WALL_H + 1.2,
+		height = WALL_H + 1.2,
+		transparency = 0.35,
+		group = "Buildings",
+	},
 	HumanSpawn = { color = "3B82F6", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	ZombieSpawn = { color = "E0303A", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
 	Start = { color = "FFFFFF", top = 0.9, height = 0.5, disc = true, label = true, group = "Spawns" },
@@ -245,7 +253,7 @@ function MapStudio.read(folder: Instance): (MapLayout.Layout?, { string }, { str
 			"Unknown Theme " .. theme .. " (themes: " .. table.concat(MapThemes.NAMES, ", ") .. ")"
 		)
 	end
-	layout.swingDoors = folder:GetAttribute("SwingDoors") == true
+	layout.roofs = folder:GetAttribute("Roofs") == true
 	return if #errors == 0 then layout else nil, errors, warnings, decor
 end
 
@@ -370,7 +378,10 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance, palette: { [
 		color = if m.outline == "Orange" then palette.OutlineOrange else palette.OutlineBlue
 		part:SetAttribute("Outline", m.outline or "Blue")
 	elseif m.kind == "Bush" then
-		color = if m.color == "Orange" then palette.BushOrange else palette.BushGreen
+		color = if m.color == "Cobweb"
+			then "C3C9CF"
+			elseif m.color == "Orange" then palette.BushOrange
+			else palette.BushGreen
 		part:SetAttribute("Color", m.color or "Green")
 	end
 	if m.id then
@@ -448,13 +459,7 @@ local function show(folder: Instance, origin: Vector3, bounds: Rect)
 	end)
 end
 
-local function place(
-	name: string,
-	title: string,
-	marks: { Mark },
-	theme: string,
-	swingDoors: boolean
-): Instance?
+local function place(name: string, title: string, marks: { Mark }, theme: string, roofs: boolean): Instance?
 	if not editing() then
 		return nil
 	end
@@ -480,7 +485,7 @@ local function place(
 	folder:SetAttribute("Title", title)
 	folder:SetAttribute("Enabled", true)
 	folder:SetAttribute("Theme", theme)
-	folder:SetAttribute("SwingDoors", swingDoors)
+	folder:SetAttribute("Roofs", roofs)
 	local palette = MapThemes.palette(theme) :: any
 	for _, m in marks do
 		local group = if MapMarks.isFurniture(m.kind) then "Furniture" else LOOKS[m.kind].group
@@ -511,7 +516,7 @@ function MapStudio.copy(name: string, newName: string?): Instance?
 		return nil
 	end
 	local title = if newName then newName else layout.title
-	return place(newName or name, title, MapMarks.fromLayout(layout), layout.theme, layout.swingDoors)
+	return place(newName or name, title, MapMarks.fromLayout(layout), layout.theme, layout.roofs)
 end
 
 -- A small map to build on, in a theme (Classic if none).
@@ -522,7 +527,7 @@ function MapStudio.new(name: string?, theme: string?): Instance?
 		warn("[Maps] No theme called " .. themeName .. ". Themes: " .. table.concat(MapThemes.NAMES, ", "))
 		return nil
 	end
-	-- Dark maps get swinging doors (they hide the rooms beyond).
+	-- Dark maps get roofs (rooms stay pitch black until you walk in).
 	local dark = MapThemes.get(themeName).dark == true
 	return place(mapName, mapName, MapMarks.starter(), themeName, dark)
 end
@@ -603,6 +608,7 @@ function MapStudio.palette(): Instance?
 	sample("Wall", 20, 3)
 	sample("Door", 8, 3)
 	sample("Window", 10, 3)
+	sample("SecretWall", 8, 3)
 	for _, floor in MapMarks.FLOORS do
 		sample("Floor", 16, 16, { floor = floor })
 	end
@@ -613,6 +619,7 @@ function MapStudio.palette(): Instance?
 	end
 	sample("Bush", 9, 9, { color = "Green" })
 	sample("Bush", 9, 9, { color = "Orange" })
+	sample("Bush", 6, 6, { color = "Cobweb" })
 	sample("Road", 16, 16)
 	sample("Sidewalk", 16, 8)
 	sample("CenterLine", 16, 1)

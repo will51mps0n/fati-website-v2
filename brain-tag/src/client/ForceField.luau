@@ -1,8 +1,9 @@
 -- Soft force fields around people and held weapons, felt by YOUR character
 -- (worked out on your machine, so it is smooth and instant):
 --   * people on your team gently push apart before they overlap
---   * someone else's weapon pushes you off it (firm ones harder)
---   * pushing into someone with your own weapon pushes you back a little
+--   * someone else's weapon pushes you off it (firm ones and bigger
+--     holders harder)
+--   * someone pressing on your own weapon pushes you back (by size)
 --   * two weapons pressed together push their holders apart
 -- So nobody stacks up and there is always a bit of friction, like the
 -- original. Bots get the same push from the server (ItemService.shaftStep).
@@ -118,9 +119,12 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 			local away = me - point
 			local overlap = (item.guard or 0.5) + myRadius - away.Magnitude
 			if overlap > 0 then
-				local firm = (item.firmness or 1) * math.clamp(scale / myScale, 0.5, 2)
+				-- Shared by strength (size squared, times how firm the weapon is):
+				-- a much bigger holder holds you off completely.
+				local hold = scale * scale * (item.firmness or 1)
+				local share = hold / (hold + myScale * myScale)
 				local dir = if away.Magnitude > 0.01 then away.Unit else facing.Unit
-				push += dir * math.min(overlap * Config.FIELD_WEAPON * firm, Config.FIELD_WEAPON_MAX)
+				push += dir * math.min(overlap * Config.FIELD_WEAPON * share * 2, Config.FIELD_WEAPON_MAX)
 			end
 
 			-- Weapon against weapon: both holders get pushed apart.
@@ -136,14 +140,17 @@ function ForceField.velocity(root: BasePart, aim: Vector3, myItemId: string?, my
 			end
 		end
 
-		-- Your weapon pushing into them pushes you back a little.
+		-- Someone pressing on your weapon pushes you back, by their share of
+		-- the strength: an equal zombie walks you backwards, a small one
+		-- against a big you barely does.
 		if myA and myB and myItem then
 			local point = closest(myA, myB, them)
 			local overlap = (myItem.guard or 0.5) + radius - (point - them).Magnitude
 			if overlap > 0 then
 				local back = if offset.Magnitude > 0.01 then offset.Unit else -aim
-				local weight = math.clamp(scale / myScale, 0.5, 2)
-				push += back * math.min(overlap * Config.FIELD_RECOIL * weight, Config.FIELD_WEAPON_MAX * 0.5)
+				local mine = myScale * myScale * (myItem.firmness or 1)
+				local share = scale * scale / (mine + scale * scale)
+				push += back * math.min(overlap * Config.FIELD_RECOIL * share * 2, Config.FIELD_WEAPON_MAX)
 			end
 		end
 	end

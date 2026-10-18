@@ -122,6 +122,9 @@ FURNITURE_COLORS = {
     "ChristmasTree": "2E7D46",
     "Present": "D8423F",
     "Snowman": "F4F8FA",
+    "Pumpkin": "E8761E",
+    "JackOLantern": "FFB347",
+    "HayBale": "D8B24C",
 }
 
 
@@ -198,7 +201,8 @@ def main() -> int:
         grown = {"x1": r["x1"] - 0.5, "z1": r["z1"] - 0.5, "x2": r["x2"] + 0.5, "z2": r["z2"] + 0.5}
         box(grown, outline_for[piece["house"]])
     for piece in data["pieces"]:
-        box(piece["rect"], c["Wall"])
+        # Fake walls show purple here (in game they look like any wall).
+        box(piece["rect"], "9B59B6" if piece.get("secret") else c["Wall"])
         if piece["window"]:
             r = piece["rect"]
             if piece["horizontal"]:
@@ -209,7 +213,7 @@ def main() -> int:
                 box({"x1": mid - 0.5, "z1": r["z1"], "x2": mid + 0.5, "z2": r["z2"]}, c["Window"])
 
     for bush in data["bushes"]:
-        color = c["BushGreen"] if bush["color"] == "Green" else c["BushOrange"]
+        color = {"Green": c["BushGreen"], "Cobweb": "C3C9CF"}.get(bush["color"], c["BushOrange"])
         point(bush, bush["r"], color)
     for p in data["humanSpawns"]:
         point(p, 1.6, "FFFFFF")

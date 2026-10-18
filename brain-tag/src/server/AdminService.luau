@@ -1,9 +1,19 @@
 -- The admin panel's server side. Every request is checked here: only admins
 -- (Studio testers, the experience owner, Config.ADMIN_USER_IDS) get through,
 -- and every argument is validated before it touches the game.
+--
+-- Admins can also type chat commands:
+--   /map Haunted     next round plays that map (part of a name is enough)
+--   /map Haunted now ...and end this round to go there right away
+--   /endround        end this round now; the next one starts
+--   /maps            list the maps
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local Announcer = require(script.Parent.Announcer)
 
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -242,10 +252,20 @@ end
 
 function ACTIONS.map(_admin, data)
 	local name = if typeof(data.map) == "string" then data.map else ""
-	if RoundManager.queueMap(name) then
-		return true, "Next round plays " .. name .. " (Skip phase to get there now)"
+	if not RoundManager.queueMap(name) then
+		return false, "No map called " .. name
 	end
-	return false, "No map called " .. name
+	if data.now == true and RoundManager.endRound() then
+		return true, "Going to " .. name .. " now"
+	end
+	return true, "Next round plays " .. name
+end
+
+function ACTIONS.endRound()
+	if RoundManager.endRound() then
+		return true, "Round ended: the next one starts now"
+	end
+	return false, "No round is running"
 end
 
 function ACTIONS.resetFurniture()
@@ -276,8 +296,88 @@ local function handle(player: Player, action: unknown, data: unknown): (boolean,
 	return success, message
 end
 
+-- A map by name, title or the start of either (any case).
+local function findMap(text: string): string?
+	local wanted = string.lower(text)
+	for _, exact in { true, false } do
+		for _, name in RoundManager.mapNames() do
+			local layout = MapLayout.get(name)
+			for _, label in { string.lower(name), string.lower(if layout then layout.title else name) } do
+				local plain = string.gsub(label, "^the ", "")
+				if
+					(exact and (label == wanted or plain == wanted))
+					or (
+						not exact
+						and (string.find(label, wanted, 1, true) or string.find(plain, wanted, 1, true))
+					)
+				then
+					return name
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function chatCommand(alias: string, run: (player: Player, admin: Participant, args: { string }) -> ())
+	local command = Instance.new("TextChatCommand")
+	command.Name = "BrainTag" .. string.sub(alias, 2)
+	command.PrimaryAlias = alias
+	command.Parent = TextChatService
+	command.Triggered:Connect(function(source: TextSource, text: string)
+		local player = Players:GetPlayerByUserId(source.UserId)
+		local admin = player and Participants.fromPlayer(player)
+		if not player or not admin or not AdminService.isAdmin(player) then
+			return
+		end
+		local words = string.split(text, " ")
+		table.remove(words, 1)
+		local args = {}
+		for _, word in words do
+			if word ~= "" then
+				table.insert(args, word)
+			end
+		end
+		run(player, admin, args)
+	end)
+end
+
+local function setupChatCommands()
+	chatCommand("/maps", function(player, _admin, _args)
+		Announcer.toast(player, "Maps: " .. table.concat(RoundManager.mapNames(), ", "))
+	end)
+	chatCommand("/endround", function(player, admin, _args)
+		local _, message = ACTIONS.endRound(admin, {})
+		Announcer.toast(player, message)
+	end)
+	chatCommand("/map", function(player, admin, args)
+		local now = args[#args] ~= nil and string.lower(args[#args]) == "now"
+		if now then
+			table.remove(args)
+		end
+		local name = findMap(table.concat(args, " "))
+		if not name then
+			Announcer.toast(
+				player,
+				"No such map. Maps: " .. table.concat(RoundManager.mapNames(), ", "),
+				"E0303A"
+			)
+			return
+		end
+		local _, message = ACTIONS.map(admin, { map = name, now = now })
+		Announcer.toast(player, message)
+	end)
+end
+
 function AdminService.init()
 	Remotes.func("Admin").OnServerInvoke = handle
+	local ok, err = pcall(function()
+		setupChatCommands()
+		return true
+	end)
+	if not ok then
+		warn("[Admin] chat commands unavailable: " .. tostring(err))
+	end
 	Participants.onAdded(function(p)
 		if p.player and AdminService.isAdmin(p.player) then
 			p.state:SetAttribute("Admin", true)

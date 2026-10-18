@@ -299,14 +299,17 @@ end
 
 -- Waits until the phase timer ends. Returns false if players dropped below
 -- the minimum (round aborted).
+-- An admin ended the round: it stops with no winner and the next one starts.
+local endRequested = false
+
 local function waitPhase(): boolean
 	while secondsLeft() > 0 do
-		if not enoughPlayers() then
+		if not enoughPlayers() or endRequested then
 			return false
 		end
 		task.wait(0.2)
 	end
-	return true
+	return not endRequested
 end
 
 local function pickFirstZombies(): { Participant }
@@ -385,6 +388,9 @@ local function runInfection(): Winner?
 	setPhase("Infection", Config.ROUND_SECONDS)
 	while true do
 		task.wait(0.1)
+		if endRequested then
+			return nil
+		end
 		local humans = Participants.onTeam("Human")
 		local zombies = Participants.onTeam("Zombie")
 		local result = RoundRules.outcome(#humans, secondsLeft())
@@ -438,6 +444,7 @@ local function nextMapIfDue()
 end
 
 local function runRound()
+	endRequested = false
 	waitForPlayers()
 
 	nextMapIfDue()
@@ -531,6 +538,22 @@ function RoundManager.skipPhase(): boolean
 	end
 	state:SetAttribute("PhaseEndsAt", workspace:GetServerTimeNow())
 	return true
+end
+
+-- Ends the whole round now (no winner, no rewards); the next round starts
+-- right away, on the map an admin queued if any.
+function RoundManager.endRound(): boolean
+	if phase == "Waiting" then
+		return false
+	end
+	endRequested = true
+	Announcer.chat("* An admin ended the round *")
+	return true
+end
+
+-- The maps in the rotation, in order (built-in and Studio-made).
+function RoundManager.mapNames(): { string }
+	return rotation
 end
 
 function RoundManager.addTime(seconds: number): boolean

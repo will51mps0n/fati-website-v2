@@ -264,6 +264,9 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	-- Round ---------------------------------------------------------------------------------
 	heading("Round")
 	local roundRow = row()
+	button(roundRow, "END ROUND NOW (next round)", ADMIN_RED, function()
+		send("endRound")
+	end)
 	button(roundRow, "Skip phase", nil, function()
 		send("skip")
 	end)
@@ -284,7 +287,7 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	end)
 
 	-- Maps --------------------------------------------------------------------------------------
-	heading("Play map next round (yours from Studio come first)")
+	heading("Maps: Next = after this round, Now = end this round and go")
 	local mapRow = row(30)
 	local shownMaps = ""
 	local function refreshMaps()
@@ -302,9 +305,15 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 		end
 		for i, name in string.split(list, "|") do
 			if name ~= "" then
-				button(mapRow, name, nil, function()
+				button(mapRow, "Next: " .. name, nil, function()
 					send("map", { map = name })
 				end).LayoutOrder = i
+						* 2
+					- 1
+				button(mapRow, "Now: " .. name, ADMIN_RED, function()
+					send("map", { map = name, now = true })
+				end).LayoutOrder = i
+					* 2
 			end
 		end
 	end

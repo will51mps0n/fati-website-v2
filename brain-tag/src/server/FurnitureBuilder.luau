@@ -527,7 +527,9 @@ local DESIGNS: { [string]: Design } = {
 			light.Range = 18
 			light.Brightness = 1.6
 			light.Color = Color3.fromHex("FFC27A")
-			light.Shadows = true
+			-- No shadows: Roblox draws only a few shadow-casting lights at a
+			-- time, and dozens of candles would crowd out your own lantern.
+			light.Shadows = false
 			light.Parent = c.body
 		end,
 	},
@@ -539,6 +541,55 @@ local DESIGNS: { [string]: Design } = {
 			c:disc(0, 0, c.w * 0.8, 0.0, 0.06, "4FC24F").Material = Enum.Material.Neon -- brew
 			c:disc(-0.5, 0.3, 0.6, 0.03, 0.06, "9BF59B")
 			c:disc(0.6, -0.4, 0.45, 0.03, 0.06, "9BF59B")
+		end,
+	},
+	Pumpkin = {
+		body = "E8761E",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -0.05, c.h - 0.1, "E8761E")
+			for k = 0, 3 do
+				c:top(0, 0, c.w * 0.92, 0.12, 0.0, 0.04, "C45C12", k * math.pi / 4) -- ribs
+			end
+			c:disc(0, 0, 0.45, 0.25, 0.4, "5B7A2E") -- stem
+		end,
+	},
+	JackOLantern = {
+		body = "E8761E",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, c.w, -0.05, c.h - 0.1, "E2701A")
+			c:disc(0, -0.1, c.w * 0.86, 0.0, 0.04, "D86514")
+			-- The carved face, glowing (forehead toward the back, mouth to the front).
+			local glow = "FFD24A"
+			for side = -1, 1, 2 do
+				c:top(side * 0.5, -0.35, 0.42, 0.42, 0.03, 0.04, glow, math.rad(45)).Material =
+					Enum.Material.Neon
+			end
+			c:top(0, 0.05, 0.22, 0.22, 0.03, 0.04, glow, math.rad(45)).Material = Enum.Material.Neon
+			c:top(0, 0.5, 1.2, 0.22, 0.03, 0.04, glow).Material = Enum.Material.Neon
+			for _, x in { -0.4, 0, 0.4 } do
+				c:top(x, 0.42, 0.16, 0.14, 0.035, 0.04, "D86514") -- teeth
+			end
+			c:disc(0, -c.d / 2 + 0.55, 0.4, 0.25, 0.4, "5B7A2E") -- stem
+			local light = Instance.new("PointLight")
+			light.Range = 12
+			light.Brightness = 1.4
+			light.Color = Color3.fromHex("FF9A3C")
+			light.Shadows = false
+			light.Parent = c.body
+		end,
+	},
+	HayBale = {
+		body = "D8B24C",
+		draw = function(c)
+			c:top(0, 0, c.w - 0.3, c.d - 0.3, 0.02, 0.04, "E2C062")
+			for i = -2, 2 do
+				c:top(i * 0.9, 0, 0.08, c.d - 0.5, 0.04, 0.03, "C29A38") -- straw
+			end
+			for side = -1, 1, 2 do
+				c:top(side * c.w / 4, 0, 0.18, c.d + 0.04, 0.05, 0.04, "7A5B34") -- twine
+			end
 		end,
 	},
 	-- Christmas Town --------------------------------------------------------------
