@@ -592,6 +592,21 @@ local DESIGNS: { [string]: Design } = {
 			end
 		end,
 	},
+	Scarecrow = {
+		body = "8B6A43",
+		transparentBody = true,
+		draw = function(c)
+			c:disc(0, 0, 0.3, -c.h + 0.5, c.h - 0.6, "6B4E2E") -- post
+			c:top(0, 0, c.w, 0.32, -1.2, 0.3, "6B4E2E") -- arms
+			c:top(0, 0.05, 1.6, 1.0, -1.6, 1.4, "8E3B2E") -- shirt
+			for side = -1, 1, 2 do
+				c:top(side * (c.w / 2 - 0.15), 0, 0.5, 0.5, -1.15, 0.2, "D8B24C") -- straw hands
+			end
+			c:disc(0, 0, 1.0, -0.45, 0.9, "D8B24C") -- sack head
+			c:disc(0, 0, 1.7, -0.05, 0.12, "6B5232") -- hat brim
+			c:disc(0, 0, 0.9, 0.25, 0.4, "5A4329") -- hat crown
+		end,
+	},
 	-- Christmas Town --------------------------------------------------------------
 	ChristmasTree = {
 		body = "2E7D46",

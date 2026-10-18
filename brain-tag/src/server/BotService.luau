@@ -317,8 +317,9 @@ end
 
 -- A human holding a weapon out at us: a spot round the side it isn't
 -- pointing (the shaft only blocks straight ahead), or nil if we're already
--- beside or behind it.
-local function flankAround(target: Seen, here: Vector3): Vector3?
+-- beside or behind it. `wary` (just got hit or pushed off it): swing wider,
+-- right round the back, out of reach.
+local function flankAround(target: Seen, here: Vector3, wary: boolean?): Vector3?
 	local item = Items.get(target.p.heldItem)
 	if not item or item.kind ~= "Melee" then
 		return nil
@@ -330,13 +331,66 @@ local function flankAround(target: Seen, here: Vector3): Vector3?
 	local rel = Util.flat(here - target.position)
 	local d = rel.Magnitude
 	local reach = (item.reach or 5) * math.max(1, target.p.scale * 0.9)
-	if d < 0.5 or d > reach + 8 or (rel / d):Dot(aim) < 0.35 then
+	local front = if d > 0.5 then (rel / d):Dot(aim) else 0
+	if d < 0.5 or d > reach + (if wary then 14 else 8) or front < (if wary then -0.2 else 0.35) then
 		return nil
 	end
 	local side = Vector3.new(-aim.Z, 0, aim.X)
 	local sign = if rel:Dot(side) >= 0 then 1 else -1
+	if wary then
+		-- Out of reach, round to the back.
+		local around = (side * sign - aim * 0.9).Unit
+		return target.position + around * (reach + 3)
+	end
 	local around = (side * sign - aim * 0.35).Unit
 	return target.position + around * (reach * 0.75 + 2)
+end
+
+-- Rooms (inside houses, not yards) and their doorways ---------------------------------------
+
+local function roomAt(x: number, z: number): MapLayout.Room?
+	for _, room in MapLayout.current().rooms do
+		if room.house ~= "" and MapLayout.inRect(room.rect, x, z) then
+			return room
+		end
+	end
+	return nil
+end
+
+type RoomDoor = { door: MapLayout.Door, center: Vector3, inward: Vector3 }
+
+-- Each doorway of a room, with the unit vector pointing into the room.
+local function doorsOfRoom(room: MapLayout.Room): { RoomDoor }
+	local r = room.rect
+	local out: { RoomDoor } = {}
+	for _, door in doors() do
+		local center = Vector3.new(door.x, 2, door.z)
+		if door.horizontal and door.x > r.x1 and door.x < r.x2 then
+			if math.abs(door.z - r.z1) < 0.6 then
+				table.insert(out, { door = door, center = center, inward = Vector3.zAxis })
+			elseif math.abs(door.z - r.z2) < 0.6 then
+				table.insert(out, { door = door, center = center, inward = -Vector3.zAxis })
+			end
+		elseif not door.horizontal and door.z > r.z1 and door.z < r.z2 then
+			if math.abs(door.x - r.x1) < 0.6 then
+				table.insert(out, { door = door, center = center, inward = Vector3.xAxis })
+			elseif math.abs(door.x - r.x2) < 0.6 then
+				table.insert(out, { door = door, center = center, inward = -Vector3.xAxis })
+			end
+		end
+	end
+	return out
+end
+
+-- A room worth holing up in: walls round it, one or two doors, not a hallway.
+local function goodHideout(room: MapLayout.Room): boolean
+	local r = room.rect
+	local doorsIn = #doorsOfRoom(room)
+	return doorsIn >= 1
+		and doorsIn <= 2
+		and (r.x2 - r.x1) >= 14
+		and (r.z2 - r.z1) >= 14
+		and not string.find(string.lower(room.name), "hall")
 end
 
 -- One bot ---------------------------------------------------------------------------------
@@ -376,6 +430,15 @@ local function brain(p: Participant, level: Level, seed: number)
 	local badDoors: { [string]: number } = {} -- doors that wouldn't give -> until
 	local dodgeSpot: Vector3? = nil
 	local dodgeUntil, nextDodge = 0, 0
+	-- Builders (more of the smarter bots) hole up in a room and barricade it.
+	local builder = random:NextNumber() < (if level.flank then 0.55 else 0.2)
+	local home: MapLayout.Room? = nil
+	local homeRound = -1
+	type Barricade = { body: BasePart, target: Vector3, key: string, startedAt: number }
+	local barricade: Barricade? = nil
+	local barricaded: { [string]: boolean } = {}
+	local waryOf: Participant? = nil
+	local waryUntil = 0
 
 	local function radius(): number
 		return 0.9 * p.scale
@@ -671,6 +734,20 @@ local function brain(p: Participant, level: Level, seed: number)
 			if not wanderGoal or now > wanderUntil or Util.flatDistance(wanderGoal, here) < 4 then
 				wanderGoal = randomSpot()
 				wanderUntil = now + random:NextNumber(6, 12)
+				-- On roofed maps nobody can see into rooms: zombies go and look.
+				if p.team == "Zombie" and MapLayout.current().roofs then
+					local rooms = {}
+					for _, room in MapLayout.current().rooms do
+						if room.house ~= "" then
+							table.insert(rooms, room)
+						end
+					end
+					if #rooms > 0 then
+						local r = rooms[random:NextInteger(1, #rooms)].rect
+						wanderGoal = Vector3.new((r.x1 + r.x2) / 2, 2, (r.z1 + r.z2) / 2)
+						wanderUntil = now + random:NextNumber(5, 9)
+					end
+				end
 			end
 			goTo(wanderGoal :: Vector3, root, humanoid, false)
 			checkProgress(root, wanderGoal, humanoid)
@@ -702,8 +779,14 @@ local function brain(p: Participant, level: Level, seed: number)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
 				lastSeen, lastSeenAt = goal, now
+				-- Just got hit, or held off a weapon? Be wary of that human for a
+				-- while: no more running straight back into it.
+				if now < p.knockedUntil + 0.3 or now < p.pressedUntil then
+					waryOf, waryUntil = best.p, now + 5
+				end
+				local wary = waryOf == best.p and now < waryUntil
 				-- Holding a weapon out at us? Go round it.
-				local around = if level.flank then flankAround(best, here) else nil
+				local around = if level.flank or wary then flankAround(best, here, wary) else nil
 				if around and inBounds(around, 3) then
 					goal = around
 				end
@@ -806,6 +889,136 @@ local function brain(p: Participant, level: Level, seed: number)
 				if dodgeSpot then
 					humanoid:MoveTo(dodgeSpot)
 					pathGoal = nil
+					continue
+				end
+			end
+		end
+
+		-- Builders: hole up in a room, shove furniture into its doorways, and
+		-- lean on the barricade when a zombie comes knocking.
+		if builder and (phase == "Prep" or phase == "Infection") then
+			if homeRound ~= round then
+				homeRound, home, barricade = round, nil, nil
+				table.clear(barricaded)
+			end
+			local threatInside = closest ~= nil
+				and closestDistance < 16
+				and home ~= nil
+				and roomAt(closest.position.X, closest.position.Z) == home
+			if not home and phase == "Prep" then
+				local best: MapLayout.Room? = nil
+				local bestDistance = 140
+				for _, room in MapLayout.current().rooms do
+					local r = room.rect
+					local d =
+						Util.flatDistance(Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2), here)
+					if room.house ~= "" and d < bestDistance and goodHideout(room) then
+						best, bestDistance = room, d
+					end
+				end
+				home = best
+			end
+			local myHome = home
+			if myHome and not threatInside then
+				local r = myHome.rect
+				local middle = Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2)
+				local inside = roomAt(here.X, here.Z) == myHome
+				local roomDoors = doorsOfRoom(myHome)
+				local handled = false
+				if not inside then
+					if not closest or closestDistance > 20 then
+						goTo(middle, root, humanoid, false)
+						checkProgress(root, middle, humanoid)
+						handled = true
+					end
+				else
+					-- A zombie at one of our doors: lean on the barricade.
+					for _, entry in roomDoors do
+						if closest and Util.flatDistance(closest.position, entry.center) < 12 then
+							humanoid:MoveTo(entry.center)
+							handled = true
+							break
+						end
+					end
+					-- Otherwise finish the barricades.
+					if not handled and (not closest or closestDistance > 18) then
+						if not barricade then
+							for _, entry in roomDoors do
+								local key = doorKey(entry.door)
+								if barricaded[key] then
+									continue
+								end
+								local block = CFrame.new(entry.center + entry.inward * 3)
+								if
+									#FurnitureService.findInBox(
+										block,
+										Vector3.new(entry.door.width + 1, 4, 4)
+									) > 0
+								then
+									barricaded[key] = true -- already blocked
+									continue
+								end
+								local piece: BasePart? = nil
+								local pieceDistance = 30
+								for _, body in FurnitureService.piecesNear(entry.center, 30) do
+									local d = Util.flatDistance(body.Position, entry.center)
+									if
+										FurnitureService.weightOf(body) ~= "Massive"
+										and d > 4
+										and d < pieceDistance
+										and MapLayout.inRect(r, body.Position.X, body.Position.Z)
+									then
+										piece, pieceDistance = body, d
+									end
+								end
+								if piece then
+									local depth = FurniturePush.extent(piece, entry.inward)
+									barricade = {
+										body = piece,
+										target = Util.flat(entry.center + entry.inward * (depth + 1.6)),
+										key = key,
+										startedAt = now,
+									}
+									break
+								end
+								barricaded[key] = true -- nothing to block it with
+							end
+						end
+						local job = barricade
+						if job then
+							local body = job.body
+							local at = Util.flat(body.Position)
+							local toTarget = job.target - at
+							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 14 then
+								barricaded[job.key] = true
+								barricade = nil
+							else
+								-- Get behind the piece, then walk it to the doorway.
+								local push = toTarget.Unit
+								local behind = at - push * (FurniturePush.extent(body, push) + radius() + 1.2)
+								if Util.flatDistance(behind, here) > 2.5 then
+									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
+								else
+									humanoid:MoveTo(
+										Vector3.new(job.target.X, here.Y, job.target.Z) + push * 2
+									)
+								end
+								handled = true
+							end
+						end
+					end
+					if not handled then
+						-- Wait well back from the doors.
+						local away = Vector3.zero
+						for _, entry in roomDoors do
+							away += entry.inward
+						end
+						local spot = middle + (if away.Magnitude > 0.1 then away.Unit else Vector3.zero) * 4
+						humanoid:MoveTo(spot)
+						handled = true
+					end
+				end
+				if handled then
 					continue
 				end
 			end

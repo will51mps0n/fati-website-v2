@@ -40,7 +40,13 @@ export type WallPiece = {
 
 export type Room = { name: string, floor: string, rect: Rect, house: string }
 export type FurnitureSpot = { kind: string, x: number, z: number, rot: number, house: string }
-export type House = { id: string, rect: Rect, outline: string, size: string }
+export type House = {
+	id: string,
+	rect: Rect,
+	outline: string,
+	size: string,
+	wall: string?, -- hex color for its walls (a corn maze); the theme's Wall color if nil
+}
 export type Bush = { x: number, z: number, r: number, color: string }
 export type Door = {
 	x: number,
@@ -542,7 +548,8 @@ local function addHouse(
 	oz: number,
 	rotated: boolean,
 	outline: string,
-	size: string
+	size: string,
+	wall: string?
 )
 	local function px(x: number): number
 		return ox + (if rotated then plan.w - x else x)
@@ -562,10 +569,13 @@ local function addHouse(
 		return out
 	end
 
-	table.insert(
-		layout.houses,
-		{ id = id, rect = rect(px(0), pz(0), px(plan.w), pz(plan.d)), outline = outline, size = size }
-	)
+	table.insert(layout.houses, {
+		id = id,
+		rect = rect(px(0), pz(0), px(plan.w), pz(plan.d)),
+		outline = outline,
+		size = size,
+		wall = wall,
+	})
 
 	for _, w in plan.walls do
 		local horizontal = w.z1 == w.z2
@@ -799,60 +809,61 @@ local WORKSHOP: Plan = {
 	},
 	furniture = {
 		piece("Rug", 35, 30),
-		piece("Table", 53.52, 36.25, 90),
-		piece("Table", 63.02, 33.75, 90),
-		piece("Table", 19.75, 41.52),
-		piece("Chair", 50.03, 22.53),
-		piece("Chair", 41.03, 35.03),
-		piece("Chair", 6.03, 37.03),
-		piece("Chair", 54.03, 4.03, 90),
-		piece("Chair", 46.03, 7.03),
-		piece("Chair", 8.53, 8.53, 90),
-		piece("Present", 29.8, 43.3, 90),
-		piece("Present", 60.3, 7.8, 90),
-		piece("Present", 20.3, 22.8, 90),
-		piece("Present", 66.3, 3.3),
-		piece("Present", 23.3, 50.8),
-		piece("Present", 9.8, 45.3),
-		piece("Crate", 26.61, 12.11),
-		piece("Crate", 58.1, 21.11),
-		piece("Crate", 43.6, 20.61, 90),
-		piece("Box", 65.64, 50.64, 90),
-		piece("Box", 50.14, 54.14, 90),
-		piece("Box", 21.64, 56.14),
-		piece("Box", 36.64, 5.64),
-		piece("ChristmasTree", 18.52, 11.03),
-		piece("Bench", 5.6, 2.8),
-		piece("Bench", 2.8, 16.6, 90),
-		piece("Desk", 58.6, 56.38, 180),
-		piece("Bookshelf", 6.65, 57.15, 180),
-		piece("Table", 88.75, 8.03),
-		piece("Present", 74.8, 22.3),
-		piece("Present", 94.3, 21.3),
-		piece("Present", 78.8, 7.3, 90),
-		piece("Present", 73.8, 4.8),
-		piece("Present", 91.3, 26.3, 90),
-		piece("Present", 80.3, 20.8),
-		piece("Box", 96.65, 26.64),
-		piece("Desk", 75.6, 33.38),
-		piece("Chair", 95.53, 51.53, 90),
-		piece("Bookshelf", 93.15, 57.15, 180),
-		piece("Armchair", 75.34, 52.84),
-		piece("Plant", 92.92, 32.91, 90),
-		piece("Present", 78.3, 39.8),
-		piece("Crate", 112.61, 54.1),
-		piece("Crate", 111.61, 4.6, 90),
-		piece("Crate", 105.11, 6.1, 90),
-		piece("Crate", 106.11, 52.1, 90),
-		piece("Barrel", 116.03, 46.03),
-		piece("Barrel", 115.53, 15.03),
-		piece("Box", 103.15, 32.14, 90),
-		piece("Box", 105.15, 37.64),
-		piece("Box", 116.15, 29.64),
-		piece("Box", 104.65, 20.64, 90),
-		piece("Present", 115.8, 40.3),
-		piece("Present", 115.8, 20.3),
-		piece("Present", 104.3, 25.8),
+		piece("Table", 64.53, 35.25, 90),
+		piece("Table", 14.25, 10.53),
+		piece("Table", 48.75, 22.02),
+		piece("Chair", 12.53, 47.03, 90),
+		piece("Chair", 18.03, 20.03, 90),
+		piece("Chair", 55.53, 35.53),
+		piece("Chair", 58.03, 8.03, 90),
+		piece("Chair", 4.53, 36.03, 90),
+		piece("Chair", 9.03, 20.03),
+		piece("Present", 47.3, 2.8, 90),
+		piece("Present", 26.3, 49.8, 90),
+		piece("Present", 59.8, 55.3, 90),
+		piece("Present", 4.8, 46.8),
+		piece("Present", 47.8, 52.3, 90),
+		piece("Present", 33.3, 7.3, 90),
+		piece("Crate", 27.11, 39.1, 90),
+		piece("Crate", 20.61, 38.1, 90),
+		piece("Crate", 8.11, 55.1),
+		piece("Box", 23.64, 22.14, 90),
+		piece("Box", 19.14, 46.64),
+		piece("Box", 26.64, 9.64, 90),
+		piece("Box", 13.64, 41.64),
+		piece("ChristmasTree", 48.02, 31.02, 90),
+		piece("Bench", 16.6, 2.8),
+		piece("Bench", 59.6, 2.8),
+		piece("Desk", 66.38, 54.6, 270),
+		piece("Bookshelf", 49.15, 57.15, 180),
+		piece("Table", 83.25, 5.03),
+		piece("Present", 73.8, 23.3, 90),
+		piece("Present", 79.3, 21.3),
+		piece("Present", 95.8, 7.8, 90),
+		piece("Present", 96.8, 22.8, 90),
+		piece("Present", 95.8, 2.8, 90),
+		piece("Present", 72.8, 6.3, 90),
+		piece("Box", 91.65, 24.64, 90),
+		piece("Box", 79.15, 26.64),
+		piece("Desk", 94.1, 56.38, 180),
+		piece("Chair", 79.03, 36.53),
+		piece("Bookshelf", 72.65, 53.15, 90),
+		piece("Armchair", 95.34, 37.84),
+		piece("Plant", 72.92, 33.91),
+		piece("Present", 78.8, 52.3, 90),
+		piece("Crate", 109.61, 54.1, 90),
+		piece("Crate", 108.11, 7.1),
+		piece("Crate", 116.11, 38.6, 90),
+		piece("Crate", 115.11, 5.1),
+		piece("Barrel", 116.03, 47.03, 90),
+		piece("Barrel", 104.53, 23.53),
+		piece("Box", 115.65, 56.64),
+		piece("Box", 116.15, 27.14),
+		piece("Box", 116.65, 16.14),
+		piece("Box", 103.65, 33.14, 90),
+		piece("Present", 116.3, 32.3),
+		piece("Present", 103.3, 55.8),
+		piece("Present", 103.8, 49.8),
 	},
 	items = { pt(35, 30), pt(85, 15), pt(85, 45), pt(110, 30) },
 }
@@ -874,16 +885,17 @@ local COTTAGE: Plan = {
 		room("Kitchen", "Tile", 24, 16, 44, 32),
 	},
 	furniture = {
-		piece("Couch", 3.72, 17.9, 90),
-		piece("Armchair", 18.34, 14.83),
-		piece("CoffeeTable", 4.88, 5.95, 90),
-		piece("Lamp", 13.05, 2.55),
+		piece("Couch", 3.72, 11.4, 90),
+		piece("Armchair", 4.33, 22.34),
+		piece("CoffeeTable", 20.38, 13.95, 90),
+		piece("Lamp", 16.55, 2.55),
+		piece("Present", 5.8, 28.3),
 		piece("Present", 20.3, 28.8, 90),
-		piece("Present", 2.8, 28.3),
-		piece("Wardrobe", 40.64, 7.1, 270),
-		piece("Fridge", 39.95, 22.95, 270),
+		piece("Wardrobe", 40.64, 9.6, 270),
+		piece("Stove", 40.45, 21.15, 270),
+		piece("Sink", 40.65, 27.65, 270),
 	},
-	items = { pt(12, 16), pt(34, 8), pt(34, 24) },
+	items = { pt(12, 16) },
 }
 
 local GINGERBREAD: Plan = {
@@ -899,13 +911,12 @@ local GINGERBREAD: Plan = {
 		room("Gingerbread house", "Wood", 0, 0, 30, 24),
 	},
 	furniture = {
-		piece("ChristmasTree", 25.02, 10.53, 90),
-		piece("Present", 8.3, 6.3),
-		piece("Present", 14.8, 4.8),
-		piece("Present", 25.3, 17.3, 90),
-		piece("Present", 2.8, 14.8),
-		piece("Chair", 3.03, 20.53, 90),
-		piece("Chair", 8.03, 14.53, 90),
+		piece("ChristmasTree", 7.53, 17.52),
+		piece("Present", 7.8, 6.3, 90),
+		piece("Present", 21.8, 16.3),
+		piece("Present", 22.3, 2.8),
+		piece("Present", 24.3, 9.8),
+		piece("Chair", 14.03, 5.03, 90),
 	},
 	items = { pt(15, 12) },
 }
@@ -937,34 +948,34 @@ local function buildChristmasTown(): Layout
 	outdoor("Snowman", 35, -50)
 	outdoor("Snowman", -35, 0)
 	outdoor("Snowman", 35, 0)
-	outdoor("Snowman", 136.9, -159.1)
-	outdoor("Snowman", -67, -5.8)
-	outdoor("Snowman", -60.4, -27.8)
-	outdoor("Snowman", 149.9, 84.7)
-	outdoor("Snowman", -82, -146.5)
-	outdoor("Snowman", -105, 52.4)
-	outdoor("ChristmasTree", 124.5, 6.2)
-	outdoor("ChristmasTree", -152.4, 72)
-	outdoor("ChristmasTree", 109.7, -117.2)
-	outdoor("ChristmasTree", -147.6, -119.3)
-	outdoor("ChristmasTree", 50.2, 87.1)
-	outdoor("ChristmasTree", -160.1, -106.6)
-	outdoor("ChristmasTree", 54, 142.9)
-	outdoor("ChristmasTree", 149.2, 69.7)
-	outdoor("Present", 121.6, 60)
-	outdoor("Present", 127.7, -146.2)
-	outdoor("Present", 89.9, 78.2)
-	outdoor("Present", -22.9, 156.8)
-	outdoor("Present", -41.2, 86.8)
-	outdoor("Present", -71.4, 27.4)
-	outdoor("Present", 73, -101.2)
-	outdoor("Present", -131.7, -91.1)
-	outdoor("Present", -104.9, -3.5)
-	outdoor("Present", -88.8, -146.1)
-	outdoor("Present", -90.6, 32.6)
-	outdoor("Present", 42.8, 49.2)
-	outdoor("Present", -140.7, 62.3)
-	outdoor("Present", 12.9, -159)
+	outdoor("Snowman", -79.3, 56.4)
+	outdoor("Snowman", 149.9, -7.8)
+	outdoor("Snowman", 78.5, -1.8)
+	outdoor("Snowman", -24.6, 154.5)
+	outdoor("Snowman", -98.3, -80.3)
+	outdoor("Snowman", 15.1, -161.8)
+	outdoor("ChristmasTree", -42.4, 142.8)
+	outdoor("ChristmasTree", -46.4, -160)
+	outdoor("ChristmasTree", -25.3, 87)
+	outdoor("ChristmasTree", -94.3, 66.7)
+	outdoor("ChristmasTree", 121.9, -79.6)
+	outdoor("ChristmasTree", -102.6, -53.2)
+	outdoor("ChristmasTree", 91.2, 74.5)
+	outdoor("ChristmasTree", 119.2, -136.6)
+	outdoor("Present", -37.6, 57.5)
+	outdoor("Present", -47.2, -17.5)
+	outdoor("Present", -124.9, 157.5)
+	outdoor("Present", -127.1, 3.4)
+	outdoor("Present", 107.7, 49.3)
+	outdoor("Present", -57.5, -26)
+	outdoor("Present", -87.4, -3.5)
+	outdoor("Present", 70.9, -31.3)
+	outdoor("Present", -58.6, 146.1)
+	outdoor("Present", 126.7, 4.2)
+	outdoor("Present", 73, -143.3)
+	outdoor("Present", -21.4, 162.8)
+	outdoor("Present", -17.6, 79.5)
+	outdoor("Present", -74.6, -84.8)
 	layout.paths = { rect(-29, -90, -21, -60), rect(21, -90, 28, -60), rect(-90, -124, -60, -116) }
 	layout.patios = { rect(-45, -60, 45, 10) }
 	layout.pools = { rect(45, 40, 90, 70) }
@@ -1090,188 +1101,171 @@ local MANOR: Plan = {
 		piece("Rug", 68, 113),
 		piece("Rug", 148, 113),
 		piece("Rug", 210, 113),
-		piece("Bookshelf", 33.15, 31.65, 270),
-		piece("Bookshelf", 2.65, 50.65, 90),
-		piece("Bookshelf", 33.15, 52.65, 270),
-		piece("Desk", 3.38, 13.6, 90),
-		piece("Chair", 31.03, 6.53),
-		piece("Armchair", 20.34, 4.33, 90),
-		piece("Armchair", 27.84, 42.34),
-		piece("Candelabra", 25.07, 53.07),
-		piece("Candelabra", 11.57, 36.07),
-		piece("JackOLantern", 14.14, 10.14),
-		piece("Box", 7.64, 56.14),
-		piece("Candelabra", 42.07, 9.57),
-		piece("Bed", 81.15, 35.15, 270),
-		piece("Bed", 61.65, 6.65),
-		piece("Wardrobe", 80.6, 56.64, 180),
-		piece("Wardrobe", 51.14, 47.1, 90),
-		piece("Dresser", 53.15, 2.85),
-		piece("Chair", 81.03, 4.03, 90),
-		piece("Candelabra", 52.07, 17.57, 90),
-		piece("Pumpkin", 56.53, 26.53, 90),
-		piece("Plant", 54.41, 12.41),
-		piece("Box", 58.64, 19.64, 90),
-		piece("Bathtub", 92.3, 7.32, 90),
-		piece("Toilet", 105.65, 3.6),
-		piece("Sink", 97.65, 26.65, 180),
-		piece("Washer", 108.38, 21.88, 270),
-		piece("Cauldron", 92.22, 20.22, 90),
-		piece("Box", 92.15, 49.64, 90),
-		piece("Box", 106.65, 53.14),
-		piece("Crate", 102.61, 35.6, 90),
-		piece("Barrel", 105.53, 44.53),
-		piece("Candelabra", 115.57, 23.57, 90),
-		piece("Candelabra", 125.07, 53.57),
-		piece("Bench", 114.8, 44.1, 90),
-		piece("JackOLantern", 115.15, 52.14),
-		piece("Desk", 135.1, 32.38, 180),
-		piece("Chair", 149.03, 4.03),
-		piece("Bookshelf", 135.15, 2.65),
-		piece("Bookshelf", 156.65, 33.15, 180),
-		piece("PoolTable", 155.4, 14.6),
-		piece("Candelabra", 142.07, 12.07, 90),
-		piece("Bed", 157.15, 53.15, 270),
-		piece("Beanbag", 149.35, 39.85),
-		piece("Armchair", 159.84, 43.34),
-		piece("Box", 132.15, 53.14),
-		piece("Pumpkin", 132.53, 39.03, 90),
-		piece("Candelabra", 138.07, 56.57, 90),
-		piece("Piano", 207.74, 52.25, 270),
-		piece("Bench", 194.1, 2.8),
-		piece("Bench", 166.8, 39.1, 90),
-		piece("Picture", 173.45, 3.38),
-		piece("Picture", 181.95, 3.38),
-		piece("Armchair", 202.84, 41.84),
-		piece("Armchair", 179.84, 30.84),
-		piece("Candelabra", 176.07, 53.07, 90),
-		piece("Candelabra", 191.07, 54.07),
-		piece("Plant", 201.41, 7.42, 90),
-		piece("Plant", 171.41, 50.91, 90),
-		piece("JackOLantern", 194.15, 11.14),
-		piece("Barrel", 216.03, 10.53),
-		piece("Bathtub", 228.3, 13.82, 90),
-		piece("Toilet", 229.15, 3.6),
-		piece("Sink", 236.65, 9.65, 270),
-		piece("Cauldron", 235.72, 21.72, 90),
-		piece("Bench", 132.1, 62.8),
-		piece("Bench", 209.6, 62.8),
-		piece("Bench", 25.1, 62.8),
-		piece("Candelabra", 89.07, 73.07, 90),
-		piece("Candelabra", 223.57, 63.57),
-		piece("Candelabra", 202.57, 63.57, 90),
-		piece("Candelabra", 194.57, 63.07),
-		piece("Candelabra", 161.07, 63.57),
-		piece("JackOLantern", 139.65, 63.14, 90),
-		piece("JackOLantern", 11.14, 63.14),
-		piece("JackOLantern", 55.14, 63.14),
-		piece("Pumpkin", 72.03, 63.03, 90),
-		piece("Pumpkin", 156.03, 63.03, 90),
-		piece("Pumpkin", 107.03, 63.03),
-		piece("Fridge", 31.95, 107.95, 270),
-		piece("Stove", 3.45, 133.15, 90),
-		piece("Stove", 3.45, 112.15, 90),
-		piece("Sink", 30.65, 79.15),
-		piece("Sink", 3.15, 105.15, 90),
-		piece("Table", 10.53, 140.75, 90),
-		piece("Chair", 21.03, 134.53),
-		piece("Chair", 30.53, 137.03, 90),
-		piece("Chair", 12.53, 120.53),
-		piece("Cauldron", 32.22, 145.72),
-		piece("Barrel", 17.53, 141.03, 90),
-		piece("Barrel", 4.03, 90.53),
-		piece("TrashCan", 11.91, 125.92, 90),
-		piece("Pumpkin", 9.03, 81.03),
-		piece("Pumpkin", 10.53, 88.03),
-		piece("Pumpkin", 10.53, 100.03, 90),
-		piece("Crate", 24.11, 121.61),
-		piece("Table", 55.75, 97.53),
-		piece("Table", 78.03, 99.25, 90),
-		piece("Chair", 54.03, 135.53),
-		piece("Chair", 55.03, 113.53),
-		piece("Chair", 84.03, 142.53, 90),
-		piece("Chair", 78.03, 112.03, 90),
-		piece("Chair", 62.53, 137.53, 90),
-		piece("Chair", 70.03, 145.53),
-		piece("Chair", 78.03, 81.03, 90),
-		piece("Chair", 57.53, 81.03, 90),
-		piece("Candelabra", 73.57, 117.07, 90),
-		piece("Candelabra", 60.07, 132.07, 90),
-		piece("Dresser", 50.85, 80.15, 90),
-		piece("JackOLantern", 78.64, 140.65, 90),
-		piece("JackOLantern", 76.64, 88.15, 90),
-		piece("Plant", 84.41, 111.42),
-		piece("Table", 106.53, 102.75, 90),
-		piece("Chair", 91.03, 104.03),
-		piece("Chair", 92.03, 84.03, 90),
-		piece("Bench", 90.8, 92.6, 90),
-		piece("Barrel", 108.53, 87.53),
-		piece("Bed", 95.15, 143.15, 180),
-		piece("Dresser", 107.65, 114.85),
-		piece("Box", 107.65, 131.65, 90),
-		piece("Candelabra", 92.57, 123.07),
-		piece("Candelabra", 115.57, 136.57, 90),
-		piece("Candelabra", 115.57, 105.57, 90),
-		piece("JackOLantern", 115.15, 121.65, 90),
-		piece("JackOLantern", 115.15, 82.65, 90),
-		piece("Bench", 114.8, 129.6, 90),
-		piece("Couch", 164.22, 89.4, 270),
-		piece("Armchair", 136.34, 136.34),
-		piece("Armchair", 141.84, 121.34, 90),
-		piece("Coffin", 135.68, 102.38, 90),
-		piece("Candelabra", 155.07, 85.07, 90),
-		piece("Candelabra", 164.57, 140.07, 90),
-		piece("Plant", 152.91, 120.42, 90),
-		piece("Plant", 149.91, 140.42),
-		piece("JackOLantern", 153.15, 110.15, 90),
-		piece("JackOLantern", 164.65, 145.15),
-		piece("Bench", 134.1, 78.8),
-		piece("PoolTable", 213.4, 87.6),
-		piece("Piano", 203.75, 145.74, 180),
-		piece("Couch", 183.72, 125.9, 90),
-		piece("Couch", 183.72, 109.9, 90),
-		piece("Armchair", 183.84, 91.84, 90),
-		piece("Armchair", 191.84, 128.34),
-		piece("Armchair", 191.34, 112.34),
-		piece("CoffeeTable", 225.38, 129.45, 90),
-		piece("Candelabra", 197.57, 116.57, 90),
-		piece("Candelabra", 235.57, 128.57, 90),
-		piece("Candelabra", 192.57, 84.07, 90),
-		piece("Candelabra", 184.57, 145.07, 90),
-		piece("Bench", 231.1, 78.8),
-		piece("Bench", 185.1, 78.8),
-		piece("JackOLantern", 231.65, 87.65, 90),
-		piece("JackOLantern", 221.15, 138.65),
-		piece("JackOLantern", 216.65, 118.15, 90),
-		piece("Pumpkin", 235.03, 137.53),
-		piece("Pumpkin", 229.03, 115.53),
-		piece("Crate", 195.11, 90.61, 90),
-		piece("Crate", 227.11, 143.11, 90),
-		piece("Aquarium", 236.65, 100.6, 270),
-		piece("Wardrobe", 214.6, 79.15),
+		piece("Bookshelf", 2.65, 46.65, 90),
+		piece("Bookshelf", 33.15, 29.65, 270),
+		piece("Bookshelf", 28.65, 57.15, 180),
+		piece("Desk", 21.1, 3.38),
+		piece("Chair", 12.03, 22.53),
+		piece("Armchair", 30.34, 3.83),
+		piece("Armchair", 11.33, 45.34, 90),
+		piece("Candelabra", 32.57, 46.07, 90),
+		piece("Candelabra", 17.57, 10.57, 90),
+		piece("JackOLantern", 11.64, 37.14, 90),
+		piece("Box", 23.64, 38.64),
+		piece("Candelabra", 44.57, 10.57, 90),
+		piece("Bed", 54.65, 34.15, 90),
+		piece("Bed", 75.65, 53.15, 180),
+		piece("Wardrobe", 84.64, 23.1, 270),
+		piece("Wardrobe", 51.14, 47.6, 90),
+		piece("Dresser", 50.85, 20.15, 90),
+		piece("Chair", 71.53, 5.53, 90),
+		piece("Candelabra", 59.57, 44.07),
+		piece("Pumpkin", 55.53, 3.53),
+		piece("Plant", 84.41, 10.41, 90),
+		piece("Box", 58.64, 15.64),
+		piece("Bathtub", 95.33, 4.29),
+		piece("Toilet", 91.61, 26.14, 90),
+		piece("Sink", 108.65, 7.15, 270),
+		piece("Washer", 91.38, 17.88, 90),
+		piece("Cauldron", 99.22, 25.72),
+		piece("Box", 108.65, 46.64, 90),
+		piece("Box", 99.15, 37.64),
+		piece("Crate", 107.11, 40.1),
+		piece("Barrel", 106.03, 54.53),
+		piece("Candelabra", 114.57, 34.07),
+		piece("Candelabra", 125.07, 33.57),
+		piece("Bench", 114.8, 26.6, 90),
+		piece("Desk", 152.6, 32.38, 180),
+		piece("Chair", 134.03, 5.53),
+		piece("Bookshelf", 155.65, 2.65),
+		piece("Bookshelf", 161.15, 11.65, 270),
+		piece("PoolTable", 133.1, 27.9, 90),
+		piece("Candelabra", 146.57, 12.57, 90),
+		piece("Bed", 156.15, 42.65),
+		piece("Beanbag", 133.35, 41.35, 90),
+		piece("Armchair", 131.84, 52.34, 90),
+		piece("Box", 158.65, 53.64, 90),
+		piece("Pumpkin", 138.03, 47.53),
+		piece("Candelabra", 150.57, 57.07, 90),
+		piece("Piano", 168.24, 14.25, 90),
+		piece("Bench", 166.8, 42.6, 90),
+		piece("Bench", 166.8, 32.1, 90),
+		piece("Picture", 172.45, 56.38, 180),
+		piece("Picture", 169.45, 3.38),
+		piece("Armchair", 201.34, 55.34),
+		piece("Armchair", 181.34, 9.83, 90),
+		piece("Candelabra", 172.07, 42.57),
+		piece("Candelabra", 191.57, 35.57),
+		piece("Plant", 194.41, 11.91, 90),
+		piece("Plant", 208.41, 32.41),
+		piece("JackOLantern", 179.15, 37.14),
+		piece("Barrel", 216.53, 11.53),
+		piece("Bathtub", 228.3, 15.82, 90),
+		piece("Toilet", 227.61, 4.14, 90),
+		piece("Sink", 236.65, 16.15, 270),
+		piece("Cauldron", 235.72, 8.72),
+		piece("Bench", 123.6, 62.8),
+		piece("Bench", 198.6, 62.8),
+		piece("Bench", 27.6, 62.8),
+		piece("Candelabra", 165.07, 63.07),
+		piece("Candelabra", 73.57, 63.07, 90),
+		piece("Candelabra", 24.07, 73.07, 90),
+		piece("Candelabra", 156.57, 63.07),
+		piece("Candelabra", 73.57, 73.07),
+		piece("Fridge", 9.45, 145.95, 180),
+		piece("Stove", 32.45, 107.65, 270),
+		piece("Stove", 3.45, 124.65, 90),
+		piece("Sink", 3.15, 94.15, 90),
+		piece("Sink", 3.15, 116.65, 90),
+		piece("Table", 30.52, 82.25, 90),
+		piece("Chair", 6.03, 132.03, 90),
+		piece("Chair", 3.53, 107.53, 90),
+		piece("Chair", 27.53, 143.03),
+		piece("Cauldron", 8.72, 83.72, 90),
+		piece("Barrel", 18.03, 136.03),
+		piece("Barrel", 10.03, 99.53, 90),
+		piece("TrashCan", 21.41, 143.42),
+		piece("Pumpkin", 26.03, 116.03),
+		piece("Pumpkin", 8.53, 114.03),
+		piece("Pumpkin", 25.03, 101.53, 90),
+		piece("Crate", 31.11, 101.11),
+		piece("Coffin", 41.67, 137.38, 90),
+		piece("Table", 57.25, 90.03),
+		piece("Table", 77.25, 114.53),
+		piece("Chair", 58.03, 118.03, 90),
+		piece("Chair", 78.53, 84.53, 90),
+		piece("Chair", 52.03, 112.53),
+		piece("Chair", 63.03, 141.53, 90),
+		piece("Chair", 81.53, 104.53, 90),
+		piece("Chair", 61.53, 100.53, 90),
+		piece("Chair", 74.53, 123.03, 90),
+		piece("Chair", 54.03, 141.03),
+		piece("Candelabra", 74.07, 103.57, 90),
+		piece("Candelabra", 83.57, 86.07, 90),
+		piece("Dresser", 77.65, 78.85),
+		piece("JackOLantern", 53.64, 104.65),
+		piece("JackOLantern", 83.14, 93.65, 90),
+		piece("Plant", 57.91, 133.92, 90),
+		piece("Table", 92.53, 93.75, 90),
+		piece("Chair", 107.03, 103.53),
+		piece("Chair", 107.53, 83.53),
+		piece("Bench", 90.8, 81.1, 90),
+		piece("Barrel", 92.03, 104.03),
+		piece("Bed", 95.65, 143.15, 180),
+		piece("Dresser", 90.85, 122.15, 90),
+		piece("Box", 108.15, 138.65, 90),
+		piece("Candelabra", 106.57, 119.07, 90),
+		piece("Candelabra", 115.07, 133.07, 90),
+		piece("Candelabra", 114.57, 109.57),
+		piece("Bench", 114.8, 118.6, 90),
+		piece("Couch", 164.22, 117.9, 270),
+		piece("Armchair", 131.84, 107.34, 90),
+		piece("Armchair", 162.34, 92.84, 90),
+		piece("Coffin", 136.18, 94.88, 90),
+		piece("Candelabra", 159.57, 139.57, 90),
+		piece("Candelabra", 155.07, 96.57, 90),
+		piece("Plant", 135.91, 114.92, 90),
+		piece("Plant", 158.41, 86.92),
+		piece("JackOLantern", 136.15, 139.65),
+		piece("JackOLantern", 138.15, 145.15, 90),
+		piece("Bench", 159.6, 78.8),
+		piece("PoolTable", 193.1, 106.9, 90),
+		piece("Piano", 184.24, 86.25, 90),
+		piece("Couch", 183.72, 108.4, 90),
+		piece("Couch", 210.9, 146.22, 180),
+		piece("Armchair", 202.84, 128.34, 90),
+		piece("Armchair", 224.34, 134.84, 90),
+		piece("Armchair", 235.84, 109.84, 90),
+		piece("CoffeeTable", 212.95, 98.38),
+		piece("Candelabra", 215.57, 91.07),
+		piece("Candelabra", 189.07, 127.07),
+		piece("Candelabra", 201.07, 118.57),
+		piece("Candelabra", 226.57, 126.07, 90),
+		piece("Bench", 215.1, 78.8),
+		piece("Bench", 182.8, 130.1, 90),
+		piece("JackOLantern", 210.65, 85.65),
+		piece("JackOLantern", 219.15, 122.15),
+		piece("JackOLantern", 229.65, 98.65),
+		piece("Pumpkin", 236.03, 97.53, 90),
+		piece("Pumpkin", 220.53, 143.53),
+		piece("Crate", 230.11, 118.11, 90),
+		piece("Crate", 194.11, 82.61, 90),
+		piece("Aquarium", 236.65, 123.6, 270),
+		piece("Wardrobe", 236.65, 135.6, 270),
 	},
 	items = {
 		pt(18, 30),
-		pt(42, 26),
-		pt(42, 50),
 		pt(68, 30),
 		pt(100, 15),
 		pt(100, 45),
-		pt(120, 30),
 		pt(146, 18),
 		pt(146, 48),
 		pt(188, 30),
-		pt(218, 50),
-		pt(232, 30),
-		pt(120, 68),
 		pt(18, 113),
-		pt(42, 137),
 		pt(68, 113),
 		pt(100, 94),
 		pt(100, 131),
-		pt(120, 113),
 		pt(148, 113),
-		pt(174, 94),
 		pt(210, 113),
 	},
 }
@@ -1393,55 +1387,55 @@ local function buildHaunted(): Layout
 	outdoor("Tombstone", 110, 143)
 	outdoor("Tombstone", 128, 143)
 	outdoor("Tombstone", 146, 143)
-	outdoor("Pumpkin", 152.38, 68.88, 90)
-	outdoor("Pumpkin", 145.88, 116.38, 90)
-	outdoor("Pumpkin", 140.88, 66.38)
-	outdoor("Pumpkin", 121.38, 127.88)
-	outdoor("JackOLantern", 48.49, 97.5)
-	outdoor("JackOLantern", 82.5, 89)
-	outdoor("JackOLantern", 62.49, 134, 90)
-	outdoor("Coffin", 74.03, 131.72, 90)
-	outdoor("Bench", 123.45, 135.65)
+	outdoor("Pumpkin", 69.88, 68.38, 90)
+	outdoor("Pumpkin", 155.88, 130.88)
+	outdoor("Pumpkin", 70.38, 120.38)
+	outdoor("Pumpkin", 75.38, 81.38)
+	outdoor("JackOLantern", 95, 82)
+	outdoor("JackOLantern", 118, 93, 90)
+	outdoor("JackOLantern", 50.99, 80.5, 90)
+	outdoor("Coffin", 136.72, 142.03)
+	outdoor("Bench", 136.45, 113.15)
 	yardRoom("Pumpkin patch", "Dirt", -170, 95, -66, 160)
-	outdoor("Pumpkin", -74.62, 106.38, 90)
-	outdoor("Pumpkin", -143.62, 115.88, 90)
-	outdoor("Pumpkin", -152.12, 115.88)
-	outdoor("Pumpkin", -136.12, 141.88)
-	outdoor("Pumpkin", -107.12, 148.38, 90)
-	outdoor("Pumpkin", -85.62, 117.88, 90)
-	outdoor("Pumpkin", -77.12, 144.38, 90)
-	outdoor("Pumpkin", -99.62, 154.38)
-	outdoor("Pumpkin", -129.12, 141.38, 90)
-	outdoor("Pumpkin", -112.12, 111.88, 90)
-	outdoor("Pumpkin", -140.12, 154.88, 90)
-	outdoor("Pumpkin", -146.12, 153.38)
-	outdoor("Pumpkin", -94.62, 109.38, 90)
-	outdoor("Pumpkin", -96.12, 102.88, 90)
-	outdoor("Pumpkin", -162.62, 146.88, 90)
-	outdoor("Pumpkin", -78.12, 122.88)
-	outdoor("Pumpkin", -152.12, 142.38, 90)
-	outdoor("Pumpkin", -84.62, 146.38)
-	outdoor("Pumpkin", -158.12, 100.88)
-	outdoor("Pumpkin", -93.62, 141.38)
-	outdoor("Pumpkin", -83.12, 135.88)
-	outdoor("Pumpkin", -158.62, 117.88)
-	outdoor("Pumpkin", -71.12, 143.38, 90)
-	outdoor("Pumpkin", -98.62, 134.88)
-	outdoor("Pumpkin", -87.62, 99.88)
-	outdoor("Pumpkin", -105.62, 105.88)
-	outdoor("JackOLantern", -145.5, 109)
-	outdoor("JackOLantern", -145, 138)
-	outdoor("JackOLantern", -111.5, 119)
-	outdoor("JackOLantern", -75, 155.5, 90)
-	outdoor("JackOLantern", -157, 133, 90)
-	outdoor("JackOLantern", -144.5, 101.5, 90)
-	outdoor("JackOLantern", -134, 103)
-	outdoor("JackOLantern", -99.5, 115.5)
-	outdoor("HayBale", -152.5, 152.38, 90)
-	outdoor("HayBale", -133.62, 112.5)
-	outdoor("HayBale", -128.12, 147.5)
-	outdoor("HayBale", -125.62, 155)
-	outdoor("HayBale", -73, 113.88, 90)
+	outdoor("Pumpkin", -102.12, 154.88, 90)
+	outdoor("Pumpkin", -144.12, 141.38)
+	outdoor("Pumpkin", -165.62, 150.38, 90)
+	outdoor("Pumpkin", -152.12, 149.88, 90)
+	outdoor("Pumpkin", -80.62, 135.88, 90)
+	outdoor("Pumpkin", -77.12, 114.88)
+	outdoor("Pumpkin", -131.12, 132.88, 90)
+	outdoor("Pumpkin", -153.62, 136.88, 90)
+	outdoor("Pumpkin", -151.12, 103.88, 90)
+	outdoor("Pumpkin", -89.12, 116.88, 90)
+	outdoor("Pumpkin", -128.12, 142.38)
+	outdoor("Pumpkin", -145.62, 154.38, 90)
+	outdoor("Pumpkin", -137.12, 151.88)
+	outdoor("Pumpkin", -123.62, 134.88)
+	outdoor("Pumpkin", -77.12, 149.88)
+	outdoor("Pumpkin", -162.62, 113.88, 90)
+	outdoor("Pumpkin", -142.62, 105.88)
+	outdoor("Pumpkin", -89.62, 151.38, 90)
+	outdoor("Pumpkin", -107.12, 135.38)
+	outdoor("Pumpkin", -108.62, 111.38, 90)
+	outdoor("Pumpkin", -74.62, 139.38)
+	outdoor("Pumpkin", -110.12, 101.88, 90)
+	outdoor("Pumpkin", -165.62, 136.88)
+	outdoor("Pumpkin", -97.12, 133.38)
+	outdoor("Pumpkin", -158.12, 100.88, 90)
+	outdoor("Pumpkin", -85.12, 141.88)
+	outdoor("JackOLantern", -98, 119.5, 90)
+	outdoor("JackOLantern", -99, 104)
+	outdoor("JackOLantern", -83.5, 106, 90)
+	outdoor("JackOLantern", -131, 108, 90)
+	outdoor("JackOLantern", -93, 109, 90)
+	outdoor("JackOLantern", -138.5, 100, 90)
+	outdoor("JackOLantern", -75.5, 100.5)
+	outdoor("JackOLantern", -96, 150.5)
+	outdoor("HayBale", -132.12, 115.5)
+	outdoor("HayBale", -110.5, 148.88, 90)
+	outdoor("HayBale", -124, 115.88, 90)
+	outdoor("HayBale", -146.5, 114.88, 90)
+	outdoor("HayBale", -127.5, 150.88, 90)
 	outdoor("JackOLantern", -10, 34)
 	outdoor("JackOLantern", 10, 34)
 	layout.paths =
@@ -1493,6 +1487,783 @@ local function buildHaunted(): Layout
 	return layout
 end
 
+-- The Pumpkin Farm ------------------------------------------------------------------------
+
+local FARMHOUSE: Plan = {
+	w = 64,
+	d = 44,
+	walls = {
+		wall(0, 0, 64, 0, nil, { { 5, 23 }, { 33, 59 } }),
+		wall(0, 44, 64, 44, { { 32, 39 } }, { { 4, 24 }, { 48, 60 } }),
+		wall(0, 0, 0, 44, { { 8, 15 } }, { { 26, 40 } }),
+		wall(64, 0, 64, 44, nil, { { 4, 18 }, { 27, 40 } }),
+		wall(28, 0, 28, 44, { { 8, 15 }, { 30, 37 } }),
+		wall(0, 22, 64, 22, { { 10, 17 }, { 32, 39 }, { 50, 57 } }),
+		wall(44, 22, 44, 44, { { 30, 37 } }),
+	},
+	rooms = {
+		room("Kitchen", "Tile", 0, 0, 28, 22),
+		room("Parlor", "Wood", 28, 0, 64, 22),
+		room("Bedroom", "Wood", 0, 22, 28, 44),
+		room("Mudroom", "Wood", 28, 22, 44, 44),
+		room("Back bedroom", "Wood", 44, 22, 64, 44),
+	},
+	furniture = {
+		piece("Fridge", 8.45, 3.95),
+		piece("Stove", 3.45, 18.15, 90),
+		piece("Sink", 18.65, 3.15),
+		piece("Chair", 22.03, 18.03),
+		piece("Chair", 24.53, 4.53),
+		piece("Piano", 46.75, 4.24),
+		piece("Couch", 60.22, 11.9, 270),
+		piece("Armchair", 35.33, 3.83, 90),
+		piece("CoffeeTable", 45.45, 18.38),
+		piece("Candelabra", 60.07, 2.57),
+		piece("Bed", 6.15, 37.15, 180),
+		piece("Wardrobe", 19.1, 40.64, 180),
+		piece("Dresser", 20.15, 24.85),
+		piece("Candelabra", 2.57, 27.07),
+		piece("Wardrobe", 56.6, 40.64, 180),
+		piece("Box", 47.64, 27.64),
+	},
+	items = { pt(14, 11), pt(46, 11), pt(14, 33), pt(54, 33) },
+}
+
+local BARN: Plan = {
+	w = 90,
+	d = 60,
+	walls = {
+		wall(0, 0, 90, 0, nil, { { 4, 14 }, { 22, 32 }, { 40, 50 }, { 58, 68 }, { 76, 86 } }),
+		wall(0, 60, 90, 60, { { 20, 28 }, { 62, 70 } }),
+		wall(0, 0, 0, 60, { { 34, 41 } }),
+		wall(90, 0, 90, 60, { { 34, 41 } }),
+		wall(
+			0,
+			18,
+			90,
+			18,
+			{ { 5.5, 12.5 }, { 23.5, 30.5 }, { 41.5, 48.5 }, { 59.5, 66.5 }, { 77.5, 84.5 } }
+		),
+		wall(18, 0, 18, 18),
+		wall(36, 0, 36, 18),
+		wall(54, 0, 54, 18),
+		wall(72, 0, 72, 18),
+	},
+	rooms = {
+		room("Stall 1", "Wood", 0, 0, 18, 18),
+		room("Stall 2", "Wood", 18, 0, 36, 18),
+		room("Stall 3", "Wood", 36, 0, 54, 18),
+		room("Stall 4", "Wood", 54, 0, 72, 18),
+		room("Tack room", "Wood", 72, 0, 90, 18),
+		room("Barn floor", "Wood", 0, 18, 90, 60),
+	},
+	furniture = {
+		piece("HayBale", 3.14, 11.53, 90),
+		piece("Barrel", 14.53, 14.53),
+		piece("HayBale", 32.64, 11.03, 90),
+		piece("Barrel", 28.53, 3.03, 90),
+		piece("HayBale", 50.64, 5.03, 90),
+		piece("Barrel", 39.03, 7.03, 90),
+		piece("HayBale", 68.64, 13.03, 90),
+		piece("Barrel", 58.03, 3.53, 90),
+		piece("Wardrobe", 86.65, 12.6, 270),
+		piece("Box", 75.15, 12.64, 90),
+		piece("HayBale", 37.02, 30.14),
+		piece("HayBale", 41.14, 53.02, 90),
+		piece("HayBale", 16.52, 25.14),
+		piece("HayBale", 49.14, 53.52, 90),
+		piece("HayBale", 4.53, 53.14),
+		piece("HayBale", 83.03, 50.14),
+		piece("HayBale", 55.64, 23.02, 90),
+		piece("HayBale", 33.02, 46.14),
+		piece("HayBale", 75.14, 51.52, 90),
+		piece("HayBale", 33.52, 54.64),
+		piece("Crate", 15.11, 52.1, 90),
+		piece("Crate", 54.6, 31.1, 90),
+		piece("Crate", 72.61, 24.6, 90),
+		piece("Barrel", 81.53, 56.03, 90),
+		piece("Barrel", 54.53, 56.03, 90),
+		piece("Scarecrow", 10.61, 45.57),
+		piece("Pumpkin", 16.03, 31.03, 90),
+		piece("Pumpkin", 86.53, 44.53),
+		piece("Pumpkin", 51.53, 46.03),
+		piece("JackOLantern", 71.64, 31.64),
+		piece("JackOLantern", 35.64, 23.14, 90),
+	},
+	items = { pt(12, 6), pt(27, 9), pt(45, 9), pt(63, 9), pt(78, 6), pt(45, 39) },
+}
+
+local CORN_MAZE: Plan = {
+	w = 96,
+	d = 72,
+	walls = {
+		wall(0, 0, 96, 0, { { 74, 82 } }),
+		wall(0, 72, 96, 72, { { 2, 10 } }),
+		wall(0, 0, 0, 72),
+		wall(96, 0, 96, 72),
+		wall(12, 0, 12, 12),
+		wall(12, 12, 12, 24),
+		wall(0, 36, 12, 36, nil, nil, { { 3, 9 } }),
+		wall(0, 60, 12, 60),
+		wall(24, 12, 24, 24),
+		wall(12, 48, 24, 48),
+		wall(24, 48, 24, 60),
+		wall(36, 0, 36, 12),
+		wall(24, 36, 36, 36),
+		wall(24, 48, 36, 48),
+		wall(24, 60, 36, 60),
+		wall(36, 24, 48, 24),
+		wall(36, 36, 48, 36),
+		wall(48, 60, 48, 72, nil, nil, { { 63, 69 } }),
+		wall(48, 12, 60, 12),
+		wall(48, 24, 60, 24, nil, nil, { { 51, 57 } }),
+		wall(60, 24, 60, 36),
+		wall(60, 36, 60, 48),
+		wall(48, 48, 60, 48),
+		wall(60, 48, 60, 60),
+		wall(60, 12, 72, 12),
+		wall(72, 12, 72, 24),
+		wall(60, 24, 72, 24, nil, nil, { { 63, 69 } }),
+		wall(60, 60, 72, 60),
+		wall(84, 24, 84, 36),
+		wall(72, 36, 84, 36),
+		wall(72, 48, 84, 48),
+		wall(72, 60, 84, 60),
+		wall(84, 36, 96, 36),
+	},
+	rooms = {},
+	furniture = {
+		piece("JackOLantern", 6, 6),
+		piece("Scarecrow", 30, 54),
+		piece("Pumpkin", 66, 18),
+		piece("HayBale", 90, 30),
+	},
+	items = { pt(54, 42) },
+}
+
+local function buildPumpkinFarm(): Layout
+	local layout = newLayout("PumpkinFarm", "The Pumpkin Farm")
+	layout.theme = "Haunted"
+	layout.roofs = true
+	layout.bounds = rect(-180, -170, 180, 170)
+	addHouse(layout, "Farmhouse", FARMHOUSE, -150, -150, false, "Orange", "Large")
+	addHouse(layout, "Barn", BARN, -40, -150, false, "Orange", "Huge")
+	addHouse(layout, "CornMaze", CORN_MAZE, 66, -40, false, "Orange", "Huge", "B8963A")
+	addHouse(layout, "Shed", GARDEN_SHED, 110, -150, false, "Orange", "Small")
+	addHouse(layout, "Outhouse1", OUTHOUSE, -172, -60, false, "Orange", "Small")
+	addHouse(layout, "Outhouse2", OUTHOUSE, 150, 120, true, "Orange", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Corn maze", "Dirt", 66, -40, 162, 32)
+	yardRoom("Pumpkin patch", "Dirt", -165, 40, -45, 150)
+	outdoor("Pumpkin", -80.62, 85.88, 90)
+	outdoor("Pumpkin", -84.12, 79.38)
+	outdoor("Pumpkin", -49.62, 106.88, 90)
+	outdoor("Pumpkin", -85.62, 131.38, 90)
+	outdoor("Pumpkin", -68.62, 84.38)
+	outdoor("Pumpkin", -155.62, 76.38)
+	outdoor("Pumpkin", -153.62, 65.88)
+	outdoor("Pumpkin", -112.12, 48.88, 90)
+	outdoor("Pumpkin", -134.12, 119.38, 90)
+	outdoor("Pumpkin", -124.62, 102.38, 90)
+	outdoor("Pumpkin", -73.12, 132.38, 90)
+	outdoor("Pumpkin", -154.62, 107.38, 90)
+	outdoor("Pumpkin", -160.12, 84.38)
+	outdoor("Pumpkin", -77.62, 69.88)
+	outdoor("Pumpkin", -132.62, 61.38, 90)
+	outdoor("Pumpkin", -54.62, 54.38)
+	outdoor("Pumpkin", -68.12, 116.88)
+	outdoor("Pumpkin", -156.12, 47.38)
+	outdoor("Pumpkin", -94.62, 47.38, 90)
+	outdoor("Pumpkin", -77.62, 107.88)
+	outdoor("Pumpkin", -84.62, 119.38, 90)
+	outdoor("Pumpkin", -131.12, 135.88, 90)
+	outdoor("Pumpkin", -73.62, 49.88)
+	outdoor("Pumpkin", -85.12, 51.88)
+	outdoor("Pumpkin", -84.12, 105.88, 90)
+	outdoor("Pumpkin", -152.12, 124.38)
+	outdoor("Pumpkin", -71.12, 61.38, 90)
+	outdoor("Pumpkin", -123.12, 134.38)
+	outdoor("Pumpkin", -126.62, 121.38)
+	outdoor("Pumpkin", -134.12, 78.88)
+	outdoor("JackOLantern", -113.5, 79.5)
+	outdoor("JackOLantern", -88, 62.99)
+	outdoor("JackOLantern", -72, 78)
+	outdoor("JackOLantern", -64, 62.99, 90)
+	outdoor("JackOLantern", -126.5, 86)
+	outdoor("JackOLantern", -55.5, 121, 90)
+	outdoor("JackOLantern", -51.5, 142)
+	outdoor("JackOLantern", -81.5, 143)
+	outdoor("JackOLantern", -139.5, 53.99, 90)
+	outdoor("JackOLantern", -158.5, 128, 90)
+	outdoor("Scarecrow", -61.04, 80.42)
+	outdoor("Scarecrow", -110.08, 140.45, 90)
+	outdoor("Scarecrow", -64.54, 72.92)
+	yardRoom("Hay field", "Dirt", -20, 70, 60, 150)
+	outdoor("HayBale", -6.12, 75)
+	outdoor("HayBale", 0.49, 133.38, 90)
+	outdoor("HayBale", 49.88, 104.5)
+	outdoor("HayBale", 45.38, 91)
+	outdoor("HayBale", -4.12, 84.5)
+	outdoor("HayBale", 35.38, 125.5)
+	outdoor("HayBale", 27.49, 97.88, 90)
+	outdoor("HayBale", 11.99, 86.88, 90)
+	outdoor("HayBale", 3.88, 120.5)
+	outdoor("HayBale", 26.88, 82.5)
+	outdoor("HayBale", -12.12, 140)
+	outdoor("HayBale", 0.99, 102.88, 90)
+	outdoor("HayBale", 49.88, 78)
+	outdoor("HayBale", 13.49, 138.38, 90)
+	outdoor("Scarecrow", -9.58, 102.95, 90)
+	outdoor("Scarecrow", -7.54, 124.42)
+	outdoor("Pumpkin", 38.88, 140.38, 90)
+	outdoor("Pumpkin", 11.38, 118.38)
+	outdoor("Pumpkin", -12.62, 131.88)
+	outdoor("Pumpkin", 27.38, 134.88, 90)
+	outdoor("Pumpkin", 50.38, 122.88)
+	outdoor("Pumpkin", 40.88, 102.38, 90)
+	layout.paths = {
+		rect(-170, -64, 170, -54),
+		rect(-118, -106, -111, -64),
+		rect(-20, -90, -12, -64),
+		rect(22, -90, 30, -64),
+	}
+	layout.pools = { rect(80, 80, 130, 115) }
+	layout.bushes = {
+		bush(-172, -160, 4, "Green"),
+		bush(174, -125, 5, "Orange"),
+		bush(-30, 160, 4, "Green"),
+		bush(172, 60, 4, "Orange"),
+		bush(-172, 10, 5, "Green"),
+		bush(100, 158, 4, "Green"),
+		bush(-36.5, -146.5, 2, "Cobweb"),
+		bush(46.5, -146.5, 2, "Cobweb"),
+	}
+	layout.humanSpawns = {
+		pt(-160, -40),
+		pt(-100, -40),
+		pt(-40, -40),
+		pt(40, -40),
+		pt(-150, 20),
+		pt(-30, 40),
+		pt(40, 50),
+		pt(175, -100),
+		pt(150, 60),
+		pt(0, 160),
+		pt(-100, 162),
+		pt(175, 150),
+	}
+	layout.zombieSpawns = { pt(165, -162), pt(-170, 160) }
+	layout.start = pt(10, 10)
+	layout.wizardSpots = { pt(-170, -100), pt(60, -165), pt(-170, 130), pt(110, 150) }
+	for _, p in { pt(-105, 95), pt(20, 110) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
+-- The Spooky Village ----------------------------------------------------------------------
+
+local COTTAGE_HOUSE: Plan = {
+	w = 36,
+	d = 28,
+	walls = {
+		wall(0, 0, 36, 0, nil, { { 3, 15 }, { 21, 33 } }),
+		wall(0, 28, 36, 28, { { 23, 30 } }, { { 3, 15 } }),
+		wall(0, 0, 0, 28, { { 4, 11 } }, { { 17, 25 } }),
+		wall(36, 0, 36, 28, nil, { { 6, 22 } }),
+		wall(18, 0, 18, 28, { { 4, 11 }, { 18, 25 } }),
+		wall(0, 14, 18, 14, { { 5.5, 12.5 } }),
+	},
+	rooms = {
+		room("Kitchen", "Tile", 0, 0, 18, 14),
+		room("Bedroom", "Wood", 0, 14, 18, 28),
+		room("Living room", "Wood", 18, 0, 36, 28),
+	},
+	furniture = {
+		piece("Wardrobe", 3.14, 19.1, 90),
+		piece("Candelabra", 32.57, 22.07),
+		piece("JackOLantern", 32.64, 12.14),
+		piece("Box", 21.14, 15.64, 90),
+	},
+	items = { pt(27, 14) },
+}
+
+local VILLAGE_HOUSE: Plan = {
+	w = 30,
+	d = 24,
+	walls = {
+		wall(0, 0, 30, 0, nil, { { 3, 13 } }),
+		wall(0, 24, 30, 24, { { 4, 11 } }, { { 19, 28 } }),
+		wall(0, 0, 0, 24, nil, { { 6, 18 } }),
+		wall(30, 0, 30, 24, nil, { { 6, 18 } }),
+		wall(16, 0, 16, 24, { { 9, 16 } }),
+	},
+	rooms = {
+		room("Front room", "Wood", 0, 0, 16, 24),
+		room("Back room", "Wood", 16, 0, 30, 24),
+	},
+	furniture = {
+		piece("Armchair", 7.83, 5.83, 90),
+		piece("Candelabra", 12.57, 20.07),
+		piece("Box", 23.64, 20.64, 90),
+	},
+	items = {},
+}
+
+local VILLAGE_SHOP: Plan = {
+	w = 28,
+	d = 20,
+	walls = {
+		wall(0, 0, 28, 0, nil, { { 3, 15 } }),
+		wall(0, 20, 28, 20, { { 5, 12 } }, { { 20, 26 } }),
+		wall(0, 0, 0, 20, nil, { { 5, 15 } }),
+		wall(28, 0, 28, 20, { { 6.5, 13.5 } }),
+		wall(18, 0, 18, 20, { { 6.5, 13.5 } }),
+	},
+	rooms = {
+		room("Shop", "Wood", 0, 0, 18, 20),
+		room("Storeroom", "Wood", 18, 0, 28, 20),
+	},
+	furniture = {
+		piece("Pumpkin", 6.53, 4.03),
+		piece("Pumpkin", 12.03, 3.03),
+		piece("JackOLantern", 3.14, 9.64),
+		piece("Crate", 24.1, 3.6),
+		piece("Barrel", 21.03, 15.53, 90),
+	},
+	items = { pt(9, 10) },
+}
+
+local INN: Plan = {
+	w = 50,
+	d = 40,
+	walls = {
+		wall(0, 0, 50, 0, nil, { { 4, 26 }, { 34, 46 } }),
+		wall(0, 40, 50, 40, { { 11, 18 } }, { { 34, 46 } }),
+		wall(0, 0, 0, 40, nil, { { 6, 34 } }),
+		wall(50, 0, 50, 40, { { 4, 11 } }, { { 19, 25 }, { 31, 37 } }),
+		wall(30, 0, 30, 40, { { 4, 11 }, { 19, 25 }, { 31, 37 } }),
+		wall(30, 16, 50, 16),
+		wall(30, 28, 50, 28),
+	},
+	rooms = {
+		room("Common room", "Wood", 0, 0, 30, 40),
+		room("Kitchen", "Tile", 30, 0, 50, 16),
+		room("Guest room", "Wood", 30, 16, 50, 28),
+		room("Spare room", "Wood", 30, 28, 50, 40),
+	},
+	furniture = {
+		piece("Table", 4.53, 20.75, 90),
+		piece("Table", 8.03, 7.75, 90),
+		piece("Chair", 6.53, 36.53, 90),
+		piece("Chair", 4.03, 29.53, 90),
+		piece("Chair", 21.03, 28.03, 90),
+		piece("Chair", 22.03, 14.03),
+		piece("Candelabra", 22.57, 2.57, 90),
+		piece("Candelabra", 26.57, 27.07, 90),
+		piece("Box", 46.64, 19.64),
+	},
+	items = { pt(15, 20) },
+}
+
+local CHURCH: Plan = {
+	w = 40,
+	d = 70,
+	walls = {
+		wall(0, 0, 40, 0, { { 28, 35 } }, { { 4, 20 } }),
+		wall(0, 70, 40, 70, { { 16, 24 } }, { { 3, 13 }, { 27, 37 } }),
+		wall(0, 0, 0, 70, nil, { { 26, 44 }, { 50, 66 } }),
+		wall(40, 0, 40, 70, nil, { { 26, 44 }, { 50, 66 } }),
+		wall(0, 20, 40, 20, { { 8.5, 15.5 }, { 28.5, 35.5 } }),
+		wall(24, 0, 24, 20, nil, nil, { { 6, 13 } }),
+	},
+	rooms = {
+		room("Nave", "Concrete", 0, 20, 40, 70),
+		room("Altar", "Brick", 0, 0, 24, 20),
+		room("Bell tower", "Concrete", 24, 0, 40, 20),
+	},
+	furniture = {
+		piece("Bench", 2.8, 56.6, 90),
+		piece("Bench", 2.8, 27.1, 90),
+		piece("Bench", 2.8, 43.1, 90),
+		piece("Bench", 21.6, 22.8),
+		piece("Candelabra", 25.57, 58.57),
+		piece("Candelabra", 18.57, 28.07),
+		piece("Candelabra", 34.07, 58.57, 90),
+		piece("Candelabra", 20.07, 38.57),
+		piece("Coffin", 5.88, 11.67),
+		piece("Candelabra", 8.07, 3.07, 90),
+		piece("Candelabra", 14.07, 3.07, 90),
+	},
+	items = { pt(20, 45), pt(12, 10) },
+}
+
+local function buildSpookyVillage(): Layout
+	local layout = newLayout("SpookyVillage", "The Spooky Village")
+	layout.theme = "BloodMoon"
+	layout.roofs = true
+	layout.bounds = rect(-180, -180, 180, 180)
+	addHouse(layout, "HouseN1", COTTAGE_HOUSE, -170, -165, false, "Orange", "Small")
+	addHouse(layout, "HouseN2", VILLAGE_HOUSE, -122, -165, false, "Blue", "Small")
+	addHouse(layout, "ShopN3", VILLAGE_SHOP, -80, -165, false, "Orange", "Small")
+	addHouse(layout, "Inn", INN, -40, -165, false, "Blue", "Small")
+	addHouse(layout, "HouseN5", VILLAGE_HOUSE, 22, -165, false, "Orange", "Small")
+	addHouse(layout, "HouseN6", COTTAGE_HOUSE, 64, -165, false, "Blue", "Small")
+	addHouse(layout, "ShopN7", VILLAGE_SHOP, 112, -165, false, "Orange", "Small")
+	addHouse(layout, "HouseS1", VILLAGE_HOUSE, -170, 135, true, "Blue", "Small")
+	addHouse(layout, "HouseS2", COTTAGE_HOUSE, -128, 131, true, "Orange", "Small")
+	addHouse(layout, "ShopS3", VILLAGE_SHOP, -80, 139, true, "Blue", "Small")
+	addHouse(layout, "HouseS4", VILLAGE_HOUSE, -40, 135, true, "Orange", "Small")
+	addHouse(layout, "HouseS5", COTTAGE_HOUSE, 2, 131, true, "Blue", "Small")
+	addHouse(layout, "ShopS6", VILLAGE_SHOP, 50, 139, true, "Orange", "Small")
+	addHouse(layout, "HouseW1", VILLAGE_HOUSE, -170, -60, false, "Blue", "Small")
+	addHouse(layout, "HouseW2", COTTAGE_HOUSE, -170, 10, false, "Orange", "Small")
+	addHouse(layout, "HouseW3", VILLAGE_HOUSE, -100, -100, false, "Orange", "Small")
+	addHouse(layout, "HouseE1", VILLAGE_HOUSE, 60, -95, false, "Blue", "Small")
+	addHouse(layout, "Church", CHURCH, 110, 40, false, "Orange", "Large")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Graveyard", "Dirt", 110, -40, 176, 26)
+	outdoor("Tombstone", 122, -25)
+	outdoor("Tombstone", 140, -25)
+	outdoor("Tombstone", 158, -25)
+	outdoor("Tombstone", 122, -8)
+	outdoor("Tombstone", 140, -8)
+	outdoor("Tombstone", 158, -8)
+	outdoor("Tombstone", 122, 9)
+	outdoor("Tombstone", 140, 9)
+	outdoor("Tombstone", 158, 9)
+	outdoor("Pumpkin", 118.88, 19.88)
+	outdoor("JackOLantern", 169, 18.49)
+	outdoor("Coffin", 128.53, -17.27, 90)
+	outdoor("Table", -30, -30)
+	outdoor("Pumpkin", -33, -23.5)
+	outdoor("JackOLantern", -27, -23.5)
+	outdoor("Table", 30, -30)
+	outdoor("Pumpkin", 27, -23.5)
+	outdoor("Pumpkin", 33, -23.5)
+	outdoor("Table", -30, 32)
+	outdoor("JackOLantern", -33, 37.5)
+	outdoor("Pumpkin", -27, 37.5)
+	outdoor("Table", 30, 32)
+	outdoor("HayBale", 30, 38.5)
+	outdoor("Cauldron", 0, -20)
+	outdoor("Pumpkin", -121.7, -15.2)
+	outdoor("Pumpkin", 137.8, -114.6)
+	outdoor("Pumpkin", 135.4, 156)
+	outdoor("Pumpkin", 23.4, 56.2)
+	outdoor("Pumpkin", -106.9, 105.2)
+	outdoor("Pumpkin", 153.1, -83.5)
+	outdoor("Pumpkin", -68.7, 91.7)
+	outdoor("Pumpkin", 40.7, 69.8)
+	outdoor("Pumpkin", 46, 48.7)
+	outdoor("Pumpkin", 73.4, -43.8)
+	outdoor("JackOLantern", 54.8, -116.9)
+	outdoor("JackOLantern", -127.6, -33.3)
+	outdoor("JackOLantern", 48.4, -133.1)
+	outdoor("JackOLantern", 69.4, -24.8)
+	outdoor("JackOLantern", 160.5, 53.4)
+	outdoor("JackOLantern", -73.5, -136.5)
+	outdoor("HayBale", -73.7, -54.2)
+	outdoor("HayBale", -81.5, 59.7)
+	outdoor("HayBale", -43.5, -64.5)
+	outdoor("HayBale", 26.8, -47.9)
+	outdoor("Barrel", 143.4, -70.7)
+	outdoor("Barrel", -57.2, 18.9)
+	outdoor("Barrel", 92.3, 38.8)
+	outdoor("Barrel", -43.5, -74.9)
+	outdoor("Crate", 161.2, -124.5)
+	outdoor("Crate", -12.7, 93.1)
+	outdoor("Crate", -58.6, -136.4)
+	layout.patios = { rect(-45, -45, 45, 45) }
+	layout.bushes = {
+		bush(-60, -70, 3, "Orange"),
+		bush(95, -40, 3, "Green"),
+		bush(-90, 95, 3, "Green"),
+		bush(95, 100, 3, "Orange"),
+		bush(-176, 100, 3, "Green"),
+		bush(176, -100, 3, "Orange"),
+		bush(-94.5, -162.5, 1.8, "Cobweb"),
+		bush(7, -128, 1.8, "Cobweb"),
+		bush(49.5, -162.5, 1.8, "Cobweb"),
+		bush(-167.5, 156.5, 1.8, "Cobweb"),
+		bush(-37.5, 156.5, 1.8, "Cobweb"),
+		bush(-142.5, -57.5, 1.8, "Cobweb"),
+		bush(-72.5, -97.5, 1.8, "Cobweb"),
+		bush(87.5, -92.5, 1.8, "Cobweb"),
+		bush(147, 43, 1.8, "Cobweb"),
+		bush(113, 107, 2, "Cobweb"),
+	}
+	layout.humanSpawns = {
+		pt(-60, -60),
+		pt(60, -60),
+		pt(-60, 60),
+		pt(60, 60),
+		pt(-120, -30),
+		pt(-120, 60),
+		pt(100, -120),
+		pt(-150, -100),
+		pt(0, 100),
+		pt(0, -100),
+		pt(160, 130),
+		pt(-100, 110),
+	}
+	layout.zombieSpawns = { pt(-176, 110), pt(170, 160) }
+	layout.start = pt(0, 10)
+	layout.wizardSpots = { pt(-60, 0), pt(150, -60), pt(-110, 170), pt(100, 170) }
+	for _, p in { pt(147, -7) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
+-- Witch Woods -----------------------------------------------------------------------------
+
+local WITCH_HUT: Plan = {
+	w = 40,
+	d = 32,
+	walls = {
+		wall(0, 0, 40, 0, nil, { { 4, 22 } }),
+		wall(0, 32, 40, 32, { { 16, 23 } }, { { 28, 38 } }),
+		wall(0, 0, 0, 32, nil, { { 6, 26 } }),
+		wall(40, 0, 40, 32, { { 18, 25 } }),
+		wall(26, 0, 26, 32, { { 4, 11 }, { 20, 27 } }),
+		wall(26, 14, 40, 14),
+	},
+	rooms = {
+		room("Brewing room", "Wood", 0, 0, 26, 32),
+		room("Pantry", "Wood", 26, 0, 40, 14),
+		room("Bedroom", "Wood", 26, 14, 40, 32),
+	},
+	furniture = {
+		piece("Piano", 4.24, 15.25, 90),
+		piece("Wardrobe", 3.14, 26.1, 90),
+		piece("Bookshelf", 11.15, 2.65),
+		piece("Candelabra", 8.07, 24.57),
+		piece("Candelabra", 9.07, 29.07, 90),
+	},
+	items = { pt(13, 16) },
+}
+
+local MILL: Plan = {
+	w = 36,
+	d = 36,
+	walls = {
+		wall(0, 0, 36, 0, nil, { { 3, 15 }, { 21, 33 } }),
+		wall(0, 36, 36, 36, { { 5.5, 12.5 } }, { { 21, 33 } }),
+		wall(0, 0, 0, 36, nil, { { 3, 15 }, { 21, 33 } }),
+		wall(36, 0, 36, 36, { { 23.5, 30.5 } }, { { 3, 15 } }),
+		wall(18, 0, 18, 36, { { 5.5, 12.5 }, { 23.5, 30.5 } }),
+		wall(0, 18, 36, 18, { { 5.5, 12.5 }, { 23.5, 30.5 } }),
+	},
+	rooms = {
+		room("Millstone room", "Concrete", 0, 0, 18, 18),
+		room("Grain room", "Wood", 18, 0, 36, 18),
+		room("Office", "Wood", 0, 18, 18, 36),
+		room("Storage", "Wood", 18, 18, 36, 36),
+	},
+	furniture = {
+		piece("Barrel", 8.53, 3.53),
+		piece("HayBale", 3.14, 6.03, 90),
+		piece("HayBale", 32.64, 10.03, 90),
+		piece("Barrel", 27.53, 3.03, 90),
+		piece("Barrel", 21.03, 14.53, 90),
+		piece("Box", 21.14, 3.14, 90),
+		piece("Desk", 3.38, 27.1, 90),
+		piece("Chair", 14.53, 21.03),
+		piece("Wardrobe", 29.6, 32.64, 180),
+		piece("Box", 21.14, 32.64, 90),
+		piece("Box", 32.64, 21.14, 90),
+		piece("Pumpkin", 21.03, 21.03),
+	},
+	items = { pt(9, 9), pt(9, 27), pt(27, 27) },
+}
+
+local CABIN: Plan = {
+	w = 30,
+	d = 22,
+	walls = {
+		wall(0, 0, 30, 0, nil, { { 4, 16 } }),
+		wall(0, 22, 30, 22, { { 6, 13 } }, { { 22, 28 } }),
+		wall(0, 0, 0, 22, nil, { { 5, 17 } }),
+		wall(30, 0, 30, 22, nil, { { 5, 17 } }),
+		wall(20, 0, 20, 22, { { 7.5, 14.5 } }),
+	},
+	rooms = {
+		room("Cabin", "Wood", 0, 0, 20, 22),
+		room("Bunk room", "Wood", 20, 0, 30, 22),
+	},
+	furniture = {
+		piece("Wardrobe", 3.14, 6.6, 90),
+		piece("Chair", 14.53, 5.03),
+		piece("Chair", 3.03, 18.53, 90),
+		piece("Barrel", 16.53, 18.03),
+		piece("Candelabra", 8.57, 3.57, 90),
+		piece("Box", 23.14, 4.14, 90),
+	},
+	items = { pt(10, 11) },
+}
+
+local function buildWitchWoods(): Layout
+	local layout = newLayout("WitchWoods", "Witch Woods")
+	layout.theme = "Swamp"
+	layout.roofs = true
+	layout.bounds = rect(-190, -190, 190, 190)
+	addHouse(layout, "WitchHut", WITCH_HUT, -20, -20, false, "Orange", "Large")
+	addHouse(layout, "Mill", MILL, 70, 40, false, "Blue", "Large")
+	addHouse(layout, "CabinA", CABIN, -160, -160, false, "Orange", "Small")
+	addHouse(layout, "CabinB", CABIN, 120, -160, false, "Blue", "Small")
+	addHouse(layout, "CabinC", CABIN, -160, 130, true, "Blue", "Small")
+	addHouse(layout, "CabinD", CABIN, 130, 140, true, "Orange", "Small")
+	addHouse(layout, "Outhouse1", OUTHOUSE, -90, -178, false, "Orange", "Small")
+	addHouse(layout, "Outhouse2", OUTHOUSE, 165, 0, false, "Orange", "Small")
+	addHouse(layout, "Outhouse3", OUTHOUSE, -178, 30, false, "Orange", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Stone circle", "Dirt", -130, -60, -70, 0)
+	outdoor("Tombstone", -80, -30)
+	outdoor("Tombstone", -83.8, -18.2)
+	outdoor("Tombstone", -93.8, -11)
+	outdoor("Tombstone", -106.2, -11)
+	outdoor("Tombstone", -116.2, -18.2)
+	outdoor("Tombstone", -120, -30)
+	outdoor("Tombstone", -116.2, -41.8)
+	outdoor("Tombstone", -106.2, -49)
+	outdoor("Tombstone", -93.8, -49)
+	outdoor("Tombstone", -83.8, -41.8)
+	outdoor("Cauldron", -108.93, -40.93, 90)
+	outdoor("JackOLantern", -75, -23.51)
+	yardRoom("Pumpkin clearing", "Dirt", 20, 105, 100, 170)
+	outdoor("Pumpkin", 85.38, 120.38)
+	outdoor("Pumpkin", 82.88, 146.88)
+	outdoor("Pumpkin", 78.88, 120.38)
+	outdoor("Pumpkin", 88.88, 147.38)
+	outdoor("Pumpkin", 28.38, 122.88, 90)
+	outdoor("Pumpkin", 28.88, 155.38, 90)
+	outdoor("Pumpkin", 46.38, 124.88)
+	outdoor("Pumpkin", 37.88, 119.88, 90)
+	outdoor("Pumpkin", 41.38, 149.88, 90)
+	outdoor("Pumpkin", 66.38, 147.38, 90)
+	outdoor("Pumpkin", 85.38, 162.88)
+	outdoor("Pumpkin", 72.38, 145.38)
+	outdoor("Pumpkin", 52.88, 163.38, 90)
+	outdoor("Pumpkin", 33.88, 148.88)
+	outdoor("Pumpkin", 73.38, 165.38, 90)
+	outdoor("Pumpkin", 54.38, 152.38)
+	outdoor("Pumpkin", 53.38, 109.38)
+	outdoor("Pumpkin", 45.88, 130.88, 90)
+	outdoor("JackOLantern", 70, 155)
+	outdoor("JackOLantern", 70.5, 129)
+	outdoor("JackOLantern", 33, 165, 90)
+	outdoor("JackOLantern", 69.5, 109.5, 90)
+	outdoor("JackOLantern", 46, 110.5, 90)
+	outdoor("JackOLantern", 93.5, 156)
+	outdoor("Scarecrow", 33.95, 128.92)
+	outdoor("Scarecrow", 67.92, 162.95, 90)
+	outdoor("HayBale", 54, 124.88, 90)
+	outdoor("HayBale", 27, 130.38, 90)
+	outdoor("HayBale", 91.5, 117.38, 90)
+	layout.paths = { rect(-3, 12, 4, 60), rect(-150, -138, -143, -100), rect(127, -138, 134, -100) }
+	layout.pools = { rect(-70, 60, -20, 92), rect(-95, 92, -50, 120), rect(120, -70, 170, -30) }
+	layout.bushes = {
+		bush(-12.5, 161.3, 4.1, "Green"),
+		bush(-103.1, -80.3, 4, "Orange"),
+		bush(-122.3, 106.8, 6.3, "Green"),
+		bush(-134.5, -179.5, 5.9, "Orange"),
+		bush(-103.2, 175, 4.6, "Orange"),
+		bush(-157.9, -72.1, 4.4, "Green"),
+		bush(64.8, -59, 4, "Green"),
+		bush(-6.9, -66.1, 6.5, "Green"),
+		bush(-159.4, 170.9, 6.1, "Green"),
+		bush(-48.1, 28.2, 6.4, "Green"),
+		bush(99.5, -141.4, 5.6, "Green"),
+		bush(16.2, -67.2, 6.8, "Green"),
+		bush(178.8, -121.8, 6.1, "Green"),
+		bush(-28.3, -160.5, 5.4, "Orange"),
+		bush(-2.3, 123.1, 4.1, "Green"),
+		bush(180.4, 127.3, 5.4, "Orange"),
+		bush(-44.7, 177.3, 4.4, "Orange"),
+		bush(-5.2, 97.7, 4.8, "Green"),
+		bush(62.2, -13.4, 4.8, "Orange"),
+		bush(107.2, -54.8, 5.9, "Green"),
+		bush(132.8, 67.6, 6.5, "Orange"),
+		bush(-169.9, -122.3, 6.2, "Green"),
+		bush(-101.2, 67, 6, "Green"),
+		bush(-10.3, -99.6, 4.1, "Green"),
+		bush(-66.3, -115.7, 4.4, "Green"),
+		bush(-12.6, -43.5, 4.1, "Green"),
+		bush(-94.5, 145.3, 5.8, "Green"),
+		bush(41.3, -147.4, 4.1, "Green"),
+		bush(-29, 112.4, 6.5, "Green"),
+		bush(-129.5, 34.7, 5.1, "Green"),
+		bush(167.7, 38.9, 6.9, "Green"),
+		bush(34.3, -86.1, 6.7, "Orange"),
+		bush(-30.5, -65.3, 5.5, "Orange"),
+		bush(44.2, -20.5, 4.4, "Green"),
+		bush(-71.6, 12, 6.3, "Green"),
+		bush(101.3, -26.3, 4, "Green"),
+		bush(-41.1, -38.8, 6.7, "Orange"),
+		bush(58.8, -170.4, 6.4, "Green"),
+		bush(162.9, 76.5, 5.9, "Green"),
+		bush(-160.7, 71.4, 5.1, "Green"),
+		bush(2.1, 147.8, 5.9, "Green"),
+		bush(90.8, 6.2, 4.8, "Green"),
+		bush(61, -148.6, 4.3, "Green"),
+		bush(81.9, -162.4, 4.1, "Green"),
+		bush(64.9, -99.2, 6.9, "Green"),
+		bush(45.3, -52.9, 4.4, "Green"),
+		bush(86.6, -37.7, 5.7, "Green"),
+		bush(-108.3, -167.5, 4.1, "Orange"),
+		bush(94, -180.4, 5.4, "Green"),
+		bush(-124.8, -88.2, 6.6, "Green"),
+		bush(-77.3, -96.1, 4.5, "Green"),
+		bush(78.4, -121.1, 6.2, "Green"),
+		bush(-54.1, -146.6, 5.6, "Green"),
+		bush(-35.2, 11.3, 5.5, "Green"),
+		bush(-142, 15.2, 4.9, "Orange"),
+		bush(-17, -17, 2, "Cobweb"),
+		bush(17, -17, 1.6, "Cobweb"),
+		bush(103, 43, 1.6, "Cobweb"),
+	}
+	layout.humanSpawns = {
+		pt(-120, -110),
+		pt(-40, -120),
+		pt(40, -120),
+		pt(120, -100),
+		pt(-170, -60),
+		pt(170, 60),
+		pt(-100, 40),
+		pt(0, 80),
+		pt(60, -40),
+		pt(-30, 160),
+		pt(160, 100),
+		pt(-140, 170),
+	}
+	layout.zombieSpawns = { pt(-180, 180), pt(180, -180) }
+	layout.start = pt(0, 45)
+	layout.wizardSpots = { pt(-60, -60), pt(100, -110), pt(-120, 80), pt(140, 30) }
+	for _, p in { pt(-100, -30), pt(60, 137.5) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
 -- END GENERATED MAPS --
 
 MapLayout.maps = {
@@ -1500,8 +2271,12 @@ MapLayout.maps = {
 	Mansion = buildMansion(),
 	ChristmasTown = buildChristmasTown(),
 	Haunted = buildHaunted(),
+	PumpkinFarm = buildPumpkinFarm(),
+	SpookyVillage = buildSpookyVillage(),
+	WitchWoods = buildWitchWoods(),
 } :: { [string]: Layout }
-MapLayout.names = { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" }
+MapLayout.names =
+	{ "Neighborhood", "Mansion", "ChristmasTown", "Haunted", "PumpkinFarm", "SpookyVillage", "WitchWoods" }
 MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood

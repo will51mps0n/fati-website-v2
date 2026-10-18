@@ -1,5 +1,5 @@
 -- Dark maps (MapThemes with dark = true, like the haunted house): a lantern
--- hangs on your own character, lit only on your screen, so you see what's
+-- follows your own character, lit only on your screen, so you see what's
 -- near you and little beyond. Walls stop its light. Other
 -- people's name tags show only within the theme's sight (BushController
 -- asks `sees`).
@@ -20,28 +20,45 @@ local function myRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function updateLantern()
-	local root = myRoot()
-	if not root then
-		return
+-- The lantern is its own invisible part on your machine, following you
+-- every frame, so nothing that happens to your character (respawns, size
+-- changes, a new round on another dark map) can ever switch it off.
+local lanternPart: Part? = nil
+local light: PointLight? = nil
+
+local function lantern(): (Part, PointLight)
+	local part, lamp = lanternPart, light
+	if part and lamp and part.Parent then
+		return part, lamp
 	end
-	local lamp = root:FindFirstChild("Lantern") :: PointLight?
-	local lantern = theme.lantern
-	if theme.dark and lantern then
-		if not lamp then
-			local made = Instance.new("PointLight")
-			made.Name = "Lantern"
-			made.Shadows = true
-			made.Parent = root
-			lamp = made
-		end
-		assert(lamp, "lamp")
+	local made = Instance.new("Part")
+	made.Name = "MyLantern"
+	made.Anchored = true
+	made.CanCollide = false
+	made.CanQuery = false
+	made.CanTouch = false
+	made.Transparency = 1
+	made.Size = Vector3.new(0.2, 0.2, 0.2)
+	local madeLight = Instance.new("PointLight")
+	madeLight.Shadows = true
+	madeLight.Parent = made
+	made.Parent = workspace
+	lanternPart, light = made, madeLight
+	return made, madeLight
+end
+
+local function updateLantern()
+	local part, lamp = lantern()
+	local root = myRoot()
+	local settings = theme.lantern
+	if theme.dark and settings and root then
+		part.CFrame = CFrame.new(root.Position + Vector3.new(0, 2, 0))
 		lamp.Enabled = true
-		lamp.Range = lantern.range
-		lamp.Brightness = lantern.brightness
-		lamp.Color = Color3.fromHex(lantern.color)
-	elseif lamp then
-		lamp:Destroy()
+		lamp.Range = settings.range
+		lamp.Brightness = settings.brightness
+		lamp.Color = Color3.fromHex(settings.color)
+	else
+		lamp.Enabled = false
 	end
 end
 
@@ -71,16 +88,7 @@ function DarknessController.start()
 	end
 	map:GetAttributeChangedSignal("Theme"):Connect(refresh)
 	refresh()
-	-- Characters (and their root) are rebuilt on respawn and resize: keep
-	-- checking that the lantern is on the current one, so it never drops out.
-	local elapsed = 0
-	RunService.Heartbeat:Connect(function(dt)
-		elapsed += dt
-		if elapsed >= 0.1 then
-			elapsed = 0
-			updateLantern()
-		end
-	end)
+	RunService.RenderStepped:Connect(updateLantern)
 end
 
 return DarknessController

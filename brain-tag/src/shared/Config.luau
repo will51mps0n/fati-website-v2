@@ -16,7 +16,8 @@ Config.FIRST_ZOMBIES_TO_SPAWN = true -- teleport first zombies to the zombie spa
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.
-Config.MAP_ROTATION = { "Neighborhood", "Mansion", "Haunted", "ChristmasTown" }
+Config.MAP_ROTATION =
+	{ "Neighborhood", "Haunted", "Mansion", "PumpkinFarm", "ChristmasTown", "SpookyVillage", "WitchWoods" }
 Config.ROUNDS_PER_MAP = 2
 
 -- Movement and size ------------------------------------------------------------

@@ -42,6 +42,7 @@ export type Participant = {
 	adminSpeed: number, -- speed multiplier set from the admin panel (1 = normal)
 	alpha: boolean, -- one of this round's first zombies (special look)
 	knockedUntil: number, -- a real hit's shove lasts until then (see Combat.knockback)
+	pressedUntil: number, -- bots: being held off someone's weapon (ItemService.shaftStep)
 	slowFactor: number,
 	spawning: boolean,
 	aim: Vector3,
@@ -162,6 +163,7 @@ function Participants.add(info: NewParticipant): Participant
 		adminSpeed = 1,
 		alpha = false,
 		knockedUntil = 0,
+		pressedUntil = 0,
 		slowFactor = 1,
 		spawning = false,
 		aim = Vector3.new(0, 0, -1),

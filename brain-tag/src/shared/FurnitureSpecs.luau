@@ -57,6 +57,7 @@ local Specs: { [string]: Spec } = {
 	Pumpkin = { w = 2.4, d = 2.4, h = 2, weight = "Light" },
 	JackOLantern = { w = 2.6, d = 2.6, h = 2.2, weight = "Light" }, -- glows
 	HayBale = { w = 5, d = 2.6, h = 2.6, weight = "Medium" },
+	Scarecrow = { w = 3.4, d = 1.6, h = 6, weight = "Medium" },
 	-- Christmas Town.
 	ChristmasTree = { w = 5, d = 5, h = 9, weight = "Medium" },
 	Present = { w = 2, d = 2, h = 2, weight = "Light" },

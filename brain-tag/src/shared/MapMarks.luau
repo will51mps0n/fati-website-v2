@@ -27,7 +27,7 @@ export type Mark = {
 	id: string?, -- House: its name; Floor: the room's name
 	floor: string?, -- Floor: Brick, Tile, Wood, Concrete or Dirt
 	outline: string?, -- House: Blue or Orange wall trim
-	color: string?, -- Bush: Green, Orange or Cobweb
+	color: string?, -- Bush: Green, Orange or Cobweb; House: its wall color (hex)
 }
 
 -- Every kind of mark besides furniture (any furniture name is a mark too).
@@ -145,6 +145,7 @@ function MapMarks.toLayout(name: string, title: string, marks: { Mark }): (Layou
 			rect = rectOf(m),
 			outline = if m.outline == "Orange" then "Orange" else "Blue",
 			size = "Large",
+			wall = m.color,
 		})
 	end
 	local function houseAt(x: number, z: number, margin: number): string
@@ -221,11 +222,12 @@ function MapMarks.toLayout(name: string, title: string, marks: { Mark }): (Layou
 
 	for i, m in all("Floor") do
 		local floor = if m.floor and table.find(MapMarks.FLOORS, m.floor) then m.floor else "Wood"
+		-- Dirt floors are yards (a graveyard, a corn maze): no house, no roof.
 		table.insert(layout.rooms, {
 			name = m.id or ("Room" .. i),
 			floor = floor :: string,
 			rect = rectOf(m),
-			house = houseAt(m.x, m.z, 0),
+			house = if floor == "Dirt" then "" else houseAt(m.x, m.z, 0),
 		})
 	end
 
@@ -354,7 +356,7 @@ function MapMarks.fromLayout(layout: Layout): { Mark }
 	add("Bounds", layout.bounds)
 	for _, house in layout.houses do
 		local m = add("House", house.rect)
-		m.id, m.outline = house.id, house.outline
+		m.id, m.outline, m.color = house.id, house.outline, house.wall
 	end
 	for _, room in layout.rooms do
 		local m = add("Floor", room.rect)

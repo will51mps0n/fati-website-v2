@@ -508,6 +508,7 @@ local function shaftStep(dt: number)
 				local step = math.min(overlap, 2) * rate
 				if not other.player then
 					oRoot.CFrame += away * (step * hold / (hold + push))
+					other.pressedUntil = os.clock() + 0.4 -- bots learn to go round
 				end
 				if not p.player then
 					root.CFrame -= away * (step * push / (hold + push))

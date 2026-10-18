@@ -38,7 +38,9 @@ local function pointRects(list: { MapLayout.Point }): { MapLayout.Rect }
 	return out
 end
 
-for _, name in { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" } do
+for _, name in
+	{ "Neighborhood", "Mansion", "ChristmasTown", "Haunted", "PumpkinFarm", "SpookyVillage", "WitchWoods" }
+do
 	test(name .. ": copied to Studio and back is the same map", function()
 		local original = MapLayout.get(name)
 		assert(original, name)
@@ -116,7 +118,11 @@ for _, name in { "Neighborhood", "Mansion", "ChristmasTown", "Haunted" } do
 		expectEq(#copy.bushes, #original.bushes, "bushes")
 		for i, b in original.bushes do
 			local c = copy.bushes[i]
-			expect(c.x == b.x and c.z == b.z and c.r == b.r and c.color == b.color, "bush " .. i)
+			local same = math.abs(c.x - b.x) < 1e-6
+				and math.abs(c.z - b.z) < 1e-6
+				and math.abs(c.r - b.r) < 1e-6
+				and c.color == b.color
+			expect(same, "bush " .. i)
 		end
 		expectEq(#copy.houses, #original.houses, "houses")
 	end)

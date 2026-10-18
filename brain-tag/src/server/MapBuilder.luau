@@ -327,6 +327,15 @@ local function outlineColor(layout: Layout, houseId: string): string
 	return COLORS.OutlineBlue
 end
 
+local function wallColor(layout: Layout, houseId: string): string
+	for _, house in layout.houses do
+		if house.id == houseId and house.wall then
+			return house.wall
+		end
+	end
+	return COLORS.Wall
+end
+
 local function buildWalls(parent: Instance, layout: Layout)
 	for i, piece in MapLayout.allWallPieces(layout) do
 		local r = piece.rect
@@ -339,7 +348,7 @@ local function buildWalls(parent: Instance, layout: Layout)
 			name = "Wall",
 			size = Vector3.new(sx, WALL_HEIGHT, sz),
 			cframe = CFrame.new(cx, WALL_HEIGHT / 2, cz),
-			color = COLORS.Wall,
+			color = wallColor(layout, piece.house),
 			parent = segment,
 		})
 		-- A slightly bigger, slightly lower slab: from above only its edge shows,

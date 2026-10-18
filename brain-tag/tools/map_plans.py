@@ -1,4 +1,5 @@
-"""Generates the Haunted House and Christmas Town layouts into MapLayout.luau.
+"""Generates the hand-planned maps into MapLayout.luau: Christmas Town and
+the Halloween maps (Haunted House, Pumpkin Farm, Spooky Village, Witch Woods).
 
 Walls, doors, windows, secret walls, rooms and outdoor things are written
 by hand below; furniture is fitted into each room automatically (against
@@ -13,6 +14,7 @@ reachable, doorways are clear and nothing overlaps.
 
 from __future__ import annotations
 
+import math
 import random
 import re
 from pathlib import Path
@@ -34,13 +36,13 @@ SPECS = {
     "Lamp": (1.8, 1.8), "Beanbag": (3.4, 3.4), "TrashCan": (2.2, 2.2), "Aquarium": (6, 2.6),
     "Tombstone": (3.2, 1.4), "Coffin": (3, 7), "Candelabra": (1.6, 1.6), "Cauldron": (3.6, 3.6),
     "Pumpkin": (2.4, 2.4), "JackOLantern": (2.6, 2.6), "HayBale": (5, 2.6),
-    "ChristmasTree": (5, 5), "Present": (2, 2), "Snowman": (3.4, 3.4),
+    "ChristmasTree": (5, 5), "Present": (2, 2), "Snowman": (3.4, 3.4), "Scarecrow": (3.4, 1.6),
 }
 AGAINST_WALL = {"Bookshelf", "Wardrobe", "Dresser", "Bed", "Piano", "Fridge", "Stove", "Sink", "Bathtub",
                 "Toilet", "Washer", "Aquarium", "Couch", "Bench", "Desk", "Picture"}
 ROOM_GAP = 2.4  # walking room left between pieces indoors
 YARD_GAP = 3.0
-LANE = 3.2  # half-width of the clear lanes kept for the biggest players (MAX_SCALE)
+LANE = 3.8  # half-width of the clear lanes kept for the biggest players (MAX_SCALE)
 
 
 def size(kind, rot=0):
@@ -112,11 +114,12 @@ class Plan:
                 else:
                     reserved.append((cx - LANE, r[1], cx + LANE, r[3]))
             target = None
-            if contents:
+            roomy = min(area[2] - area[0], area[3] - area[1]) >= 14
+            if contents and roomy:
                 target = self._item_spot(area, zones, placed)
                 if target:
                     self.items.append(target)
-                    reserved.append(around(*target, 2.6))
+                    reserved.append(around(*target, 3.4))
             target = target or ((r[0] + r[2]) / 2, (r[1] + r[3]) / 2)
             # A wide lane from each doorway of the room to its middle.
             for door, normal in self.doors_of(r):
@@ -140,7 +143,7 @@ class Plan:
         cx, cz = (area[0] + area[2]) / 2, (area[1] + area[3]) / 2
         for dx, dz in [(0, 0), (3, 3), (-3, -3), (3, -3), (-3, 3), (0, 6), (0, -6), (6, 0), (-6, 0)]:
             x, z = cx + dx, cz + dz
-            box = around(x, z, 2.6)
+            box = around(x, z, 3.4)
             if box[0] < area[0] or box[2] > area[2] or box[1] < area[1] or box[3] > area[3]:
                 continue
             if any(overlap(box, o) for o in zones + placed):
@@ -393,7 +396,7 @@ def gingerbread():
 class Map:
     def __init__(self, fn, name, title, theme, roofs, bounds):
         self.fn, self.name, self.title, self.theme, self.roofs, self.bounds = fn, name, title, theme, roofs, bounds
-        self.houses = []  # (id, plan, ox, oz, rotated, outline, size)
+        self.houses = []  # (id, plan, ox, oz, rotated, outline, size[, wall color])
         self.yard_rooms = []  # (name, floor, rect, contents, fixed)
         self.yard_pieces = []  # fixed outdoor pieces (kind, x, z, rot)
         self.yard_scatter = []  # kinds placed anywhere outdoors
@@ -474,6 +477,338 @@ def christmas():
     return m
 
 
+# --- More Halloween maps ---------------------------------------------------------------------
+
+def farmhouse():
+    p = Plan("FARMHOUSE", 64, 44)
+    p.wall(0, 0, 64, 0, windows=[(5, 23), (33, 59)])
+    p.wall(0, 44, 64, 44, gaps=[(32, 39)], windows=[(4, 24), (48, 60)])
+    p.wall(0, 0, 0, 44, gaps=[(8, 15)], windows=[(26, 40)])
+    p.wall(64, 0, 64, 44, windows=[(4, 18), (27, 40)])
+    p.wall(28, 0, 28, 44, gaps=[(8, 15), (30, 37)])
+    p.wall(0, 22, 64, 22, gaps=[(10, 17), (32, 39), (50, 57)])
+    p.wall(44, 22, 44, 44, gaps=[(30, 37)])
+    c = "Candelabra"
+    p.room("Kitchen", "Tile", 0, 0, 28, 22, ["Fridge", "Stove", "Sink", "Table", "Chair", "Chair", "Pumpkin", "Barrel"])
+    p.room("Parlor", "Wood", 28, 0, 64, 22, ["Piano", "Couch", "Armchair", "CoffeeTable", c, "JackOLantern"])
+    p.room("Bedroom", "Wood", 0, 22, 28, 44, ["Bed", "Wardrobe", "Dresser", c])
+    p.room("Mudroom", "Wood", 28, 22, 44, 44, ["Bench", "Box", "Pumpkin"])
+    p.room("Back bedroom", "Wood", 44, 22, 64, 44, ["Bed", "Wardrobe", "Box"])
+    return p
+
+
+def barn():
+    p = Plan("BARN", 90, 60)
+    p.wall(0, 0, 90, 0, windows=[(4, 14), (22, 32), (40, 50), (58, 68), (76, 86)])
+    p.wall(0, 60, 90, 60, gaps=[(20, 28), (62, 70)])
+    p.wall(0, 0, 0, 60, gaps=[(34, 41)])
+    p.wall(90, 0, 90, 60, gaps=[(34, 41)])
+    p.wall(0, 18, 90, 18, gaps=[(5.5, 12.5), (23.5, 30.5), (41.5, 48.5), (59.5, 66.5), (77.5, 84.5)])
+    for x in (18, 36, 54, 72):
+        p.wall(x, 0, x, 18)
+    for i in range(4):
+        p.room("Stall %d" % (i + 1), "Wood", i * 18, 0, i * 18 + 18, 18, ["HayBale", "Barrel"])
+    p.room("Tack room", "Wood", 72, 0, 90, 18, ["Wardrobe", "Crate", "Box"])
+    p.room("Barn floor", "Wood", 0, 18, 90, 60,
+           ["HayBale"] * 10 + ["Crate", "Crate", "Crate", "Barrel", "Barrel", "Scarecrow", "Pumpkin", "Pumpkin",
+                               "Pumpkin", "JackOLantern", "JackOLantern"])
+    p.cobwebs += [(3.5, 3.5, 2), (86.5, 3.5, 2)]
+    return p
+
+
+def corn_maze(rng, cols=8, rows=6, cell=12):
+    """A random maze of tall corn walls with a few walk-through (secret) shortcuts."""
+    p = Plan("CORN_MAZE", cols * cell, rows * cell)
+    open_edges = set()
+    seen = {(0, 0)}
+    stack = [(0, 0)]
+    while stack:
+        cx, cz = stack[-1]
+        nbrs = [(cx + dx, cz + dz) for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                if 0 <= cx + dx < cols and 0 <= cz + dz < rows and (cx + dx, cz + dz) not in seen]
+        if nbrs:
+            n = rng.choice(nbrs)
+            open_edges.add(frozenset(((cx, cz), n)))
+            seen.add(n)
+            stack.append(n)
+        else:
+            stack.pop()
+    # A few extra openings so there are loops to run around.
+    inner = []
+    for i in range(cols):
+        for j in range(rows):
+            for n in ((i + 1, j), (i, j + 1)):
+                if n[0] < cols and n[1] < rows and frozenset(((i, j), n)) not in open_edges:
+                    inner.append(((i, j), n))
+    rng.shuffle(inner)
+    for a, b in inner[:6]:
+        open_edges.add(frozenset((a, b)))
+    walls_left = [e for e in inner[6:]]
+    secrets = set(frozenset(e) for e in walls_left[:4])
+    top, bottom = rng.randrange(cols), rng.randrange(cols)
+    p.wall(0, 0, cols * cell, 0, gaps=[(top * cell + 2, top * cell + 10)])
+    p.wall(0, rows * cell, cols * cell, rows * cell, gaps=[(bottom * cell + 2, bottom * cell + 10)])
+    p.wall(0, 0, 0, rows * cell)
+    p.wall(cols * cell, 0, cols * cell, rows * cell)
+    for i in range(cols):
+        for j in range(rows):
+            for n in ((i + 1, j), (i, j + 1)):
+                if n[0] >= cols or n[1] >= rows or frozenset(((i, j), n)) in open_edges:
+                    continue
+                secret = frozenset(((i, j), n)) in secrets
+                if n[0] == i + 1:  # wall to the east of (i, j)
+                    x = (i + 1) * cell
+                    p.wall(x, j * cell, x, (j + 1) * cell, secrets=[(j * cell + 3, j * cell + 9)] if secret else [])
+                else:  # wall to the south
+                    z = (j + 1) * cell
+                    p.wall(i * cell, z, (i + 1) * cell, z, secrets=[(i * cell + 3, i * cell + 9)] if secret else [])
+    # Dead ends get something spooky; the middle-most open cell keeps an item.
+    def exits(c):
+        count = sum(1 for e in open_edges if c in e)
+        return count + (1 if c in ((top, 0), (bottom, rows - 1)) else 0)
+    props = ["JackOLantern", "Scarecrow", "Pumpkin", "HayBale", "JackOLantern", "Pumpkin", "Scarecrow"]
+    dead = [(i, j) for i in range(cols) for j in range(rows) if exits((i, j)) == 1]
+    for k, (i, j) in enumerate(dead):
+        p.fixed.append((props[k % len(props)], i * cell + cell / 2, j * cell + cell / 2, 0))
+    middle = min(((i, j) for i in range(cols) for j in range(rows) if (i, j) not in dead),
+                 key=lambda c: (c[0] - cols / 2) ** 2 + (c[1] - rows / 2) ** 2)
+    p.items.append((middle[0] * cell + cell / 2, middle[1] * cell + cell / 2))
+    return p
+
+
+def village_house():
+    p = Plan("VILLAGE_HOUSE", 30, 24)
+    p.wall(0, 0, 30, 0, windows=[(3, 13)])
+    p.wall(0, 24, 30, 24, gaps=[(4, 11)], windows=[(19, 28)])
+    p.wall(0, 0, 0, 24, windows=[(6, 18)])
+    p.wall(30, 0, 30, 24, windows=[(6, 18)])
+    p.wall(16, 0, 16, 24, gaps=[(9, 16)])
+    p.room("Front room", "Wood", 0, 0, 16, 24, ["Armchair", "Table", "Chair", "Candelabra", "Pumpkin"])
+    p.room("Back room", "Wood", 16, 0, 30, 24, ["Bed", "Box"])
+    p.cobwebs.append((27.5, 2.5, 1.8))
+    return p
+
+
+def cottage_house():
+    p = Plan("COTTAGE_HOUSE", 36, 28)
+    p.wall(0, 0, 36, 0, windows=[(3, 15), (21, 33)])
+    p.wall(0, 28, 36, 28, gaps=[(23, 30)], windows=[(3, 15)])
+    p.wall(0, 0, 0, 28, gaps=[(4, 11)], windows=[(17, 25)])
+    p.wall(36, 0, 36, 28, windows=[(6, 22)])
+    p.wall(18, 0, 18, 28, gaps=[(4, 11), (18, 25)])
+    p.wall(0, 14, 18, 14, gaps=[(5.5, 12.5)])
+    p.room("Kitchen", "Tile", 0, 0, 18, 14, ["Stove", "Sink", "Barrel"])
+    p.room("Bedroom", "Wood", 0, 14, 18, 28, ["Wardrobe", "Bed"])
+    p.room("Living room", "Wood", 18, 0, 36, 28, ["Couch", "Armchair", "Candelabra", "JackOLantern", "Box"])
+    return p
+
+
+def village_shop():
+    p = Plan("VILLAGE_SHOP", 28, 20)
+    p.wall(0, 0, 28, 0, windows=[(3, 15)])
+    p.wall(0, 20, 28, 20, gaps=[(5, 12)], windows=[(20, 26)])
+    p.wall(0, 0, 0, 20, windows=[(5, 15)])
+    p.wall(28, 0, 28, 20, gaps=[(6.5, 13.5)])
+    p.wall(18, 0, 18, 20, gaps=[(6.5, 13.5)])
+    p.room("Shop", "Wood", 0, 0, 18, 20, ["Table", "Pumpkin", "Pumpkin", "JackOLantern", "Crate"])
+    p.room("Storeroom", "Wood", 18, 0, 28, 20, ["Crate", "Barrel", "Box"])
+    return p
+
+
+def inn():
+    p = Plan("INN", 50, 40)
+    p.wall(0, 0, 50, 0, windows=[(4, 26), (34, 46)])
+    p.wall(0, 40, 50, 40, gaps=[(11, 18)], windows=[(34, 46)])
+    p.wall(0, 0, 0, 40, windows=[(6, 34)])
+    p.wall(50, 0, 50, 40, gaps=[(4, 11)], windows=[(19, 25), (31, 37)])
+    p.wall(30, 0, 30, 40, gaps=[(4, 11), (19, 25), (31, 37)])
+    p.wall(30, 16, 50, 16)
+    p.wall(30, 28, 50, 28)
+    c = "Candelabra"
+    p.room("Common room", "Wood", 0, 0, 30, 40,
+           ["Table", "Table", "Chair", "Chair", "Chair", "Chair", "Bench", c, c, "Barrel", "JackOLantern"])
+    p.room("Kitchen", "Tile", 30, 0, 50, 16, ["Stove", "Sink", "Cauldron"])
+    p.room("Guest room", "Wood", 30, 16, 50, 28, ["Bed", "Box"])
+    p.room("Spare room", "Wood", 30, 28, 50, 40, ["Bed", "Dresser"])
+    p.cobwebs.append((47, 37, 1.8))
+    return p
+
+
+def church():
+    p = Plan("CHURCH", 40, 70)
+    p.wall(0, 0, 40, 0, gaps=[(28, 35)], windows=[(4, 20)])
+    p.wall(0, 70, 40, 70, gaps=[(16, 24)], windows=[(3, 13), (27, 37)])
+    p.wall(0, 0, 0, 70, windows=[(26, 44), (50, 66)])
+    p.wall(40, 0, 40, 70, windows=[(26, 44), (50, 66)])
+    p.wall(0, 20, 40, 20, gaps=[(8.5, 15.5), (28.5, 35.5)])
+    p.wall(24, 0, 24, 20, secrets=[(6, 13)])
+    c = "Candelabra"
+    p.room("Nave", "Concrete", 0, 20, 40, 70, ["Bench"] * 8 + [c, c, c, c])
+    p.room("Altar", "Brick", 0, 0, 24, 20, ["Coffin", c, c])
+    p.room("Bell tower", "Concrete", 24, 0, 40, 20, ["Barrel", "Crate"])
+    p.cobwebs += [(37, 3, 1.8), (3, 67, 2)]
+    return p
+
+
+def witch_hut():
+    p = Plan("WITCH_HUT", 40, 32)
+    p.wall(0, 0, 40, 0, windows=[(4, 22)])
+    p.wall(0, 32, 40, 32, gaps=[(16, 23)], windows=[(28, 38)])
+    p.wall(0, 0, 0, 32, windows=[(6, 26)])
+    p.wall(40, 0, 40, 32, gaps=[(18, 25)])
+    p.wall(26, 0, 26, 32, gaps=[(4, 11), (20, 27)])
+    p.wall(26, 14, 40, 14)
+    c = "Candelabra"
+    p.room("Brewing room", "Wood", 0, 0, 26, 32,
+           ["Piano", "Wardrobe", "Cauldron", "Cauldron", "Cauldron", "Bookshelf", "Bookshelf", c, c, "JackOLantern", "Pumpkin"])
+    p.room("Pantry", "Wood", 26, 0, 40, 14, ["Barrel", "Barrel", "Crate"])
+    p.room("Bedroom", "Wood", 26, 14, 40, 32, ["Wardrobe", "Bed"])
+    p.cobwebs += [(3, 3, 2), (37, 3, 1.6)]
+    return p
+
+
+def cabin():
+    p = Plan("CABIN", 30, 22)
+    p.wall(0, 0, 30, 0, windows=[(4, 16)])
+    p.wall(0, 22, 30, 22, gaps=[(6, 13)], windows=[(22, 28)])
+    p.wall(0, 0, 0, 22, windows=[(5, 17)])
+    p.wall(30, 0, 30, 22, windows=[(5, 17)])
+    p.wall(20, 0, 20, 22, gaps=[(7.5, 14.5)])
+    p.room("Cabin", "Wood", 0, 0, 20, 22, ["Wardrobe", "Table", "Chair", "Chair", "Barrel", "Candelabra"])
+    p.room("Bunk room", "Wood", 20, 0, 30, 22, ["Wardrobe", "Box"])
+    return p
+
+
+def mill():
+    p = Plan("MILL", 36, 36)
+    p.wall(0, 0, 36, 0, windows=[(3, 15), (21, 33)])
+    p.wall(0, 36, 36, 36, gaps=[(5.5, 12.5)], windows=[(21, 33)])
+    p.wall(0, 0, 0, 36, windows=[(3, 15), (21, 33)])
+    p.wall(36, 0, 36, 36, gaps=[(23.5, 30.5)], windows=[(3, 15)])
+    p.wall(18, 0, 18, 36, gaps=[(5.5, 12.5), (23.5, 30.5)])
+    p.wall(0, 18, 36, 18, gaps=[(5.5, 12.5), (23.5, 30.5)])
+    p.room("Millstone room", "Concrete", 0, 0, 18, 18, ["Crate", "Barrel", "HayBale"])
+    p.room("Grain room", "Wood", 18, 0, 36, 18, ["HayBale", "Barrel", "Barrel", "Box"])
+    p.room("Office", "Wood", 0, 18, 18, 36, ["Desk", "Chair", "Wardrobe"])
+    p.room("Storage", "Wood", 18, 18, 36, 36, ["Wardrobe", "Crate", "Box", "Box", "Cauldron", "Pumpkin"])
+    p.cobwebs.append((33, 3, 1.6))
+    return p
+
+
+def scatter_trees(m, rng, count, rmin, rmax):
+    """Forest: trees (bushes you can hide in) spread out, never in the way."""
+    b = m.bounds
+    avoid = [(h[0] - 9, h[1] - 9, h[2] + 9, h[3] + 9) for h in (m.house_rect(h) for h in m.houses)]
+    avoid += [(r[0] - 5, r[1] - 5, r[2] + 5, r[3] + 5) for _, _, r, _, _ in m.yard_rooms]
+    avoid += [(r[0] - 5, r[1] - 5, r[2] + 5, r[3] + 5) for r in m.pools + m.paths + m.patios]
+    avoid += [around(x, z, 7) for x, z in m.human + m.zombie + m.wizard]
+    avoid += [around(m.start[0], m.start[1], 18)]
+    trees = []
+    for _ in range(count * 60):
+        if len(trees) >= count:
+            break
+        r = rng.uniform(rmin, rmax)
+        x = rng.uniform(b[0] + r + 4, b[2] - r - 4)
+        z = rng.uniform(b[1] + r + 4, b[3] - r - 4)
+        box = around(x, z, r)
+        if any(overlap(box, a) for a in avoid):
+            continue
+        if any((x - tx) ** 2 + (z - tz) ** 2 < (r + tr + 8) ** 2 for tx, tz, tr, _ in trees + m.bushes):
+            continue
+        trees.append((round(x, 1), round(z, 1), round(r, 1), "Green" if rng.random() < 0.8 else "Orange"))
+    m.bushes += trees
+
+
+def pumpkin_farm(rng):
+    m = Map("buildPumpkinFarm", "PumpkinFarm", "The Pumpkin Farm", "Haunted", True, (-180, -170, 180, 170))
+    m.houses.append(("Farmhouse", farmhouse(), -150, -150, False, "Orange", "Large"))
+    m.houses.append(("Barn", barn(), -40, -150, False, "Orange", "Huge"))
+    m.houses.append(("CornMaze", corn_maze(rng), 66, -40, False, "Orange", "Huge", "B8963A"))
+    m.houses.append(("Shed", garden_shed(), 110, -150, False, "Orange", "Small"))
+    m.houses.append(("Outhouse1", outhouse(), -172, -60, False, "Orange", "Small"))
+    m.houses.append(("Outhouse2", outhouse(), 150, 120, True, "Orange", "Small"))
+    m.yard_rooms.append(("Corn maze", "Dirt", (66, -40, 162, 32), [], []))
+    m.yard_rooms.append(("Pumpkin patch", "Dirt", (-165, 40, -45, 150),
+                         ["Pumpkin"] * 30 + ["JackOLantern"] * 10 + ["Scarecrow"] * 3, []))
+    m.yard_rooms.append(("Hay field", "Dirt", (-20, 70, 60, 150),
+                         ["HayBale"] * 14 + ["Scarecrow"] * 2 + ["Pumpkin"] * 6, []))
+    m.paths = [rect(-170, -64, 170, -54), rect(-118, -106, -111, -64), rect(-20, -90, -12, -64), rect(22, -90, 30, -64)]
+    m.pools = [rect(80, 80, 130, 115)]
+    m.bushes = [(-172, -160, 4, "Green"), (174, -125, 5, "Orange"), (-30, 160, 4, "Green"), (172, 60, 4, "Orange"),
+                (-172, 10, 5, "Green"), (100, 158, 4, "Green")]
+    m.human = [(-160, -40), (-100, -40), (-40, -40), (40, -40), (-150, 20), (-30, 40), (40, 50), (175, -100),
+               (150, 60), (0, 160), (-100, 162), (175, 150)]
+    m.zombie = [(165, -162), (-170, 160)]
+    m.start = (10, 10)
+    m.wizard = [(-170, -100), (60, -165), (-170, 130), (110, 150)]
+    return m
+
+
+def spooky_village():
+    m = Map("buildSpookyVillage", "SpookyVillage", "The Spooky Village", "BloodMoon", True, (-180, -180, 180, 180))
+    north = [("HouseN1", cottage_house(), -170, -165), ("HouseN2", village_house(), -122, -165),
+             ("ShopN3", village_shop(), -80, -165), ("Inn", inn(), -40, -165), ("HouseN5", village_house(), 22, -165),
+             ("HouseN6", cottage_house(), 64, -165), ("ShopN7", village_shop(), 112, -165)]
+    for i, (hid, plan, ox, oz) in enumerate(north):
+        m.houses.append((hid, plan, ox, oz, False, "Blue" if i % 2 else "Orange", "Small"))
+    south = [("HouseS1", village_house(), -170, 135), ("HouseS2", cottage_house(), -128, 131),
+             ("ShopS3", village_shop(), -80, 139), ("HouseS4", village_house(), -40, 135),
+             ("HouseS5", cottage_house(), 2, 131), ("ShopS6", village_shop(), 50, 139)]
+    for i, (hid, plan, ox, oz) in enumerate(south):
+        m.houses.append((hid, plan, ox, oz, True, "Orange" if i % 2 else "Blue", "Small"))
+    m.houses.append(("HouseW1", village_house(), -170, -60, False, "Blue", "Small"))
+    m.houses.append(("HouseW2", cottage_house(), -170, 10, False, "Orange", "Small"))
+    m.houses.append(("HouseW3", village_house(), -100, -100, False, "Orange", "Small"))
+    m.houses.append(("HouseE1", village_house(), 60, -95, False, "Blue", "Small"))
+    m.houses.append(("Church", church(), 110, 40, False, "Orange", "Large"))
+    tomb = [("Tombstone", x, z, 0) for z in (-25, -8, 9) for x in (122, 140, 158)]
+    m.yard_rooms.append(("Graveyard", "Dirt", (110, -40, 176, 26), ["Pumpkin", "JackOLantern", "Coffin"], tomb))
+    m.patios = [rect(-45, -45, 45, 45)]
+    # Market stalls round the square: a table, pumpkins in front.
+    m.yard_pieces += [("Table", -30, -30, 0), ("Pumpkin", -33, -23.5, 0), ("JackOLantern", -27, -23.5, 0),
+                      ("Table", 30, -30, 0), ("Pumpkin", 27, -23.5, 0), ("Pumpkin", 33, -23.5, 0),
+                      ("Table", -30, 32, 0), ("JackOLantern", -33, 37.5, 0), ("Pumpkin", -27, 37.5, 0),
+                      ("Table", 30, 32, 0), ("HayBale", 30, 38.5, 0), ("Cauldron", 0, -20, 0)]
+    m.yard_scatter = ["Pumpkin"] * 10 + ["JackOLantern"] * 6 + ["HayBale"] * 4 + ["Barrel"] * 4 + ["Crate"] * 3
+    m.bushes = [(-60, -70, 3, "Orange"), (95, -40, 3, "Green"), (-90, 95, 3, "Green"), (95, 100, 3, "Orange"),
+                (-176, 100, 3, "Green"), (176, -100, 3, "Orange")]
+    m.human = [(-60, -60), (60, -60), (-60, 60), (60, 60), (-120, -30), (-120, 60), (100, -120), (-150, -100),
+               (0, 100), (0, -100), (160, 130), (-100, 110)]
+    m.zombie = [(-176, 110), (170, 160)]
+    m.start = (0, 10)
+    m.wizard = [(-60, 0), (150, -60), (-110, 170), (100, 170)]
+    return m
+
+
+def witch_woods(rng):
+    m = Map("buildWitchWoods", "WitchWoods", "Witch Woods", "Swamp", True, (-190, -190, 190, 190))
+    m.houses.append(("WitchHut", witch_hut(), -20, -20, False, "Orange", "Large"))
+    m.houses.append(("Mill", mill(), 70, 40, False, "Blue", "Large"))
+    m.houses.append(("CabinA", cabin(), -160, -160, False, "Orange", "Small"))
+    m.houses.append(("CabinB", cabin(), 120, -160, False, "Blue", "Small"))
+    m.houses.append(("CabinC", cabin(), -160, 130, True, "Blue", "Small"))
+    m.houses.append(("CabinD", cabin(), 130, 140, True, "Orange", "Small"))
+    m.houses.append(("Outhouse1", outhouse(), -90, -178, False, "Orange", "Small"))
+    m.houses.append(("Outhouse2", outhouse(), 165, 0, False, "Orange", "Small"))
+    m.houses.append(("Outhouse3", outhouse(), -178, 30, False, "Orange", "Small"))
+    stones = []
+    for k in range(10):
+        a = k / 10 * math.tau
+        stones.append(("Tombstone", round(-100 + math.cos(a) * 20, 1), round(-30 + math.sin(a) * 20, 1), 0))
+    m.yard_rooms.append(("Stone circle", "Dirt", (-130, -60, -70, 0), ["Cauldron", "JackOLantern"], stones))
+    m.yard_rooms.append(("Pumpkin clearing", "Dirt", (20, 105, 100, 170),
+                         ["Pumpkin"] * 18 + ["JackOLantern"] * 6 + ["Scarecrow"] * 2 + ["HayBale"] * 3, []))
+    m.pools = [rect(-70, 60, -20, 92), rect(-95, 92, -50, 120), rect(120, -70, 170, -30)]
+    m.paths = [rect(-3, 12, 4, 60), rect(-150, -138, -143, -100), rect(127, -138, 134, -100)]
+    m.human = [(-120, -110), (-40, -120), (40, -120), (120, -100), (-170, -60), (170, 60), (-100, 40), (0, 80),
+               (60, -40), (-30, 160), (160, 100), (-140, 170)]
+    m.zombie = [(-180, 180), (180, -180)]
+    m.start = (0, 45)
+    m.wizard = [(-60, -60), (100, -110), (-120, 80), (140, 30)]
+    scatter_trees(m, rng, 55, 4, 7)
+    return m
+
+
 def place_yards(m, rng):
     houses = [m.house_rect(h) for h in m.houses]
     reserved = [around(x, z, 4) for x, z in m.human + m.zombie + m.wizard + [m.start]]
@@ -485,6 +820,9 @@ def place_yards(m, rng):
     out_rooms = []
     for name, floor, r, contents, fixed in m.yard_rooms:
         placed += [Plan._rect(*p) for p in fixed]
+        if not contents and not fixed:
+            out_rooms.append((name, floor, r, []))  # just a floor (a corn maze's dirt)
+            continue
         area = (r[0] + 3, r[1] + 3, r[2] - 3, r[3] - 3)
         cx, cz = (area[0] + area[2]) / 2, (area[1] + area[3]) / 2
         # Near the middle, well clear of fixed pieces (tombstones).
@@ -569,8 +907,10 @@ def emit_map(lines, m, rng, emitted):
     if m.roofs:
         lines.append("\tlayout.roofs = true")
     lines.append("\tlayout.bounds = rect(%s, %s, %s, %s)" % tuple(fmt(v) for v in b))
-    for hid, plan, ox, oz, rotated, outline, sz in m.houses:
-        lines.append('\taddHouse(layout, "%s", %s, %s, %s, %s, "%s", "%s")' % (hid, plan.name, fmt(ox), fmt(oz), "true" if rotated else "false", outline, sz))
+    for h in m.houses:
+        hid, plan, ox, oz, rotated, outline, sz = h[:7]
+        wall = ', "%s"' % h[7] if len(h) > 7 else ""
+        lines.append('\taddHouse(layout, "%s", %s, %s, %s, %s, "%s", "%s"%s)' % (hid, plan.name, fmt(ox), fmt(oz), "true" if rotated else "false", outline, sz, wall))
     # Cobwebs inside houses (plan coords -> world).
     webs = []
     for h in m.houses:
@@ -630,7 +970,9 @@ def main():
     rng = random.Random(1031)
     lines = [BEGIN, "-- Made by tools/map_plans.py: edit that file and rerun it, don't edit here.", ""]
     emitted = {}
-    for m in (christmas(), haunted()):
+    maps = [christmas(), haunted()]
+    maps += [pumpkin_farm(random.Random(77)), spooky_village(), witch_woods(random.Random(5))]
+    for m in maps:
         lines.append("-- %s %s" % (m.title, "-" * max(4, 88 - len(m.title))))
         lines.append("")
         emit_map(lines, m, rng, emitted)

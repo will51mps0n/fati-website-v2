@@ -188,6 +188,7 @@ local function markOf(child: Instance, kind: string, origin: Vector3): Mark
 		m.floor = attr(child, "Floor") or (if child:IsA("BasePart") then floorOf(child) else nil)
 	elseif kind == "House" then
 		m.outline = attr(child, "Outline") or (if orange(child) then "Orange" else "Blue")
+		m.color = attr(child, "WallColor")
 	elseif kind == "Bush" then
 		m.color = attr(child, "Color") or (if orange(child) then "Orange" else "Green")
 	end
@@ -377,6 +378,9 @@ local function makeMark(m: Mark, origin: Vector3, parent: Instance, palette: { [
 	elseif m.kind == "House" then
 		color = if m.outline == "Orange" then palette.OutlineOrange else palette.OutlineBlue
 		part:SetAttribute("Outline", m.outline or "Blue")
+		if m.color then
+			part:SetAttribute("WallColor", m.color) -- hex, e.g. corn maze walls
+		end
 	elseif m.kind == "Bush" then
 		color = if m.color == "Cobweb"
 			then "C3C9CF"

@@ -172,7 +172,84 @@ local THEMES: { [string]: Theme } = {
 	},
 }
 
-MapThemes.NAMES = { "Classic", "Haunted", "Winter", "Lab", "Desert" }
+-- Two more nights, built on Haunted: a red moon over a village, and a
+-- green, foggy swamp forest.
+local function night(name: string, about: string, colors: { [string]: string }, lighting: Lighting): Theme
+	local merged = table.clone(THEMES.Haunted.colors)
+	for key, value in colors do
+		merged[key] = value
+	end
+	return {
+		name = name,
+		about = about,
+		colors = merged,
+		lighting = lighting,
+		dark = true,
+		sight = 34,
+		lantern = { range = 30, brightness = 2.6, color = "FFD9A0" },
+	}
+end
+
+THEMES.BloodMoon = night(
+	"BloodMoon",
+	"Night under a red moon: dark stone, red trim. You only see near yourself.",
+	{
+		Grass = "3B3533",
+		Outside = "1A1212",
+		GrassTuft = "2E2726",
+		Flower = "7A2230",
+		FlowerCenter = "E0A040",
+		Dirt = "4A3530",
+		DirtSpeck = "3A2824",
+		Sidewalk = "57504E",
+		SidewalkSpeck = "48423F",
+		Wall = "24181A",
+		OutlineBlue = "8E2B32",
+		OutlineOrange = "B5562A",
+		Brick = "5C3434",
+		BrickMortar = "3B2424",
+		BushGreen = "3A2E22",
+		BushOrange = "6E2A22",
+	},
+	{
+		ambient = "40222A",
+		outdoor = "40222A",
+		brightness = 0,
+		clock = 0,
+		tint = "FFC9C4",
+		saturation = -0.1,
+		contrast = 0.12,
+	}
+)
+
+THEMES.Swamp = night("Swamp", "A foggy green night in the woods. You only see near yourself.", {
+	Grass = "2F3F2A",
+	Outside = "121A10",
+	GrassTuft = "24321F",
+	Flower = "4F6A3A",
+	FlowerCenter = "C8E070",
+	Dirt = "3D3626",
+	DirtSpeck = "2F2A1D",
+	Wall = "1F2419",
+	OutlineBlue = "4E7A3A",
+	OutlineOrange = "7A5A2A",
+	Wood = "3E3324",
+	WoodLine = "2C2418",
+	PoolWater = "33502C",
+	PoolRim = "4A5040",
+	BushGreen = "1F3A22",
+	BushOrange = "4A4A1E",
+}, {
+	ambient = "22362A",
+	outdoor = "22362A",
+	brightness = 0,
+	clock = 0,
+	tint = "C8F0C8",
+	saturation = -0.2,
+	contrast = 0.1,
+})
+
+MapThemes.NAMES = { "Classic", "Haunted", "Winter", "Lab", "Desert", "BloodMoon", "Swamp" }
 
 function MapThemes.get(name: string?): Theme
 	return THEMES[name or "Classic"] or THEMES.Classic

@@ -158,6 +158,17 @@ function FurnitureService.pieceOf(part: BasePart): FurnitureBuilder.Built?
 	return byBody[part]
 end
 
+-- Every movable piece within `radius` of a point (bots barricading).
+function FurnitureService.piecesNear(position: Vector3, radius: number): { BasePart }
+	local out: { BasePart } = {}
+	for _, piece in pieces do
+		if piece.body.Parent and Util.flatDistance(piece.body.Position, position) <= radius then
+			table.insert(out, piece.body)
+		end
+	end
+	return out
+end
+
 function FurnitureService.weightOf(body: BasePart): string?
 	local piece = byBody[body]
 	return piece and piece.weight

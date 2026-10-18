@@ -125,6 +125,7 @@ FURNITURE_COLORS = {
     "Pumpkin": "E8761E",
     "JackOLantern": "FFB347",
     "HayBale": "D8B24C",
+    "Scarecrow": "8E3B2E",
 }
 
 
