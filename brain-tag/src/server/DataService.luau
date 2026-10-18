@@ -1,4 +1,6 @@
--- Saves each player's score, stats, skins and purchases with DataStoreService.
+-- Saves each player's best score, stats, skins and purchases with
+-- DataStoreService. Points themselves are not saved: everyone starts each
+-- visit at 0 (Participants), and BestScore keeps the highest they reached.
 --
 -- Safety rules:
 --  * Every DataStore call is wrapped in pcall and retried with backoff.
@@ -22,7 +24,7 @@ local MAX_RECEIPTS = 100
 
 export type Profile = {
 	Version: number,
-	Score: number,
+	BestScore: number, -- most points reached in one visit; the all-time board
 	Wins: number,
 	Infections: number,
 	RoundsPlayed: number,
@@ -50,7 +52,7 @@ local warned = false
 local function defaults(): Profile
 	return {
 		Version = VERSION,
-		Score = 0,
+		BestScore = 0,
 		Wins = 0,
 		Infections = 0,
 		RoundsPlayed = 0,
@@ -242,7 +244,10 @@ function DataService.save(player: Player): boolean
 	end)
 	if ok and orderedStore then
 		pcall(function()
-			(orderedStore :: OrderedDataStore):SetAsync(tostring(player.UserId), math.floor(snapshot.Score))
+			(orderedStore :: OrderedDataStore):SetAsync(
+				tostring(player.UserId),
+				math.floor(snapshot.BestScore)
+			)
 		end)
 	end
 	session.saving = false

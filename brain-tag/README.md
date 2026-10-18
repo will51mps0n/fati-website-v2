@@ -296,7 +296,8 @@ Bar line never touches them.
 
 ## Saving progress
 
-Score, wins, skins and purchases save with DataStores. Saving needs two things:
+Best score, wins, skins and purchases save with DataStores. Points do not:
+everyone starts at 0 each time they join. Saving needs two things:
 
 1. Publish the place: File > Publish to Roblox.
 2. Home > Game Settings > Security > turn on **Enable Studio Access to API Services**.
@@ -316,7 +317,8 @@ hiccup can't wipe real progress.
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
-Score (points) persists, buys items, and sets your speed and size, which
+Score (points) starts at 0 every time you join and carries through the
+rounds while you stay in the server. It buys items and sets your speed and size, which
 update the moment your points change (bottom-left shows points, speed boost
 and size). A zombie that eats you takes 75% of your points
 (`INFECT_STEAL_FRACTION`) plus a small flat bonus (`INFECT_REWARD`), so

@@ -107,6 +107,7 @@ function Participants.publish(p: Participant)
 		s:SetAttribute("Wins", p.profile.Wins or 0)
 		s:SetAttribute("Infections", p.profile.Infections or 0)
 		s:SetAttribute("RoundsPlayed", p.profile.RoundsPlayed or 0)
+		s:SetAttribute("BestScore", p.profile.BestScore or 0)
 		s:SetAttribute("SeenTutorial", p.profile.SeenTutorial == true)
 	end
 end
@@ -140,7 +141,7 @@ function Participants.add(info: NewParticipant): Participant
 		isBot = info.isBot,
 		character = nil,
 		team = "Human",
-		score = if profile then profile.Score or 0 else 0,
+		score = 0, -- points reset every visit; only BestScore is saved
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
@@ -265,8 +266,9 @@ end
 
 function Participants.setScore(p: Participant, value: number)
 	p.score = math.max(0, math.floor(value))
-	if p.profile then
-		p.profile.Score = p.score
+	if p.profile and p.score > p.profile.BestScore then
+		p.profile.BestScore = p.score
+		p.state:SetAttribute("BestScore", p.score)
 	end
 	p.state:SetAttribute("Score", p.score)
 end

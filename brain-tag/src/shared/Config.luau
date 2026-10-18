@@ -149,7 +149,7 @@ Config.ADMIN_USER_IDS = {} :: { number }
 -- Saving ------------------------------------------------------------------------------------
 
 Config.DATASTORE_NAME = "BrainTag_v1"
-Config.LEADERBOARD_STORE_NAME = "BrainTag_TopScores_v1"
+Config.LEADERBOARD_STORE_NAME = "BrainTag_BestScores_v1" -- best single visit
 Config.AUTOSAVE_SECONDS = 90
 Config.TOP_SCORES_REFRESH_SECONDS = 120
 

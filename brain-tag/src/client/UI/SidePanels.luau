@@ -151,7 +151,7 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 	})
 	UIKit.label({
 		LayoutOrder = 2,
-		Text = "All-time top 10",
+		Text = "All-time best scores",
 		Size = UDim2.new(1, 0, 0, 30),
 		TextSize = 22,
 		Font = UIKit.HEAVY,
@@ -188,8 +188,8 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 				return
 			end
 			stats.Text = string.format(
-				"Score <b>%s</b>     Wins <b>%d</b>     Infections <b>%d</b>     Rounds <b>%d</b>",
-				Util.commas(ClientState.my("Score") or 0),
+				"Best <b>%s</b>     Wins <b>%d</b>     Infections <b>%d</b>     Rounds <b>%d</b>",
+				Util.commas(ClientState.my("BestScore") or 0),
 				ClientState.my("Wins") or 0,
 				ClientState.my("Infections") or 0,
 				ClientState.my("RoundsPlayed") or 0
@@ -212,7 +212,7 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 				end
 				board.Text = table.concat(lines, "\n")
 			else
-				board.Text = "No saved scores yet. (Saving needs a published place with API access.)"
+				board.Text = "No best scores saved yet. (Saving needs a published place with API access.)"
 			end
 		end,
 	}

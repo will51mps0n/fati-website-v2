@@ -1032,7 +1032,7 @@ Config.ADMIN_USER_IDS = {} :: { number }
 -- Saving ------------------------------------------------------------------------------------
 
 Config.DATASTORE_NAME = "BrainTag_v1"
-Config.LEADERBOARD_STORE_NAME = "BrainTag_TopScores_v1"
+Config.LEADERBOARD_STORE_NAME = "BrainTag_BestScores_v1" -- best single visit
 Config.AUTOSAVE_SECONDS = 90
 Config.TOP_SCORES_REFRESH_SECONDS = 120
 
@@ -8707,7 +8707,9 @@ return Combat
       <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">DataService</string>
-          <string name="Source"><![CDATA[-- Saves each player's score, stats, skins and purchases with DataStoreService.
+          <string name="Source"><![CDATA[-- Saves each player's best score, stats, skins and purchases with
+-- DataStoreService. Points themselves are not saved: everyone starts each
+-- visit at 0 (Participants), and BestScore keeps the highest they reached.
 --
 -- Safety rules:
 --  * Every DataStore call is wrapped in pcall and retried with backoff.
@@ -8731,7 +8733,7 @@ local MAX_RECEIPTS = 100
 
 export type Profile = {
 	Version: number,
-	Score: number,
+	BestScore: number, -- most points reached in one visit; the all-time board
 	Wins: number,
 	Infections: number,
 	RoundsPlayed: number,
@@ -8759,7 +8761,7 @@ local warned = false
 local function defaults(): Profile
 	return {
 		Version = VERSION,
-		Score = 0,
+		BestScore = 0,
 		Wins = 0,
 		Infections = 0,
 		RoundsPlayed = 0,
@@ -8951,7 +8953,10 @@ function DataService.save(player: Player): boolean
 	end)
 	if ok and orderedStore then
 		pcall(function()
-			(orderedStore :: OrderedDataStore):SetAsync(tostring(player.UserId), math.floor(snapshot.Score))
+			(orderedStore :: OrderedDataStore):SetAsync(
+				tostring(player.UserId),
+				math.floor(snapshot.BestScore)
+			)
 		end)
 	end
 	session.saving = false
@@ -12847,6 +12852,7 @@ function Participants.publish(p: Participant)
 		s:SetAttribute("Wins", p.profile.Wins or 0)
 		s:SetAttribute("Infections", p.profile.Infections or 0)
 		s:SetAttribute("RoundsPlayed", p.profile.RoundsPlayed or 0)
+		s:SetAttribute("BestScore", p.profile.BestScore or 0)
 		s:SetAttribute("SeenTutorial", p.profile.SeenTutorial == true)
 	end
 end
@@ -12880,7 +12886,7 @@ function Participants.add(info: NewParticipant): Participant
 		isBot = info.isBot,
 		character = nil,
 		team = "Human",
-		score = if profile then profile.Score or 0 else 0,
+		score = 0, -- points reset every visit; only BestScore is saved
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
@@ -13005,8 +13011,9 @@ end
 
 function Participants.setScore(p: Participant, value: number)
 	p.score = math.max(0, math.floor(value))
-	if p.profile then
-		p.profile.Score = p.score
+	if p.profile and p.score > p.profile.BestScore then
+		p.profile.BestScore = p.score
+		p.state:SetAttribute("BestScore", p.score)
 	end
 	p.state:SetAttribute("Score", p.score)
 end
@@ -18735,7 +18742,7 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 	})
 	UIKit.label({
 		LayoutOrder = 2,
-		Text = "All-time top 10",
+		Text = "All-time best scores",
 		Size = UDim2.new(1, 0, 0, 30),
 		TextSize = 22,
 		Font = UIKit.HEAVY,
@@ -18772,8 +18779,8 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 				return
 			end
 			stats.Text = string.format(
-				"Score <b>%s</b>     Wins <b>%d</b>     Infections <b>%d</b>     Rounds <b>%d</b>",
-				Util.commas(ClientState.my("Score") or 0),
+				"Best <b>%s</b>     Wins <b>%d</b>     Infections <b>%d</b>     Rounds <b>%d</b>",
+				Util.commas(ClientState.my("BestScore") or 0),
 				ClientState.my("Wins") or 0,
 				ClientState.my("Infections") or 0,
 				ClientState.my("RoundsPlayed") or 0
@@ -18796,7 +18803,7 @@ function SidePanels.buildTrophy(parent: Instance): Panel
 				end
 				board.Text = table.concat(lines, "\n")
 			else
-				board.Text = "No saved scores yet. (Saving needs a published place with API access.)"
+				board.Text = "No best scores saved yet. (Saving needs a published place with API access.)"
 			end
 		end,
 	}
