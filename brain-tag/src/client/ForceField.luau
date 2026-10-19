@@ -99,6 +99,10 @@ local function furniturePush(root: BasePart, scale: number, a: Vector3?, b: Vect
 		local mid = Vector3.new((a.X + b.X) / 2, y, (a.Z + b.Z) / 2)
 		local size = Vector3.new(guard * 2 + 1, root.Size.Y + 2, (b - a).Magnitude + guard * 2 + 1)
 		for _, body in solidPieces(mid, (b - a).Unit, size) do
+			local model = body.Parent
+			if model and model:FindFirstChild("HeldGlow") then
+				continue -- the piece you're holding moves with you
+			end
 			local depth, out = FurniturePush.overlapOut(a, b, guard, body)
 			if out then
 				push += out * math.min(depth * Config.FIELD_FURNITURE, Config.FIELD_WEAPON_MAX)

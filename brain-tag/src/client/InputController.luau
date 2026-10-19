@@ -2,10 +2,12 @@
 --   Left click / R2: use item (hold to keep spraying)
 --   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
 --   1 2 3 / D-pad: switch inventory slot
+--   F / L2 (hold): grab the furniture next to you and drag it along
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local FurnitureController = require(script.Parent.FurnitureController)
 local MovementController = require(script.Parent.MovementController)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -62,6 +64,14 @@ function InputController.shop()
 	InputController.onShop()
 end
 
+function InputController.grabStart()
+	FurnitureController.grab()
+end
+
+function InputController.grabStop()
+	FurnitureController.release()
+end
+
 local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.E] = InputController.pickUp,
 	[Enum.KeyCode.G] = InputController.drop,
@@ -72,6 +82,8 @@ local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.ButtonY] = InputController.shop,
 	[Enum.KeyCode.ButtonL1] = InputController.zombieReturn,
 	[Enum.KeyCode.ButtonR2] = InputController.useStart,
+	[Enum.KeyCode.F] = InputController.grabStart,
+	[Enum.KeyCode.ButtonL2] = InputController.grabStart,
 	[Enum.KeyCode.One] = function()
 		InputController.selectSlot(1)
 	end,
@@ -114,6 +126,8 @@ function InputController.start()
 			or input.KeyCode == Enum.KeyCode.ButtonR2
 		then
 			InputController.useStop()
+		elseif input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonL2 then
+			InputController.grabStop()
 		end
 	end)
 end

@@ -96,7 +96,9 @@ local function step()
 	-- nobody stacks and pushing always meets a little resistance.
 	if not root:FindFirstChild("KnockbackForce") then
 		local v = root.AssemblyLinearVelocity
-		local speed = humanoid.WalkSpeed
+		-- Dragging a heavy piece slows you down (FurnitureController).
+		local drag = character:GetAttribute("DragFactor")
+		local speed = humanoid.WalkSpeed * (if typeof(drag) == "number" then drag else 1)
 		local field =
 			ForceField.velocity(root, aim, ClientState.my("HeldItem"), character:GetAttribute("Team"))
 		root.AssemblyLinearVelocity = Vector3.new(move.X * speed + field.X, v.Y, move.Z * speed + field.Z)

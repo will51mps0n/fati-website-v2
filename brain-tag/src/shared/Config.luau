@@ -138,7 +138,14 @@ Config.ZOMBIE_STRENGTH = 1.5
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
-Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
+Config.FURNITURE_SPIN = 0.07 -- how much off-center pushes rotate a piece
+-- Grabbing, like the original: hold F (L2, or GRAB on a phone) next to a
+-- piece and it comes with you, pulled or pushed, keeping its place beside
+-- you. Heavy pieces slow you down (a massive one won't come alone). Humans
+-- only.
+Config.GRAB_REACH = 2.5 -- how far past your bumper a piece can be to grab it
+Config.GRAB_BREAK = 4 -- you let go when the piece lags this far behind (stuck on a wall)
+Config.GRAB_FOLLOW = 10 -- how hard a held piece catches up to its place
 -- A piece starts moving this far (studs, at size 1) before it reaches your
 -- bumper, so you push it from a little way off instead of walking into it.
 Config.PUSH_REACH = 1.4

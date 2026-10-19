@@ -12,6 +12,7 @@ local EVENTS = {
 	"SelectSlot", -- (slot: number) which inventory slot is in your hand
 	"ZombieReturn",
 	"TutorialDone",
+	"Grab", -- (model: Model, on: boolean) holding a piece of furniture
 	-- server -> client
 	"Knockback", -- (velocity: Vector3, seconds: number)
 	"Announce", -- (text, hexColor?)

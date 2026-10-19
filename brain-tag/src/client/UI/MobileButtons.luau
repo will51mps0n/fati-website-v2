@@ -1,5 +1,5 @@
--- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
--- and RETURN for zombies. Placed bottom-right.
+-- On-screen buttons for phones and tablets: USE (hold), GRAB (hold), PICK
+-- UP, DROP, SHOP, and RETURN for zombies. Placed bottom-right.
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local InputController = require(script.Parent.Parent.InputController)
@@ -53,6 +53,24 @@ function MobileButtons.build(parent: Instance): () -> ()
 		end
 	end)
 
+	local grab = round(cluster, "GRAB", 58, UDim2.fromOffset(28, 66), UIKit.GOOD)
+	grab.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
+			InputController.grabStart()
+		end
+	end)
+	grab.InputEnded:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
+			InputController.grabStop()
+		end
+	end)
+
 	local pick = round(cluster, "PICK\nUP", 56, UDim2.fromOffset(52, 150), UIKit.PANEL)
 	pick.Activated:Connect(InputController.pickUp)
 	local drop = round(cluster, "DROP", 50, UDim2.fromOffset(78, 92), UIKit.PANEL)
@@ -65,6 +83,7 @@ function MobileButtons.build(parent: Instance): () -> ()
 	return function()
 		local zombie = ClientState.isZombie()
 		use.Visible = not zombie
+		grab.Visible = not zombie
 		pick.Visible = not zombie
 		drop.Visible = not zombie
 		shop.Visible = not zombie

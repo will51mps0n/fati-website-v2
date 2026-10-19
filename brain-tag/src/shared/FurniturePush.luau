@@ -155,6 +155,43 @@ function FurniturePush.overlapOut(a: Vector3, b: Vector3, pad: number, body: Bas
 	return best, out
 end
 
+-- A held piece: the velocity that keeps it at its place beside the holder
+-- (the holder's root plus the flat offset it was grabbed at), and how far
+-- it lags behind that place.
+function FurniturePush.holdVelocity(root: BasePart, offset: Vector3, body: BasePart): (Vector3, number)
+	local target = Vector3.new(root.Position.X + offset.X, 0, root.Position.Z + offset.Z)
+	local lag = target - Vector3.new(body.Position.X, 0, body.Position.Z)
+	local v = root.AssemblyLinearVelocity
+	return Vector3.new(v.X, 0, v.Z) + lag * Config.GRAB_FOLLOW, lag.Magnitude
+end
+
+-- How fast someone dragging a piece can walk, as a share of their speed.
+function FurniturePush.dragFactor(body: BasePart, strength: number): number
+	return math.clamp(RoundRules.pushFraction(FurniturePush.mass(body), strength) + 0.15, 0.3, 1)
+end
+
+-- The piece within grabbing reach of a mover (the one it faces, if several).
+function FurniturePush.pickGrab(root: BasePart, scale: number, aim: Vector3, bodies: { BasePart }): BasePart?
+	local reach = FurniturePush.bumperRadius(scale) + Config.GRAB_REACH
+	local best: BasePart? = nil
+	local bestScore = math.huge
+	for _, body in bodies do
+		local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+		if rel.Magnitude < 0.05 then
+			continue
+		end
+		local dir = rel.Unit
+		local gap = rel.Magnitude - FurniturePush.extent(body, dir)
+		if gap <= reach then
+			local score = gap - dir:Dot(aim) * 1.5
+			if score < bestScore then
+				best, bestScore = body, score
+			end
+		end
+	end
+	return best
+end
+
 -- How far an oriented piece reaches from its center along a flat direction.
 function FurniturePush.extent(body: BasePart, dir: Vector3): number
 	local cf = body.CFrame

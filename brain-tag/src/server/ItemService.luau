@@ -499,7 +499,11 @@ local function shaftStep(dt: number)
 			-- this for them, see ForceField).
 			local grip = CharacterLook.grip(p.scale)
 			local frame, size = FurniturePush.itemProbe(root, grip, p.aim, reach, guard)
+			local held = FurnitureService.holding(p.id)
 			for _, body in FurnitureService.findInBox(frame, size + Vector3.new(1, 0, 1)) do
+				if body == held then
+					continue -- it moves with them
+				end
 				local depth, out = FurniturePush.overlapOut(start, start + p.aim * reach, guard, body)
 				if out then
 					root.CFrame += out * (math.min(depth, 2) * rate)

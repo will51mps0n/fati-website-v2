@@ -354,6 +354,11 @@ players push heavier furniture faster: each pusher's strength is size squared
 strength). Furniture keeps a little space from you (an invisible bumper,
 `CHARACTER.BumperDiameter`) and starts moving `PUSH_REACH` studs before it
 reaches it, so you push from a short way off instead of walking into it.
+Hold **F** (L2 on a gamepad, GRAB on a phone) next to a piece to grab it,
+like in the original: it comes with you, pulled or pushed, keeping its place
+beside you, and you let go when you release F or it snags on a wall. Heavy
+pieces slow you down and a massive one won't come alone. Humans only. Builder
+bots grab pieces too and carry them into their doorways.
 Furniture is solid to weapons too: a piece pushed into your weapon (or your
 weapon pressed into one that can't move) pushes you back, so the weapon
 bounces off instead of sinking in, and nobody is ever left inside a piece. Light, medium,

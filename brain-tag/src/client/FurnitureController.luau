@@ -3,7 +3,9 @@
 -- you claim it and takes it back if someone else pushes it too.
 --
 -- You move furniture by walking into it, with a zombie's arms, or with a
--- held weapon: its shaft is solid and pushes whatever it touches.
+-- held weapon: its shaft is solid and pushes whatever it touches. Humans can
+-- also grab the piece next to them (hold F): it comes with you, pulled or
+-- pushed, and heavy pieces slow you down.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +34,10 @@ local claimRemote: UnreliableRemoteEvent
 local owned: { [BasePart]: boolean } = {}
 local pendingClaims: { [Instance]: boolean } = {}
 local lastClaim = 0
+local grabRemote: RemoteEvent
+local held: BasePart? = nil -- the piece you're holding
+local heldOffset = Vector3.zero -- where it stays, relative to you
+local heldGlow: Highlight? = nil
 
 local function track(model: Instance)
 	if not model:IsA("Model") then
@@ -63,12 +69,70 @@ local function query(cframe: CFrame, size: Vector3): { BasePart }
 	return found
 end
 
+-- Your walking speed while dragging (MovementController reads it).
+local function setDrag(factor: number?)
+	local character = player.Character
+	if character and character:GetAttribute("DragFactor") ~= factor then
+		character:SetAttribute("DragFactor", factor)
+	end
+end
+
+function FurnitureController.release()
+	local body = held
+	if not body then
+		return
+	end
+	held = nil
+	if heldGlow then
+		heldGlow:Destroy()
+		heldGlow = nil
+	end
+	setDrag(nil)
+	if body.Parent then
+		grabRemote:FireServer(body.Parent, false)
+	end
+end
+
+-- Grab the piece next to you (the one you face, if several).
+function FurnitureController.grab()
+	FurnitureController.release()
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or ClientState.isZombie() then
+		return
+	end
+	local scale = ClientState.my("Scale") or 1
+	local around = (FurniturePush.bumperRadius(scale) + Config.GRAB_REACH) * 2 + 14
+	local body = FurniturePush.pickGrab(
+		root,
+		scale,
+		MovementController.aim(),
+		query(CFrame.new(root.Position), Vector3.new(around, root.Size.Y + 4, around))
+	)
+	local model = body and body.Parent
+	if not body or not model then
+		return
+	end
+	held = body
+	heldOffset = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+	local glow = Instance.new("Highlight")
+	glow.Name = "HeldGlow" -- ForceField skips the piece you hold
+	glow.FillTransparency = 1
+	glow.OutlineColor = Color3.fromHex(Config.COLORS.SelfName)
+	glow.DepthMode = Enum.HighlightDepthMode.Occluded
+	glow.Adornee = model
+	glow.Parent = model
+	heldGlow = glow
+	grabRemote:FireServer(model, true)
+end
+
 local function collect(): FurniturePush.Pushes
 	local pushes: FurniturePush.Pushes = {}
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not root or not humanoid or humanoid.Health <= 0 then
+		FurnitureController.release()
 		return pushes
 	end
 	local scale = ClientState.my("Scale") or 1
@@ -77,6 +141,22 @@ local function collect(): FurniturePush.Pushes
 	local move = Vector3.new(humanoid.MoveDirection.X, 0, humanoid.MoveDirection.Z)
 	local moving = move.Magnitude > 0.1 and walk > 0
 	local dir = if moving then move.Unit else Vector3.zero
+
+	-- The piece you're holding comes with you; you let go if it gets stuck.
+	local body = held
+	if body then
+		if body.Parent == nil or ClientState.isZombie() then
+			FurnitureController.release()
+		else
+			local desired, lag = FurniturePush.holdVelocity(root, heldOffset, body)
+			if lag > Config.GRAB_BREAK then
+				FurnitureController.release()
+			else
+				FurniturePush.add(pushes, body, desired, strength, nil)
+				setDrag(FurniturePush.dragFactor(body, strength))
+			end
+		end
+	end
 
 	-- Walking into furniture.
 	if moving then
@@ -213,6 +293,7 @@ function FurnitureController.start()
 	folder = workspace:WaitForChild("Furniture")
 	overlap.FilterDescendantsInstances = { folder }
 	claimRemote = Remotes.unreliable("PushClaim")
+	grabRemote = Remotes.event("Grab")
 	folder.ChildAdded:Connect(function(child)
 		task.spawn(track, child)
 	end)

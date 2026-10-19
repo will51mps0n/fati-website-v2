@@ -1048,7 +1048,14 @@ Config.ZOMBIE_STRENGTH = 1.5
 Config.FURNITURE_DENSITY = { Light = 0.4, Medium = 0.9, Heavy = 1.8, Massive = 3 }
 Config.FURNITURE_MAX_SPEED = 22
 Config.FURNITURE_RELEASE_SECONDS = 0.6 -- your client stops driving a piece this long after you stop pushing
-Config.FURNITURE_SPIN = 0.035 -- how much off-center pushes rotate a piece
+Config.FURNITURE_SPIN = 0.07 -- how much off-center pushes rotate a piece
+-- Grabbing, like the original: hold F (L2, or GRAB on a phone) next to a
+-- piece and it comes with you, pulled or pushed, keeping its place beside
+-- you. Heavy pieces slow you down (a massive one won't come alone). Humans
+-- only.
+Config.GRAB_REACH = 2.5 -- how far past your bumper a piece can be to grab it
+Config.GRAB_BREAK = 4 -- you let go when the piece lags this far behind (stuck on a wall)
+Config.GRAB_FOLLOW = 10 -- how hard a held piece catches up to its place
 -- A piece starts moving this far (studs, at size 1) before it reaches your
 -- bumper, so you push it from a little way off instead of walking into it.
 Config.PUSH_REACH = 1.4
@@ -1352,6 +1359,43 @@ function FurniturePush.overlapOut(a: Vector3, b: Vector3, pad: number, body: Bas
 		end
 	end
 	return best, out
+end
+
+-- A held piece: the velocity that keeps it at its place beside the holder
+-- (the holder's root plus the flat offset it was grabbed at), and how far
+-- it lags behind that place.
+function FurniturePush.holdVelocity(root: BasePart, offset: Vector3, body: BasePart): (Vector3, number)
+	local target = Vector3.new(root.Position.X + offset.X, 0, root.Position.Z + offset.Z)
+	local lag = target - Vector3.new(body.Position.X, 0, body.Position.Z)
+	local v = root.AssemblyLinearVelocity
+	return Vector3.new(v.X, 0, v.Z) + lag * Config.GRAB_FOLLOW, lag.Magnitude
+end
+
+-- How fast someone dragging a piece can walk, as a share of their speed.
+function FurniturePush.dragFactor(body: BasePart, strength: number): number
+	return math.clamp(RoundRules.pushFraction(FurniturePush.mass(body), strength) + 0.15, 0.3, 1)
+end
+
+-- The piece within grabbing reach of a mover (the one it faces, if several).
+function FurniturePush.pickGrab(root: BasePart, scale: number, aim: Vector3, bodies: { BasePart }): BasePart?
+	local reach = FurniturePush.bumperRadius(scale) + Config.GRAB_REACH
+	local best: BasePart? = nil
+	local bestScore = math.huge
+	for _, body in bodies do
+		local rel = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+		if rel.Magnitude < 0.05 then
+			continue
+		end
+		local dir = rel.Unit
+		local gap = rel.Magnitude - FurniturePush.extent(body, dir)
+		if gap <= reach then
+			local score = gap - dir:Dot(aim) * 1.5
+			if score < bestScore then
+				best, bestScore = body, score
+			end
+		end
+	end
+	return best
 end
 
 -- How far an oriented piece reaches from its center along a flat direction.
@@ -6561,6 +6605,7 @@ local EVENTS = {
 	"SelectSlot", -- (slot: number) which inventory slot is in your hand
 	"ZombieReturn",
 	"TutorialDone",
+	"Grab", -- (model: Model, on: boolean) holding a piece of furniture
 	-- server -> client
 	"Knockback", -- (velocity: Vector3, seconds: number)
 	"Announce", -- (text, hexColor?)
@@ -9043,13 +9088,29 @@ local function brain(p: Participant, level: Level, seed: number)
 							local body = job.body
 							local at = Util.flat(body.Position)
 							local toTarget = job.target - at
-							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 18 then
+							local holder = FurnitureService.heldBy(body)
+							if body.Parent == nil or toTarget.Magnitude < 1.8 or now - job.startedAt > 20 then
+								if holder == p.id then
+									FurnitureService.release(p.id) -- in place: let go
+								end
 								job.done = true
 								fort.barricaded[job.key] = true
 								barricade = nil
+							elseif holder == p.id then
+								-- Carrying it: walk so that it lands in the doorway. If that
+								-- would take us out of the room (we grabbed it from the
+								-- wrong side), let go and come round behind it.
+								local _, offset = FurnitureService.holding(p.id)
+								local goal = job.target - offset
+								if MapLayout.inRect(r, goal.X, goal.Z, -1) then
+									goTo(Vector3.new(goal.X, here.Y, goal.Z), root, humanoid, false)
+								else
+									FurnitureService.release(p.id)
+								end
+								handled = true
 							else
-								-- Get behind the piece (side by side with a helper), then
-								-- walk it to the doorway.
+								-- Get behind it (on the far side from the doorway; a helper
+								-- beside us), grab it, then carry it there.
 								local push = toTarget.Unit
 								local side = Vector3.new(-push.Z, 0, push.X)
 								local offset = 0
@@ -9078,7 +9139,13 @@ local function brain(p: Participant, level: Level, seed: number)
 										barricade = nil
 									end
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
+								elseif holder == nil then
+									approachJob = nil
+									if not FurnitureService.grab(p, body) then
+										moveTo(humanoid, Vector3.new(at.X, here.Y, at.Z)) -- step in closer
+									end
 								else
+									-- A teammate is carrying it: push alongside.
 									approachJob = nil
 									moveTo(
 										humanoid,
@@ -9123,6 +9190,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 
+		-- Not building right now: don't keep dragging a piece around.
+		if FurnitureService.holding(p.id) then
+			FurnitureService.release(p.id)
+		end
 		local hidden = BushService.hidden(p)
 		-- Hiders take a bush of their own just before the outbreak and keep
 		-- still in it; one a zombie flushed them out of is given up.
@@ -9331,7 +9402,7 @@ local function drive()
 			toGoal = Util.flat(goal - root.Position)
 		end
 		local move = if toGoal.Magnitude > 0.6 then toGoal.Unit else nil
-		local speed = humanoid.WalkSpeed
+		local speed = humanoid.WalkSpeed * FurnitureService.dragFactor(p)
 		if move and speed > 0 then
 			stopped[humanoid] = nil
 			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
@@ -11214,6 +11285,9 @@ type Piece = FurnitureBuilder.Built & {
 	lastGoodAt: number, -- when the piece last moved to lastGood
 }
 
+-- A piece someone is holding (grabbed): it stays at `offset` from them.
+type Hold = { piece: Piece, offset: Vector3 }
+
 -- Someone who can push furniture. `reach` is set while they hold a melee
 -- weapon, whose shaft (along `aim`) pushes too.
 export type Mover = {
@@ -11232,6 +11306,7 @@ local OWNER = FurniturePush.OWNER_ATTRIBUTE
 local CONTEST_SECONDS = 0.8
 
 local pieces: { Piece } = {}
+local holds: { [string]: Hold } = {} -- participant id -> the piece they hold
 local byBody: { [BasePart]: Piece } = {}
 local byModel: { [Instance]: Piece } = {}
 local folder: Folder
@@ -11361,7 +11436,56 @@ function FurnitureService.findInBox(cframe: CFrame, size: Vector3): { BasePart }
 	return found
 end
 
+-- Grabbing (players through the Grab remote, bots directly): a human holds
+-- the piece next to them, which then comes with them.
+function FurnitureService.grab(p: Participants.Participant, body: BasePart): boolean
+	local piece = byBody[body]
+	local root = Participants.body(p)
+	if not piece or not root or p.team ~= "Human" then
+		return false
+	end
+	local reach = body.Size.Magnitude / 2 + FurniturePush.bumperRadius(p.scale) + Config.GRAB_REACH + 2
+	if Util.flatDistance(body.Position, root.Position) > reach then
+		return false
+	end
+	holds[p.id] = { piece = piece, offset = Util.flat(body.Position - root.Position) }
+	return true
+end
+
+function FurnitureService.release(id: string)
+	holds[id] = nil
+end
+
+-- The piece someone holds, and where it stays relative to them.
+function FurnitureService.holding(id: string): (BasePart?, Vector3)
+	local hold = holds[id]
+	if hold and hold.piece.body.Parent then
+		return hold.piece.body, hold.offset
+	end
+	return nil, Vector3.zero
+end
+
+-- Who holds this piece, if anyone.
+function FurnitureService.heldBy(body: BasePart): string?
+	for id, hold in holds do
+		if hold.piece.body == body then
+			return id
+		end
+	end
+	return nil
+end
+
+-- How fast someone can walk while dragging (1 when not holding anything).
+function FurnitureService.dragFactor(p: Participants.Participant): number
+	local body = FurnitureService.holding(p.id)
+	if not body then
+		return 1
+	end
+	return FurniturePush.dragFactor(body, RoundRules.pushStrength(p.scale))
+end
+
 function FurnitureService.resetAll()
+	table.clear(holds)
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0
@@ -11503,6 +11627,23 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			piece.pushers[mover.id] = now
 			for _, id in helpers do
 				piece.pushers[id] = now
+			end
+		end
+		-- The piece they hold comes with them; they let go if it gets stuck.
+		local hold = holds[mover.id]
+		if hold then
+			local body = hold.piece.body
+			if body.Parent == nil or mover.zombie then
+				holds[mover.id] = nil
+			else
+				local desired, lag = FurniturePush.holdVelocity(root, hold.offset, body)
+				if lag > Config.GRAB_BREAK then
+					holds[mover.id] = nil
+				else
+					touched[body] = true
+					pushing(hold.piece)
+					FurniturePush.add(pushes, body, desired, leans[i].own, nil)
+				end
 			end
 		end
 		if dir then
@@ -11701,6 +11842,18 @@ end
 function FurnitureService.start(movers: () -> { Mover })
 	getMovers = movers
 	Remotes.unreliable("PushClaim").OnServerEvent:Connect(onClaim)
+	Remotes.event("Grab").OnServerEvent:Connect(function(player: Player, model: unknown, on: unknown)
+		local p = Participants.fromPlayer(player)
+		if not p then
+			return
+		end
+		local piece = if typeof(model) == "Instance" then byModel[model] else nil
+		if on == true and piece then
+			FurnitureService.grab(p, piece.body)
+		else
+			holds[p.id] = nil
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		for _, piece in pieces do
 			if piece.owner == player then
@@ -12219,7 +12372,11 @@ local function shaftStep(dt: number)
 			-- this for them, see ForceField).
 			local grip = CharacterLook.grip(p.scale)
 			local frame, size = FurniturePush.itemProbe(root, grip, p.aim, reach, guard)
+			local held = FurnitureService.holding(p.id)
 			for _, body in FurnitureService.findInBox(frame, size + Vector3.new(1, 0, 1)) do
+				if body == held then
+					continue -- it moves with them
+				end
 				local depth, out = FurniturePush.overlapOut(start, start + p.aim * reach, guard, body)
 				if out then
 					root.CFrame += out * (math.min(depth, 2) * rate)
@@ -17117,6 +17274,10 @@ local function furniturePush(root: BasePart, scale: number, a: Vector3?, b: Vect
 		local mid = Vector3.new((a.X + b.X) / 2, y, (a.Z + b.Z) / 2)
 		local size = Vector3.new(guard * 2 + 1, root.Size.Y + 2, (b - a).Magnitude + guard * 2 + 1)
 		for _, body in solidPieces(mid, (b - a).Unit, size) do
+			local model = body.Parent
+			if model and model:FindFirstChild("HeldGlow") then
+				continue -- the piece you're holding moves with you
+			end
 			local depth, out = FurniturePush.overlapOut(a, b, guard, body)
 			if out then
 				push += out * math.min(depth * Config.FIELD_FURNITURE, Config.FIELD_WEAPON_MAX)
@@ -17236,7 +17397,9 @@ return ForceField
 -- you claim it and takes it back if someone else pushes it too.
 --
 -- You move furniture by walking into it, with a zombie's arms, or with a
--- held weapon: its shaft is solid and pushes whatever it touches.
+-- held weapon: its shaft is solid and pushes whatever it touches. Humans can
+-- also grab the piece next to them (hold F): it comes with you, pulled or
+-- pushed, and heavy pieces slow you down.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17265,6 +17428,10 @@ local claimRemote: UnreliableRemoteEvent
 local owned: { [BasePart]: boolean } = {}
 local pendingClaims: { [Instance]: boolean } = {}
 local lastClaim = 0
+local grabRemote: RemoteEvent
+local held: BasePart? = nil -- the piece you're holding
+local heldOffset = Vector3.zero -- where it stays, relative to you
+local heldGlow: Highlight? = nil
 
 local function track(model: Instance)
 	if not model:IsA("Model") then
@@ -17296,12 +17463,70 @@ local function query(cframe: CFrame, size: Vector3): { BasePart }
 	return found
 end
 
+-- Your walking speed while dragging (MovementController reads it).
+local function setDrag(factor: number?)
+	local character = player.Character
+	if character and character:GetAttribute("DragFactor") ~= factor then
+		character:SetAttribute("DragFactor", factor)
+	end
+end
+
+function FurnitureController.release()
+	local body = held
+	if not body then
+		return
+	end
+	held = nil
+	if heldGlow then
+		heldGlow:Destroy()
+		heldGlow = nil
+	end
+	setDrag(nil)
+	if body.Parent then
+		grabRemote:FireServer(body.Parent, false)
+	end
+end
+
+-- Grab the piece next to you (the one you face, if several).
+function FurnitureController.grab()
+	FurnitureController.release()
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or ClientState.isZombie() then
+		return
+	end
+	local scale = ClientState.my("Scale") or 1
+	local around = (FurniturePush.bumperRadius(scale) + Config.GRAB_REACH) * 2 + 14
+	local body = FurniturePush.pickGrab(
+		root,
+		scale,
+		MovementController.aim(),
+		query(CFrame.new(root.Position), Vector3.new(around, root.Size.Y + 4, around))
+	)
+	local model = body and body.Parent
+	if not body or not model then
+		return
+	end
+	held = body
+	heldOffset = Vector3.new(body.Position.X - root.Position.X, 0, body.Position.Z - root.Position.Z)
+	local glow = Instance.new("Highlight")
+	glow.Name = "HeldGlow" -- ForceField skips the piece you hold
+	glow.FillTransparency = 1
+	glow.OutlineColor = Color3.fromHex(Config.COLORS.SelfName)
+	glow.DepthMode = Enum.HighlightDepthMode.Occluded
+	glow.Adornee = model
+	glow.Parent = model
+	heldGlow = glow
+	grabRemote:FireServer(model, true)
+end
+
 local function collect(): FurniturePush.Pushes
 	local pushes: FurniturePush.Pushes = {}
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not root or not humanoid or humanoid.Health <= 0 then
+		FurnitureController.release()
 		return pushes
 	end
 	local scale = ClientState.my("Scale") or 1
@@ -17310,6 +17535,22 @@ local function collect(): FurniturePush.Pushes
 	local move = Vector3.new(humanoid.MoveDirection.X, 0, humanoid.MoveDirection.Z)
 	local moving = move.Magnitude > 0.1 and walk > 0
 	local dir = if moving then move.Unit else Vector3.zero
+
+	-- The piece you're holding comes with you; you let go if it gets stuck.
+	local body = held
+	if body then
+		if body.Parent == nil or ClientState.isZombie() then
+			FurnitureController.release()
+		else
+			local desired, lag = FurniturePush.holdVelocity(root, heldOffset, body)
+			if lag > Config.GRAB_BREAK then
+				FurnitureController.release()
+			else
+				FurniturePush.add(pushes, body, desired, strength, nil)
+				setDrag(FurniturePush.dragFactor(body, strength))
+			end
+		end
+	end
 
 	-- Walking into furniture.
 	if moving then
@@ -17446,6 +17687,7 @@ function FurnitureController.start()
 	folder = workspace:WaitForChild("Furniture")
 	overlap.FilterDescendantsInstances = { folder }
 	claimRemote = Remotes.unreliable("PushClaim")
+	grabRemote = Remotes.event("Grab")
 	folder.ChildAdded:Connect(function(child)
 		task.spawn(track, child)
 	end)
@@ -17467,10 +17709,12 @@ return FurnitureController
 --   Left click / R2: use item (hold to keep spraying)
 --   E / X: pick up      G / B: drop      B / Y: shop      Z / L1: zombie return
 --   1 2 3 / D-pad: switch inventory slot
+--   F / L2 (hold): grab the furniture next to you and drag it along
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local FurnitureController = require(script.Parent.FurnitureController)
 local MovementController = require(script.Parent.MovementController)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -17527,6 +17771,14 @@ function InputController.shop()
 	InputController.onShop()
 end
 
+function InputController.grabStart()
+	FurnitureController.grab()
+end
+
+function InputController.grabStop()
+	FurnitureController.release()
+end
+
 local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.E] = InputController.pickUp,
 	[Enum.KeyCode.G] = InputController.drop,
@@ -17537,6 +17789,8 @@ local BEGIN: { [Enum.KeyCode]: () -> () } = {
 	[Enum.KeyCode.ButtonY] = InputController.shop,
 	[Enum.KeyCode.ButtonL1] = InputController.zombieReturn,
 	[Enum.KeyCode.ButtonR2] = InputController.useStart,
+	[Enum.KeyCode.F] = InputController.grabStart,
+	[Enum.KeyCode.ButtonL2] = InputController.grabStart,
 	[Enum.KeyCode.One] = function()
 		InputController.selectSlot(1)
 	end,
@@ -17579,6 +17833,8 @@ function InputController.start()
 			or input.KeyCode == Enum.KeyCode.ButtonR2
 		then
 			InputController.useStop()
+		elseif input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonL2 then
+			InputController.grabStop()
 		end
 	end)
 end
@@ -17709,7 +17965,9 @@ local function step()
 	-- nobody stacks and pushing always meets a little resistance.
 	if not root:FindFirstChild("KnockbackForce") then
 		local v = root.AssemblyLinearVelocity
-		local speed = humanoid.WalkSpeed
+		-- Dragging a heavy piece slows you down (FurnitureController).
+		local drag = character:GetAttribute("DragFactor")
+		local speed = humanoid.WalkSpeed * (if typeof(drag) == "number" then drag else 1)
 		local field =
 			ForceField.velocity(root, aim, ClientState.my("HeldItem"), character:GetAttribute("Team"))
 		root.AssemblyLinearVelocity = Vector3.new(move.X * speed + field.X, v.Y, move.Z * speed + field.Z)
@@ -19004,7 +19262,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
 						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
-					text = verb .. "   [G] drop   [1-3] switch"
+					text = verb .. "   [F] grab   [G] drop   [1-3] switch"
 				end
 			end
 		end
@@ -19427,8 +19685,8 @@ return Hud
           <Item class="ModuleScript" referent="72">
             <Properties>
               <string name="Name">MobileButtons</string>
-              <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), PICK UP, DROP, SHOP,
--- and RETURN for zombies. Placed bottom-right.
+              <string name="Source"><![CDATA[-- On-screen buttons for phones and tablets: USE (hold), GRAB (hold), PICK
+-- UP, DROP, SHOP, and RETURN for zombies. Placed bottom-right.
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local InputController = require(script.Parent.Parent.InputController)
@@ -19482,6 +19740,24 @@ function MobileButtons.build(parent: Instance): () -> ()
 		end
 	end)
 
+	local grab = round(cluster, "GRAB", 58, UDim2.fromOffset(28, 66), UIKit.GOOD)
+	grab.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
+			InputController.grabStart()
+		end
+	end)
+	grab.InputEnded:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+		then
+			InputController.grabStop()
+		end
+	end)
+
 	local pick = round(cluster, "PICK\nUP", 56, UDim2.fromOffset(52, 150), UIKit.PANEL)
 	pick.Activated:Connect(InputController.pickUp)
 	local drop = round(cluster, "DROP", 50, UDim2.fromOffset(78, 92), UIKit.PANEL)
@@ -19494,6 +19770,7 @@ function MobileButtons.build(parent: Instance): () -> ()
 	return function()
 		local zombie = ClientState.isZombie()
 		use.Visible = not zombie
+		grab.Visible = not zombie
 		pick.Visible = not zombie
 		drop.Visible = not zombie
 		shop.Visible = not zombie
@@ -19556,6 +19833,7 @@ function QuickStart.build(parent: Instance, touchMode: boolean, onDone: () -> ()
 		then {
 			"<b>Thumbstick</b>  move",
 			"<b>USE</b>  swing or fire your item",
+			"<b>GRAB</b> (hold)  drag the furniture next to you",
 			"<b>PICK UP / DROP</b>  grab or let go of an item",
 			"<b>SHOP</b>  buy items (and trade with the wizard)",
 			"<b>RETURN</b>  zombies: back to spawn",
@@ -19565,6 +19843,7 @@ function QuickStart.build(parent: Instance, touchMode: boolean, onDone: () -> ()
 			"<b>Mouse</b>  aim     <b>Click</b>  use item",
 			"<b>B</b>  shop (or the wizard, when you stand next to him)",
 			"<b>E</b>  pick up     <b>G</b>  drop",
+			"<b>F</b> (hold)  grab the furniture next to you and drag it",
 			"<b>Z</b>  zombies: back to spawn",
 		}
 	for i, text in controls do

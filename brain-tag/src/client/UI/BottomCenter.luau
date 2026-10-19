@@ -214,7 +214,7 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
 						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
 						else "[Click] use"
-					text = verb .. "   [G] drop   [1-3] switch"
+					text = verb .. "   [F] grab   [G] drop   [1-3] switch"
 				end
 			end
 		end

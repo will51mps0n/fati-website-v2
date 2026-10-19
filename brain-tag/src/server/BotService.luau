@@ -1430,13 +1430,29 @@ local function brain(p: Participant, level: Level, seed: number)
 							local body = job.body
 							local at = Util.flat(body.Position)
 							local toTarget = job.target - at
-							if body.Parent == nil or toTarget.Magnitude < 2.2 or now - job.startedAt > 18 then
+							local holder = FurnitureService.heldBy(body)
+							if body.Parent == nil or toTarget.Magnitude < 1.8 or now - job.startedAt > 20 then
+								if holder == p.id then
+									FurnitureService.release(p.id) -- in place: let go
+								end
 								job.done = true
 								fort.barricaded[job.key] = true
 								barricade = nil
+							elseif holder == p.id then
+								-- Carrying it: walk so that it lands in the doorway. If that
+								-- would take us out of the room (we grabbed it from the
+								-- wrong side), let go and come round behind it.
+								local _, offset = FurnitureService.holding(p.id)
+								local goal = job.target - offset
+								if MapLayout.inRect(r, goal.X, goal.Z, -1) then
+									goTo(Vector3.new(goal.X, here.Y, goal.Z), root, humanoid, false)
+								else
+									FurnitureService.release(p.id)
+								end
+								handled = true
 							else
-								-- Get behind the piece (side by side with a helper), then
-								-- walk it to the doorway.
+								-- Get behind it (on the far side from the doorway; a helper
+								-- beside us), grab it, then carry it there.
 								local push = toTarget.Unit
 								local side = Vector3.new(-push.Z, 0, push.X)
 								local offset = 0
@@ -1465,7 +1481,13 @@ local function brain(p: Participant, level: Level, seed: number)
 										barricade = nil
 									end
 									goTo(Vector3.new(behind.X, here.Y, behind.Z), root, humanoid, false)
+								elseif holder == nil then
+									approachJob = nil
+									if not FurnitureService.grab(p, body) then
+										moveTo(humanoid, Vector3.new(at.X, here.Y, at.Z)) -- step in closer
+									end
 								else
+									-- A teammate is carrying it: push alongside.
 									approachJob = nil
 									moveTo(
 										humanoid,
@@ -1510,6 +1532,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 
+		-- Not building right now: don't keep dragging a piece around.
+		if FurnitureService.holding(p.id) then
+			FurnitureService.release(p.id)
+		end
 		local hidden = BushService.hidden(p)
 		-- Hiders take a bush of their own just before the outbreak and keep
 		-- still in it; one a zombie flushed them out of is given up.
@@ -1718,7 +1744,7 @@ local function drive()
 			toGoal = Util.flat(goal - root.Position)
 		end
 		local move = if toGoal.Magnitude > 0.6 then toGoal.Unit else nil
-		local speed = humanoid.WalkSpeed
+		local speed = humanoid.WalkSpeed * FurnitureService.dragFactor(p)
 		if move and speed > 0 then
 			stopped[humanoid] = nil
 			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)

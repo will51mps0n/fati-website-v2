@@ -37,6 +37,9 @@ type Piece = FurnitureBuilder.Built & {
 	lastGoodAt: number, -- when the piece last moved to lastGood
 }
 
+-- A piece someone is holding (grabbed): it stays at `offset` from them.
+type Hold = { piece: Piece, offset: Vector3 }
+
 -- Someone who can push furniture. `reach` is set while they hold a melee
 -- weapon, whose shaft (along `aim`) pushes too.
 export type Mover = {
@@ -55,6 +58,7 @@ local OWNER = FurniturePush.OWNER_ATTRIBUTE
 local CONTEST_SECONDS = 0.8
 
 local pieces: { Piece } = {}
+local holds: { [string]: Hold } = {} -- participant id -> the piece they hold
 local byBody: { [BasePart]: Piece } = {}
 local byModel: { [Instance]: Piece } = {}
 local folder: Folder
@@ -184,7 +188,56 @@ function FurnitureService.findInBox(cframe: CFrame, size: Vector3): { BasePart }
 	return found
 end
 
+-- Grabbing (players through the Grab remote, bots directly): a human holds
+-- the piece next to them, which then comes with them.
+function FurnitureService.grab(p: Participants.Participant, body: BasePart): boolean
+	local piece = byBody[body]
+	local root = Participants.body(p)
+	if not piece or not root or p.team ~= "Human" then
+		return false
+	end
+	local reach = body.Size.Magnitude / 2 + FurniturePush.bumperRadius(p.scale) + Config.GRAB_REACH + 2
+	if Util.flatDistance(body.Position, root.Position) > reach then
+		return false
+	end
+	holds[p.id] = { piece = piece, offset = Util.flat(body.Position - root.Position) }
+	return true
+end
+
+function FurnitureService.release(id: string)
+	holds[id] = nil
+end
+
+-- The piece someone holds, and where it stays relative to them.
+function FurnitureService.holding(id: string): (BasePart?, Vector3)
+	local hold = holds[id]
+	if hold and hold.piece.body.Parent then
+		return hold.piece.body, hold.offset
+	end
+	return nil, Vector3.zero
+end
+
+-- Who holds this piece, if anyone.
+function FurnitureService.heldBy(body: BasePart): string?
+	for id, hold in holds do
+		if hold.piece.body == body then
+			return id
+		end
+	end
+	return nil
+end
+
+-- How fast someone can walk while dragging (1 when not holding anything).
+function FurnitureService.dragFactor(p: Participants.Participant): number
+	local body = FurnitureService.holding(p.id)
+	if not body then
+		return 1
+	end
+	return FurniturePush.dragFactor(body, RoundRules.pushStrength(p.scale))
+end
+
 function FurnitureService.resetAll()
+	table.clear(holds)
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0
@@ -326,6 +379,23 @@ local function collectPushes(now: number): FurniturePush.Pushes
 			piece.pushers[mover.id] = now
 			for _, id in helpers do
 				piece.pushers[id] = now
+			end
+		end
+		-- The piece they hold comes with them; they let go if it gets stuck.
+		local hold = holds[mover.id]
+		if hold then
+			local body = hold.piece.body
+			if body.Parent == nil or mover.zombie then
+				holds[mover.id] = nil
+			else
+				local desired, lag = FurniturePush.holdVelocity(root, hold.offset, body)
+				if lag > Config.GRAB_BREAK then
+					holds[mover.id] = nil
+				else
+					touched[body] = true
+					pushing(hold.piece)
+					FurniturePush.add(pushes, body, desired, leans[i].own, nil)
+				end
 			end
 		end
 		if dir then
@@ -524,6 +594,18 @@ end
 function FurnitureService.start(movers: () -> { Mover })
 	getMovers = movers
 	Remotes.unreliable("PushClaim").OnServerEvent:Connect(onClaim)
+	Remotes.event("Grab").OnServerEvent:Connect(function(player: Player, model: unknown, on: unknown)
+		local p = Participants.fromPlayer(player)
+		if not p then
+			return
+		end
+		local piece = if typeof(model) == "Instance" then byModel[model] else nil
+		if on == true and piece then
+			FurnitureService.grab(p, piece.body)
+		else
+			holds[p.id] = nil
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		for _, piece in pieces do
 			if piece.owner == player then

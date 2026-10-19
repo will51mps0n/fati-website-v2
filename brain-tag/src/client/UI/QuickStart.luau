@@ -46,6 +46,7 @@ function QuickStart.build(parent: Instance, touchMode: boolean, onDone: () -> ()
 		then {
 			"<b>Thumbstick</b>  move",
 			"<b>USE</b>  swing or fire your item",
+			"<b>GRAB</b> (hold)  drag the furniture next to you",
 			"<b>PICK UP / DROP</b>  grab or let go of an item",
 			"<b>SHOP</b>  buy items (and trade with the wizard)",
 			"<b>RETURN</b>  zombies: back to spawn",
@@ -55,6 +56,7 @@ function QuickStart.build(parent: Instance, touchMode: boolean, onDone: () -> ()
 			"<b>Mouse</b>  aim     <b>Click</b>  use item",
 			"<b>B</b>  shop (or the wizard, when you stand next to him)",
 			"<b>E</b>  pick up     <b>G</b>  drop",
+			"<b>F</b> (hold)  grab the furniture next to you and drag it",
 			"<b>Z</b>  zombies: back to spawn",
 		}
 	for i, text in controls do
