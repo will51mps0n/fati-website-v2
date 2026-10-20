@@ -61,6 +61,8 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
+-- Points are saved; when you come back you keep this share of them.
+Config.REJOIN_KEEP = 0.9
 -- Staying alive pays as you go: every human gets this much every few
 -- seconds of the outbreak (a "+10" floats up on their screen).
 Config.SURVIVAL_POINTS = 10
@@ -86,7 +88,16 @@ Config.CAMERA_HEIGHT = 175
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
 Config.CAMERA_SMOOTHING = 0 -- 0 = locked to you like the original; e.g. 12 for a soft follow
 Config.CAMERA_ZOOMS = { Close = 140, Normal = 175, Far = 220 }
-Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
+Config.CAMERA_GROWTH = 0.35 -- you see this much more around you per extra unit of your size
+-- The camera never goes higher than this: beyond it, it widens its view
+-- instead. (Roblox only draws lights near the camera: a giant's camera
+-- 600 studs up lost its lantern on dark maps.)
+Config.CAMERA_MAX_EYE = 260
+
+-- How much more of the world you see at a size (1 at size 1).
+function Config.viewGrowth(scale: number): number
+	return 1 + (scale - 1) * Config.CAMERA_GROWTH
+end
 
 -- Character look (studs, at scale 1) -------------------------------------------------
 

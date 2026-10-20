@@ -1,6 +1,7 @@
--- Saves each player's best score, stats, skins and purchases with
--- DataStoreService. Points themselves are not saved: everyone starts each
--- visit at 0 (Participants), and BestScore keeps the highest they reached.
+-- Saves each player's points, best score, stats, skins and purchases with
+-- DataStoreService. Coming back costs a little: you rejoin with
+-- Config.REJOIN_KEEP of your points (Participants). BestScore keeps the most
+-- you ever had.
 --
 -- Safety rules:
 --  * Every DataStore call is wrapped in pcall and retried with backoff.
@@ -24,7 +25,8 @@ local MAX_RECEIPTS = 100
 
 export type Profile = {
 	Version: number,
-	BestScore: number, -- most points reached in one visit; the all-time board
+	Score: number, -- points right now
+	BestScore: number, -- most points ever; the all-time board
 	Wins: number,
 	Infections: number,
 	RoundsPlayed: number,
@@ -52,6 +54,7 @@ local warned = false
 local function defaults(): Profile
 	return {
 		Version = VERSION,
+		Score = 0,
 		BestScore = 0,
 		Wins = 0,
 		Infections = 0,

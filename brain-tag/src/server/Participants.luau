@@ -5,6 +5,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Skins = require(ReplicatedStorage.Shared.Skins)
 
 export type Team = "Human" | "Zombie"
@@ -142,7 +143,8 @@ function Participants.add(info: NewParticipant): Participant
 		isBot = info.isBot,
 		character = nil,
 		team = "Human",
-		score = 0, -- points reset every visit; only BestScore is saved
+		-- Saved points, minus a little for having left.
+		score = if profile then math.floor((profile.Score or 0) * Config.REJOIN_KEEP) else 0,
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
@@ -268,9 +270,12 @@ end
 
 function Participants.setScore(p: Participant, value: number)
 	p.score = math.max(0, math.floor(value))
-	if p.profile and p.score > p.profile.BestScore then
-		p.profile.BestScore = p.score
-		p.state:SetAttribute("BestScore", p.score)
+	if p.profile then
+		p.profile.Score = p.score
+		if p.score > p.profile.BestScore then
+			p.profile.BestScore = p.score
+			p.state:SetAttribute("BestScore", p.score)
+		end
 	end
 	p.state:SetAttribute("Score", p.score)
 end

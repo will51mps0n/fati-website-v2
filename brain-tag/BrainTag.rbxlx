@@ -971,6 +971,8 @@ end
 -- Rewards (score) --------------------------------------------------------------
 
 Config.SURVIVOR_WIN_REWARD = 500
+-- Points are saved; when you come back you keep this share of them.
+Config.REJOIN_KEEP = 0.9
 -- Staying alive pays as you go: every human gets this much every few
 -- seconds of the outbreak (a "+10" floats up on their screen).
 Config.SURVIVAL_POINTS = 10
@@ -996,7 +998,16 @@ Config.CAMERA_HEIGHT = 175
 Config.CAMERA_FOV = 20 -- narrow field of view = near-orthographic flat 2D look
 Config.CAMERA_SMOOTHING = 0 -- 0 = locked to you like the original; e.g. 12 for a soft follow
 Config.CAMERA_ZOOMS = { Close = 140, Normal = 175, Far = 220 }
-Config.CAMERA_GROWTH = 0.35 -- the camera rises this much per extra unit of your size
+Config.CAMERA_GROWTH = 0.35 -- you see this much more around you per extra unit of your size
+-- The camera never goes higher than this: beyond it, it widens its view
+-- instead. (Roblox only draws lights near the camera: a giant's camera
+-- 600 studs up lost its lantern on dark maps.)
+Config.CAMERA_MAX_EYE = 260
+
+-- How much more of the world you see at a size (1 at size 1).
+function Config.viewGrowth(scale: number): number
+	return 1 + (scale - 1) * Config.CAMERA_GROWTH
+end
 
 -- Character look (studs, at scale 1) -------------------------------------------------
 
@@ -10086,9 +10097,10 @@ return Combat
       <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">DataService</string>
-          <string name="Source"><![CDATA[-- Saves each player's best score, stats, skins and purchases with
--- DataStoreService. Points themselves are not saved: everyone starts each
--- visit at 0 (Participants), and BestScore keeps the highest they reached.
+          <string name="Source"><![CDATA[-- Saves each player's points, best score, stats, skins and purchases with
+-- DataStoreService. Coming back costs a little: you rejoin with
+-- Config.REJOIN_KEEP of your points (Participants). BestScore keeps the most
+-- you ever had.
 --
 -- Safety rules:
 --  * Every DataStore call is wrapped in pcall and retried with backoff.
@@ -10112,7 +10124,8 @@ local MAX_RECEIPTS = 100
 
 export type Profile = {
 	Version: number,
-	BestScore: number, -- most points reached in one visit; the all-time board
+	Score: number, -- points right now
+	BestScore: number, -- most points ever; the all-time board
 	Wins: number,
 	Infections: number,
 	RoundsPlayed: number,
@@ -10140,6 +10153,7 @@ local warned = false
 local function defaults(): Profile
 	return {
 		Version = VERSION,
+		Score = 0,
 		BestScore = 0,
 		Wins = 0,
 		Infections = 0,
@@ -14297,6 +14311,7 @@ return MonetizationService
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Skins = require(ReplicatedStorage.Shared.Skins)
 
 export type Team = "Human" | "Zombie"
@@ -14434,7 +14449,8 @@ function Participants.add(info: NewParticipant): Participant
 		isBot = info.isBot,
 		character = nil,
 		team = "Human",
-		score = 0, -- points reset every visit; only BestScore is saved
+		-- Saved points, minus a little for having left.
+		score = if profile then math.floor((profile.Score or 0) * Config.REJOIN_KEEP) else 0,
 		immunity = 0,
 		scale = 1,
 		heldItem = nil,
@@ -14560,9 +14576,12 @@ end
 
 function Participants.setScore(p: Participant, value: number)
 	p.score = math.max(0, math.floor(value))
-	if p.profile and p.score > p.profile.BestScore then
-		p.profile.BestScore = p.score
-		p.state:SetAttribute("BestScore", p.score)
+	if p.profile then
+		p.profile.Score = p.score
+		if p.score > p.profile.BestScore then
+			p.profile.BestScore = p.score
+			p.state:SetAttribute("BestScore", p.score)
+		end
 	end
 	p.state:SetAttribute("Score", p.score)
 end
@@ -16291,10 +16310,16 @@ local function update(dt: number)
 		end
 	end
 	if focus then
-		-- Bigger players see a little more around them.
+		-- Bigger players see more around them: the camera rises, up to
+		-- CAMERA_MAX_EYE, then widens its view instead (same ground covered).
 		local scale = ClientState.my("Scale") or 1
-		local eye = height * (1 + (scale - 1) * Config.CAMERA_GROWTH)
+		local wanted = height * Config.viewGrowth(scale)
+		local eye = math.min(wanted, math.max(height, Config.CAMERA_MAX_EYE))
+		local half = math.tan(math.rad(Config.CAMERA_FOV / 2)) * wanted / eye
+		camera.FieldOfView = math.deg(math.atan(half)) * 2
 		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, eye, 0), focus, SCREEN_UP)
+		-- Lighting (your lantern) is drawn around the camera's focus: you.
+		camera.Focus = CFrame.new(focus)
 	end
 end
 
@@ -16533,6 +16558,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 
 local DarknessController = {}
@@ -16581,10 +16607,12 @@ local function updateLantern()
 	-- No character for a moment (respawning)? Light where the camera looks.
 	local center = if root then root.Position elseif camera then camera.Focus.Position else nil
 	if theme.dark and settings and center then
+		-- Above your head however big you are, and reaching as far as your
+		-- (wider) view: big players see more, on dark maps too.
 		local scale = if root then math.max(1, root.Size.Y / 2) else 1
-		at.WorldPosition = center + Vector3.new(0, 2 + scale, 0)
-		lamp.Range = settings.range
-		lamp.Brightness = settings.brightness
+		at.WorldPosition = center + Vector3.new(0, 2 + scale * 1.2, 0)
+		lamp.Range = math.min(60, settings.range * Config.viewGrowth(scale) + scale)
+		lamp.Brightness = settings.brightness * math.min(1.6, Config.viewGrowth(scale) ^ 0.5)
 		lamp.Color = Color3.fromHex(settings.color)
 		lamp.Enabled = true
 	else
@@ -16606,7 +16634,8 @@ function DarknessController.sees(position: Vector3): boolean
 		return true
 	end
 	local offset = position - root.Position
-	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= (theme.sight or 40)
+	local scale = math.max(1, root.Size.Y / 2)
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= (theme.sight or 40) * Config.viewGrowth(scale)
 end
 
 function DarknessController.start()

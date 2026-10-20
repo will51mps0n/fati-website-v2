@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local MapThemes = require(ReplicatedStorage.Shared.MapThemes)
 
 local DarknessController = {}
@@ -60,10 +61,12 @@ local function updateLantern()
 	-- No character for a moment (respawning)? Light where the camera looks.
 	local center = if root then root.Position elseif camera then camera.Focus.Position else nil
 	if theme.dark and settings and center then
+		-- Above your head however big you are, and reaching as far as your
+		-- (wider) view: big players see more, on dark maps too.
 		local scale = if root then math.max(1, root.Size.Y / 2) else 1
-		at.WorldPosition = center + Vector3.new(0, 2 + scale, 0)
-		lamp.Range = settings.range
-		lamp.Brightness = settings.brightness
+		at.WorldPosition = center + Vector3.new(0, 2 + scale * 1.2, 0)
+		lamp.Range = math.min(60, settings.range * Config.viewGrowth(scale) + scale)
+		lamp.Brightness = settings.brightness * math.min(1.6, Config.viewGrowth(scale) ^ 0.5)
 		lamp.Color = Color3.fromHex(settings.color)
 		lamp.Enabled = true
 	else
@@ -85,7 +88,8 @@ function DarknessController.sees(position: Vector3): boolean
 		return true
 	end
 	local offset = position - root.Position
-	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= (theme.sight or 40)
+	local scale = math.max(1, root.Size.Y / 2)
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= (theme.sight or 40) * Config.viewGrowth(scale)
 end
 
 function DarknessController.start()

@@ -43,10 +43,16 @@ local function update(dt: number)
 		end
 	end
 	if focus then
-		-- Bigger players see a little more around them.
+		-- Bigger players see more around them: the camera rises, up to
+		-- CAMERA_MAX_EYE, then widens its view instead (same ground covered).
 		local scale = ClientState.my("Scale") or 1
-		local eye = height * (1 + (scale - 1) * Config.CAMERA_GROWTH)
+		local wanted = height * Config.viewGrowth(scale)
+		local eye = math.min(wanted, math.max(height, Config.CAMERA_MAX_EYE))
+		local half = math.tan(math.rad(Config.CAMERA_FOV / 2)) * wanted / eye
+		camera.FieldOfView = math.deg(math.atan(half)) * 2
 		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, eye, 0), focus, SCREEN_UP)
+		-- Lighting (your lantern) is drawn around the camera's focus: you.
+		camera.Focus = CFrame.new(focus)
 	end
 end
 

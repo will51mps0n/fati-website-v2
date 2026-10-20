@@ -315,8 +315,8 @@ Bar line never touches them.
 
 ## Saving progress
 
-Best score, wins, skins and purchases save with DataStores. Points do not:
-everyone starts at 0 each time they join. Saving needs two things:
+Points, best score, wins, skins and purchases save with DataStores. When you
+come back you keep 90% of your points (`REJOIN_KEEP`). Saving needs two things:
 
 1. Publish the place: File > Publish to Roblox.
 2. Home > Game Settings > Security > turn on **Enable Studio Access to API Services**.
@@ -337,8 +337,8 @@ hiccup can't wipe real progress.
 | End (6 s) | "Survivors Win!!!" if anyone survived the timer, "Zombies Win!!!" if nobody did. Rewards, growth. |
 | Reset | Furniture, walls and items reset; everyone respawns as a human, all together at the map's start spot. |
 
-Score (points) starts at 0 every time you join and carries through the
-rounds while you stay in the server. It buys items and sets your speed and size, which
+Score (points) is saved: it carries through the rounds and across visits
+(you rejoin with 90% of it). It buys items and sets your speed and size, which
 update the moment your points change (bottom-left shows points, speed boost
 and size). A zombie that eats you takes 75% of your points
 (`INFECT_STEAL_FRACTION`) plus a small flat bonus (`INFECT_REWARD`), so
@@ -517,7 +517,7 @@ Everything lives in `src/shared/Config.luau`:
 - **Rounds:** `PREP_SECONDS`, `ROUND_SECONDS`, `ZOMBIE_RATIO`, rewards, `SURVIVAL_POINTS` / `SURVIVAL_POINTS_SECONDS` (points for staying alive).
 - **Zombies:** `ZOMBIE_SPEED_FACTOR`, `ZOMBIE_STRENGTH`.
 - **Push distance:** `PUSH_REACH` and `CHARACTER.BumperDiameter`.
-- **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`.
+- **Camera:** `CAMERA_HEIGHT`, `CAMERA_FOV`, `CAMERA_GROWTH` (how much more bigger players see) and `CAMERA_MAX_EYE` (the highest the camera goes; past it the view widens instead, so lights near you, like your lantern on dark maps, keep being drawn).
 - **Collisions:** `PLAYERS_COLLIDE` (characters bump into each other), `CHARACTER.ShellDiameter`.
 - **Held weapons:** `SHAFT_SOFTNESS`, `FIELD_WEAPON`, `FIELD_RECOIL` (how hard a weapon and the people pressing on it push each other, shared by size), `SHAFT_FURNITURE_FACTOR`, and per item `SOLIDITY` in `Items.luau`.
 - **Furniture size:** `FurnitureSpecs.SIZE_SCALE` (and `KEEP_SIZE` for pieces that sit against walls).
