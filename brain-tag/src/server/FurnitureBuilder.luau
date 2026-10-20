@@ -320,6 +320,19 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, c.d / 2 - 1.1, 2.2, 0.35, 0.07, 0.04, "2E2E2E") -- stencil
 		end,
 	},
+	-- The Blood Staff's summoned box: dark red, with glowing seams.
+	BloodBox = {
+		body = "6E0F1C",
+		draw = function(c)
+			local t = 0.35
+			c:top(0, -c.d / 2 + t / 2, c.w, t, 0.03, 0.06, "D11F35")
+			c:top(0, c.d / 2 - t / 2, c.w, t, 0.03, 0.06, "D11F35")
+			c:top(-c.w / 2 + t / 2, 0, t, c.d, 0.03, 0.06, "D11F35")
+			c:top(c.w / 2 - t / 2, 0, t, c.d, 0.03, 0.06, "D11F35")
+			c:top(0, 0, 1.4, 1.4, 0.05, 0.06, "FF3B4F", math.rad(45)) -- a glowing rune
+			c:top(0, 0, 0.7, 0.7, 0.07, 0.06, "6E0F1C", math.rad(45))
+		end,
+	},
 	Barrel = {
 		body = "8B5A2B",
 		transparentBody = true,

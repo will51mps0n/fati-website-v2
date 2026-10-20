@@ -2269,6 +2269,616 @@ local function buildWitchWoods(): Layout
 	return layout
 end
 
+-- The School ------------------------------------------------------------------------------
+
+local SCHOOL: Plan = {
+	w = 200,
+	d = 110,
+	walls = {
+		wall(
+			0,
+			0,
+			200,
+			0,
+			{ { 21.5, 28.5 }, { 171.5, 178.5 } },
+			{ { 4, 18 }, { 32, 46 }, { 54, 96 }, { 104, 146 }, { 154, 168 }, { 182, 196 } }
+		),
+		wall(
+			0,
+			110,
+			200,
+			110,
+			{ { 31.5, 38.5 }, { 106.5, 113.5 } },
+			{ { 4, 26 }, { 44, 66 }, { 74, 102 }, { 118, 146 }, { 154, 171 } }
+		),
+		wall(0, 0, 0, 110, { { 51.5, 58.5 } }, { { 6, 40 }, { 70, 104 } }),
+		wall(200, 0, 200, 110, { { 51.5, 58.5 } }, { { 6, 40 }, { 80, 104 } }),
+		wall(0, 45, 200, 45, { { 21.5, 28.5 }, { 71.5, 78.5 }, { 121.5, 128.5 }, { 171.5, 178.5 } }),
+		wall(0, 65, 200, 65, {
+			{ 21.5, 28.5 },
+			{ 46.5, 53.5 },
+			{ 91.5, 98.5 },
+			{ 121.5, 128.5 },
+			{ 158.5, 165.5 },
+			{ 184, 191 },
+		}),
+		wall(50, 0, 50, 45, { { 18.5, 25.5 } }),
+		wall(100, 0, 100, 45),
+		wall(150, 0, 150, 45, { { 18.5, 25.5 } }),
+		wall(70, 65, 70, 110, { { 84.5, 91.5 } }),
+		wall(150, 65, 150, 110),
+		wall(175, 65, 175, 110),
+	},
+	rooms = {
+		room("Classroom A", "Wood", 0, 0, 50, 45),
+		room("Classroom B", "Wood", 50, 0, 100, 45),
+		room("Library", "Wood", 100, 0, 150, 45),
+		room("Science lab", "Tile", 150, 0, 200, 45),
+		room("Main hallway", "Tile", 0, 45, 200, 65),
+		room("Cafeteria", "Tile", 0, 65, 70, 110),
+		room("Gym", "Wood", 70, 65, 150, 110),
+		room("Office", "Wood", 150, 65, 175, 110),
+		room("Bathroom", "Tile", 175, 65, 200, 110),
+	},
+	furniture = {
+		piece("Desk", 46.38, 9.6, 270),
+		piece("Desk", 8.6, 41.38, 180),
+		piece("Desk", 33.6, 41.38, 180),
+		piece("Desk", 3.38, 31.6, 90),
+		piece("Desk", 3.38, 22.1, 90),
+		piece("Desk", 46.38, 35.6, 270),
+		piece("Chair", 39.03, 13.03),
+		piece("Chair", 18.03, 11.53, 90),
+		piece("Chair", 3.53, 5.53),
+		piece("Chair", 18.53, 17.53),
+		piece("Chair", 12.53, 10.53),
+		piece("Chair", 17.03, 23.03),
+		piece("Bookshelf", 42.15, 2.65),
+		piece("Table", 12.75, 32.02),
+		piece("TrashCan", 30.41, 28.41, 90),
+		piece("Plant", 5.92, 14.91, 90),
+		piece("Desk", 96.38, 18.1, 270),
+		piece("Desk", 81.6, 3.38),
+		piece("Desk", 96.38, 32.1, 270),
+		piece("Desk", 53.38, 32.6, 90),
+		piece("Desk", 58.6, 41.38, 180),
+		piece("Desk", 84.1, 41.38, 180),
+		piece("Chair", 86.53, 35.53),
+		piece("Chair", 64.03, 6.53, 90),
+		piece("Chair", 84.53, 13.53),
+		piece("Chair", 69.03, 16.03),
+		piece("Chair", 63.53, 28.53),
+		piece("Chair", 57.03, 6.53, 90),
+		piece("Aquarium", 72.1, 3.14),
+		piece("Bookshelf", 97.15, 7.15, 270),
+		piece("TrashCan", 80.91, 19.91, 90),
+		piece("Bookshelf", 135.65, 42.15, 180),
+		piece("Bookshelf", 140.15, 2.65),
+		piece("Bookshelf", 147.15, 12.15, 270),
+		piece("Bookshelf", 102.65, 31.65, 90),
+		piece("Bookshelf", 121.65, 2.65),
+		piece("Bookshelf", 147.15, 36.65, 270),
+		piece("Table", 135.25, 15.03),
+		piece("Table", 117.03, 12.25, 90),
+		piece("Chair", 118.03, 26.53),
+		piece("Chair", 124.53, 15.03),
+		piece("Chair", 119.03, 40.03),
+		piece("Chair", 105.53, 16.53, 90),
+		piece("Couch", 107.4, 41.22, 180),
+		piece("Armchair", 138.34, 30.84, 90),
+		piece("Lamp", 118.55, 31.55, 90),
+		piece("Table", 183.75, 16.52),
+		piece("Table", 183.75, 34.52),
+		piece("Table", 162.75, 8.53),
+		piece("Table", 160.53, 32.75, 90),
+		piece("Chair", 196.53, 22.03),
+		piece("Chair", 193.53, 32.53, 90),
+		piece("Chair", 196.03, 4.03, 90),
+		piece("Chair", 194.03, 13.03, 90),
+		piece("Sink", 161.15, 41.65, 180),
+		piece("Sink", 153.15, 32.15, 90),
+		piece("Fridge", 195.95, 39.95, 270),
+		piece("Aquarium", 153.15, 8.1, 90),
+		piece("Crate", 182.11, 8.11, 90),
+		piece("Wardrobe", 161.6, 48.14),
+		piece("Wardrobe", 46.1, 48.14),
+		piece("Wardrobe", 188.1, 48.14),
+		piece("Wardrobe", 176.1, 61.64, 180),
+		piece("Wardrobe", 7.6, 48.14),
+		piece("Wardrobe", 109.6, 61.64, 180),
+		piece("VendingMachine", 56.24, 48.88),
+		piece("VendingMachine", 151.74, 49.38),
+		piece("Bench", 66.1, 47.8),
+		piece("Bench", 85.1, 47.8),
+		piece("TrashCan", 15.91, 61.41, 90),
+		piece("TrashCan", 133.41, 47.91, 90),
+		piece("Plant", 15.91, 48.91),
+		piece("Table", 16.25, 81.53),
+		piece("Table", 43.02, 73.75, 90),
+		piece("Table", 57.25, 105.03),
+		piece("Table", 16.52, 97.75, 90),
+		piece("Table", 47.75, 96.03),
+		piece("Table", 63.25, 78.03),
+		piece("Bench", 2.8, 79.1, 90),
+		piece("Bench", 16.6, 67.8),
+		piece("Bench", 2.8, 97.1, 90),
+		piece("Bench", 61.6, 67.8),
+		piece("Bench", 32.6, 67.8),
+		piece("Bench", 6.6, 67.8),
+		piece("Fridge", 26.45, 105.95, 180),
+		piece("Fridge", 6.95, 105.95, 180),
+		piece("Stove", 66.45, 100.15, 270),
+		piece("Sink", 48.15, 106.65, 180),
+		piece("VendingMachine", 58.88, 95.24, 90),
+		piece("TrashCan", 7.92, 73.92),
+		piece("Treadmill", 83.18, 72.38, 90),
+		piece("Treadmill", 74.38, 79.18),
+		piece("Treadmill", 114.38, 72.18),
+		piece("Treadmill", 130.88, 87.68),
+		piece("Bench", 140.6, 67.8),
+		piece("Bench", 72.8, 103.6, 90),
+		piece("Bench", 105.1, 67.8),
+		piece("Box", 78.65, 99.65, 90),
+		piece("Box", 93.65, 105.65),
+		piece("Box", 137.15, 85.15),
+		piece("Crate", 143.61, 75.11, 90),
+		piece("Desk", 167.6, 106.38, 180),
+		piece("Desk", 153.38, 85.6, 90),
+		piece("Chair", 168.03, 85.03),
+		piece("Chair", 167.53, 94.53, 90),
+		piece("Bookshelf", 152.65, 98.65, 90),
+		piece("Wardrobe", 153.15, 70.1, 90),
+		piece("Plant", 171.91, 79.42, 90),
+		piece("Toilet", 178.61, 84.15, 90),
+		piece("Toilet", 193.15, 68.61),
+		piece("Toilet", 178.61, 90.15, 90),
+		piece("Sink", 196.65, 84.65, 270),
+		piece("Sink", 196.65, 92.15, 270),
+	},
+	items = {
+		pt(25, 22.5),
+		pt(75, 22.5),
+		pt(125, 22.5),
+		pt(175, 22.5),
+		pt(100, 55),
+		pt(35, 87.5),
+		pt(110, 87.5),
+		pt(162.5, 87.5),
+		pt(187.5, 87.5),
+	},
+}
+
+local PORTABLE: Plan = {
+	w = 36,
+	d = 24,
+	walls = {
+		wall(0, 0, 36, 0, nil, { { 4, 32 } }),
+		wall(0, 24, 36, 24, { { 14.5, 21.5 } }, { { 3, 11 }, { 25, 33 } }),
+		wall(0, 0, 0, 24, nil, { { 5, 19 } }),
+		wall(36, 0, 36, 24, nil, { { 5, 19 } }),
+	},
+	rooms = {
+		room("Portable classroom", "Wood", 0, 0, 36, 24),
+	},
+	furniture = {
+		piece("Desk", 32.38, 6.6, 270),
+		piece("Desk", 13.1, 3.38),
+		piece("Desk", 3.38, 17.1, 90),
+		piece("Chair", 26.53, 7.53, 90),
+		piece("Chair", 30.03, 15.03),
+		piece("Chair", 5.03, 5.53),
+		piece("Bookshelf", 26.65, 21.15, 180),
+	},
+	items = { pt(18, 12) },
+}
+
+local EQUIPMENT_SHED: Plan = {
+	w = 28,
+	d = 20,
+	walls = {
+		wall(0, 0, 28, 0, nil, { { 8, 20 } }),
+		wall(0, 20, 28, 20, { { 10.5, 17.5 } }),
+		wall(0, 0, 0, 20),
+		wall(28, 0, 28, 20),
+	},
+	rooms = {
+		room("Equipment shed", "Concrete", 0, 0, 28, 20),
+	},
+	furniture = {
+		piece("Crate", 4, 4),
+		piece("Barrel", 9, 3.8),
+		piece("Box", 23.5, 4),
+		piece("Box", 23.5, 7.5),
+		piece("Treadmill", 4.5, 13),
+	},
+	items = { pt(15, 11) },
+}
+
+local function buildSchool(): Layout
+	local layout = newLayout("School", "The School")
+	layout.theme = "Classic"
+	layout.bounds = rect(-180, -170, 180, 170)
+	addHouse(layout, "School", SCHOOL, -100, -150, false, "Blue", "Huge")
+	addHouse(layout, "PortableA", PORTABLE, -170, -20, false, "Orange", "Small")
+	addHouse(layout, "PortableB", PORTABLE, 134, -20, false, "Orange", "Small")
+	addHouse(layout, "Shed", EQUIPMENT_SHED, 130, -160, false, "Blue", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Playground", "Dirt", -125, 40, -45, 100)
+	outdoor("Bench", -52.35, 51.45, 90)
+	outdoor("Bench", -102.05, 82.65)
+	outdoor("Bench", -61.05, 89.65)
+	outdoor("TrashCan", -67.23, 46.77)
+	outdoor("TrashCan", -78.23, 86.27)
+	yardRoom("Sports field", "Dirt", 40, 30, 125, 100)
+	outdoor("Bench", 102.45, 81.15)
+	outdoor("Bench", 108.95, 92.65)
+	outdoor("Bench", 45.65, 44.95, 90)
+	outdoor("Bench", 118.45, 80.65)
+	outdoor("Crate", 58.95, 44.95, 90)
+	outdoor("Barrel", 87.88, 94.88)
+	outdoor("Car", -140, 125, 90)
+	outdoor("Car", -110, 125, 90)
+	outdoor("Car", 105, 125, 90)
+	outdoor("Car", 135, 125, 90)
+	outdoor("Bench", -30, -32)
+	outdoor("Bench", 30, -32)
+	outdoor("TrashCan", 0, -32)
+	outdoor("TrashCan", -13, 66)
+	outdoor("TrashCan", -142, 87.7)
+	outdoor("TrashCan", -58.5, -17.3)
+	outdoor("TrashCan", -62.6, 13.7)
+	outdoor("Bench", 147, 158.7)
+	outdoor("Bench", -115, -99.9)
+	outdoor("Bench", 157.5, -31.3)
+	outdoor("Plant", -96.9, 6.7)
+	outdoor("Plant", -12.7, -161.4)
+	outdoor("Plant", -147.2, 50.5)
+	outdoor("Plant", 88.2, 8.3)
+	outdoor("Plant", 133.3, 88)
+	outdoor("Plant", 157.3, -95)
+	outdoor("Crate", 99, -30.7)
+	outdoor("Crate", 138.9, 100.6)
+	outdoor("Crate", -147.3, -153.4)
+	layout.paths = { rect(-4, 20, 4, 112), rect(-156, 4, -148, 30), rect(148, 4, 156, 30) }
+	layout.patios = { rect(-40, -30, 40, 20) }
+	layout.road = {
+		sidewalks = { rect(-180, 112, 180, 118), rect(-180, 146, 180, 152) },
+		asphalt = { rect(-180, 118, 180, 146) },
+		centerLines = { rect(-180, 131.6, 180, 132.4) },
+		edgeLines = { rect(-180, 119, 180, 119.4), rect(-180, 144.6, 180, 145) },
+	}
+	layout.bushes = {
+		bush(-170, -160, 5, "Green"),
+		bush(-130, -160, 4, "Orange"),
+		bush(-170, -90, 4, "Green"),
+		bush(170, -100, 4, "Orange"),
+		bush(115, -60, 4, "Green"),
+		bush(-115, -60, 4, "Orange"),
+		bush(-170, 70, 4, "Green"),
+		bush(165, 50, 4, "Green"),
+		bush(-30, 85, 3, "Orange"),
+		bush(30, 70, 3, "Green"),
+		bush(-60, 162, 4, "Green"),
+		bush(60, 162, 4, "Orange"),
+	}
+	layout.humanSpawns = {
+		pt(-150, 40),
+		pt(-60, 25),
+		pt(60, 25),
+		pt(150, 40),
+		pt(-160, 95),
+		pt(-15, 95),
+		pt(160, 95),
+		pt(-135, -60),
+		pt(135, -60),
+		pt(-120, 162),
+		pt(120, 162),
+		pt(0, -25),
+	}
+	layout.zombieSpawns = { pt(-170, 132), pt(170, 132) }
+	layout.start = pt(0, 0)
+	layout.wizardSpots = { pt(-160, -120), pt(165, -130), pt(-170, 162), pt(170, 162) }
+	for _, p in { pt(-85, 70), pt(82.5, 65) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
+-- Dusty Gulch -----------------------------------------------------------------------------
+
+local SALOON: Plan = {
+	w = 60,
+	d = 44,
+	walls = {
+		wall(0, 0, 60, 0, nil, { { 4, 21 }, { 43, 56 } }),
+		wall(0, 44, 60, 44, { { 26.5, 33.5 } }, { { 4, 20 }, { 40, 56 } }),
+		wall(0, 0, 0, 44, nil, { { 19, 40 } }),
+		wall(60, 0, 60, 44, { { 20.5, 27.5 } }, { { 31, 40 } }),
+		wall(0, 16, 60, 16, { { 8.5, 15.5 }, { 28.5, 35.5 }, { 46.5, 53.5 } }),
+		wall(24, 0, 24, 16),
+		wall(40, 0, 40, 16),
+	},
+	rooms = {
+		room("Bar room", "Wood", 0, 16, 60, 44),
+		room("Kitchen", "Wood", 0, 0, 24, 16),
+		room("Storeroom", "Wood", 24, 0, 40, 16),
+		room("Poker room", "Wood", 40, 0, 60, 16),
+	},
+	furniture = {
+		piece("PoolTable", 15.9, 38.1),
+		piece("Piano", 4.24, 26.25, 90),
+		piece("Bookshelf", 41.65, 41.15, 180),
+		piece("Table", 53.75, 38.52),
+		piece("Table", 20.75, 21.52),
+		piece("Chair", 5.53, 38.53, 90),
+		piece("Chair", 40.03, 36.03, 90),
+		piece("Chair", 56.53, 31.03, 90),
+		piece("Stove", 5.65, 3.45),
+		piece("Sink", 18.15, 3.15),
+		piece("Barrel", 20.03, 11.03),
+		piece("Chair", 55.53, 9.53),
+		piece("Chair", 44.53, 5.03),
+		piece("Chair", 44.03, 10.53, 90),
+	},
+	items = { pt(30, 30) },
+}
+
+local SHERIFF: Plan = {
+	w = 40,
+	d = 30,
+	walls = {
+		wall(0, 0, 40, 0, nil, { { 4, 12 }, { 28, 36 } }),
+		wall(0, 30, 40, 30, { { 16.5, 23.5 } }, { { 3, 13 }, { 27, 37 } }),
+		wall(0, 0, 0, 30, nil, { { 15, 27 } }),
+		wall(40, 0, 40, 30, nil, { { 15, 27 } }),
+		wall(0, 12, 40, 12, { { 6.5, 13.5 }, { 26.5, 33.5 } }),
+		wall(20, 0, 20, 12),
+	},
+	rooms = {
+		room("Jail cell 1", "Concrete", 0, 0, 20, 12),
+		room("Jail cell 2", "Concrete", 20, 0, 40, 12),
+		room("Sheriff's office", "Wood", 0, 12, 40, 30),
+	},
+	furniture = {
+		piece("Bench", 2.8, 5.1, 90),
+		piece("Box", 16.14, 3.14),
+		piece("Bench", 22.8, 6.6, 90),
+		piece("Barrel", 36.53, 8.03, 90),
+		piece("Desk", 36.38, 22.6, 270),
+		piece("Chair", 21.53, 15.53, 90),
+		piece("Wardrobe", 3.14, 22.1, 90),
+	},
+	items = { pt(20, 21) },
+}
+
+local GENERAL_STORE: Plan = {
+	w = 40,
+	d = 30,
+	walls = {
+		wall(0, 0, 40, 0, nil, { { 4, 22 }, { 30, 36 } }),
+		wall(0, 30, 40, 30, { { 9.5, 16.5 } }, { { 19, 24 }, { 30, 37 } }),
+		wall(0, 0, 0, 30, nil, { { 6, 24 } }),
+		wall(40, 0, 40, 30, { { 11.5, 18.5 } }),
+		wall(26, 0, 26, 30, { { 11.5, 18.5 } }),
+	},
+	rooms = {
+		room("Store", "Wood", 0, 0, 26, 30),
+		room("Stockroom", "Wood", 26, 0, 40, 30),
+	},
+	furniture = {
+		piece("Table", 19.75, 4.53),
+		piece("Table", 21.02, 23.75, 90),
+		piece("Crate", 3.6, 24.61, 90),
+		piece("Barrel", 11.03, 8.03, 90),
+		piece("Barrel", 3.03, 4.03),
+		piece("Bookshelf", 2.65, 13.15, 90),
+		piece("Box", 7.64, 14.14),
+		piece("Wardrobe", 32.6, 3.14),
+		piece("Crate", 34.1, 21.11),
+		piece("Barrel", 29.03, 9.03),
+		piece("Box", 35.64, 9.14, 90),
+	},
+	items = { pt(13, 15) },
+}
+
+local BANK: Plan = {
+	w = 36,
+	d = 30,
+	walls = {
+		wall(0, 0, 36, 0),
+		wall(0, 30, 36, 30, { { 14.5, 21.5 } }, { { 3, 11 }, { 25, 33 } }),
+		wall(0, 0, 0, 30, nil, { { 15, 27 } }),
+		wall(36, 0, 36, 30, nil, { { 15, 27 } }),
+		wall(0, 12, 36, 12, { { 14.5, 21.5 } }),
+	},
+	rooms = {
+		room("Vault", "Concrete", 0, 0, 36, 12),
+		room("Lobby", "Wood", 0, 12, 36, 30),
+	},
+	furniture = {
+		piece("Crate", 6.6, 3.6, 90),
+		piece("Crate", 27.11, 5.1),
+		piece("Box", 12.64, 4.14),
+		piece("Desk", 32.38, 18.1, 270),
+		piece("Desk", 3.38, 23.6, 90),
+		piece("Chair", 10.53, 25.03),
+		piece("Chair", 24.03, 21.03),
+		piece("Bench", 5.1, 14.8),
+		piece("Plant", 12.41, 19.91, 90),
+	},
+	items = { pt(18, 21) },
+}
+
+local ADOBE_HOUSE: Plan = {
+	w = 30,
+	d = 24,
+	walls = {
+		wall(0, 0, 30, 0, nil, { { 3, 13 } }),
+		wall(0, 24, 30, 24, { { 4, 11 } }, { { 19, 28 } }),
+		wall(0, 0, 0, 24, nil, { { 6, 18 } }),
+		wall(30, 0, 30, 24, nil, { { 6, 18 } }),
+		wall(16, 0, 16, 24, { { 9, 16 } }),
+	},
+	rooms = {
+		room("Front room", "Wood", 0, 0, 16, 24),
+		room("Bedroom", "Wood", 16, 0, 30, 24),
+	},
+	furniture = {
+		piece("Table", 7.25, 5.03),
+		piece("Plant", 12.91, 19.91, 90),
+		piece("Dresser", 25.15, 2.85),
+	},
+	items = {},
+}
+
+local STABLE: Plan = {
+	w = 60,
+	d = 40,
+	walls = {
+		wall(0, 0, 60, 0, nil, { { 3, 12 }, { 18, 27 }, { 33, 42 }, { 48, 57 } }),
+		wall(0, 40, 60, 40, { { 26.5, 33.5 } }),
+		wall(0, 0, 0, 40, { { 23.5, 30.5 } }),
+		wall(60, 0, 60, 40, nil, { { 18, 36 } }),
+		wall(0, 14, 60, 14, { { 4, 11 }, { 19, 26 }, { 34, 41 }, { 49, 56 } }),
+		wall(15, 0, 15, 14),
+		wall(30, 0, 30, 14),
+		wall(45, 0, 45, 14),
+	},
+	rooms = {
+		room("Stall 1", "Wood", 0, 0, 15, 14),
+		room("Stall 2", "Wood", 15, 0, 30, 14),
+		room("Stall 3", "Wood", 30, 0, 45, 14),
+		room("Stall 4", "Wood", 45, 0, 60, 14),
+		room("Stable floor", "Wood", 0, 14, 60, 40),
+	},
+	furniture = {
+		piece("HayBale", 19.52, 33.14),
+		piece("HayBale", 45.52, 33.64),
+		piece("HayBale", 30.52, 20.14),
+		piece("HayBale", 11.64, 34.52, 90),
+		piece("HayBale", 38.14, 34.02, 90),
+		piece("Crate", 44.1, 21.11),
+		piece("Crate", 5.6, 35.11, 90),
+		piece("Barrel", 14.53, 19.53, 90),
+	},
+	items = { pt(30, 27) },
+}
+
+local function buildDustyGulch(): Layout
+	local layout = newLayout("DustyGulch", "Dusty Gulch")
+	layout.theme = "Desert"
+	layout.bounds = rect(-180, -180, 180, 180)
+	addHouse(layout, "Saloon", SALOON, -30, -68, false, "Orange", "Large")
+	addHouse(layout, "Sheriff", SHERIFF, -90, -54, false, "Blue", "Small")
+	addHouse(layout, "GeneralStore", GENERAL_STORE, 50, -54, false, "Orange", "Small")
+	addHouse(layout, "Bank", BANK, 110, -54, false, "Blue", "Small")
+	addHouse(layout, "AdobeN", ADOBE_HOUSE, -150, -48, false, "Orange", "Small")
+	addHouse(layout, "Stable", STABLE, -40, 24, true, "Orange", "Large")
+	addHouse(layout, "AdobeS1", ADOBE_HOUSE, -150, 24, true, "Blue", "Small")
+	addHouse(layout, "AdobeS2", ADOBE_HOUSE, -100, 24, true, "Orange", "Small")
+	addHouse(layout, "AdobeS3", ADOBE_HOUSE, 50, 24, true, "Blue", "Small")
+	addHouse(layout, "AdobeS4", ADOBE_HOUSE, 100, 24, true, "Orange", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Boot Hill", "Dirt", 66, -170, 168, -100)
+	outdoor("Tombstone", 80, -155)
+	outdoor("Tombstone", 98, -155)
+	outdoor("Tombstone", 116, -155)
+	outdoor("Tombstone", 134, -155)
+	outdoor("Tombstone", 152, -155)
+	outdoor("Tombstone", 80, -138)
+	outdoor("Tombstone", 98, -138)
+	outdoor("Tombstone", 116, -138)
+	outdoor("Tombstone", 134, -138)
+	outdoor("Tombstone", 152, -138)
+	outdoor("Tombstone", 80, -121)
+	outdoor("Tombstone", 98, -121)
+	outdoor("Tombstone", 116, -121)
+	outdoor("Tombstone", 134, -121)
+	outdoor("Tombstone", 152, -121)
+	outdoor("Barrel", 123.38, -119.12)
+	outdoor("Bench", 143.45, -147.85)
+	yardRoom("Corral", "Dirt", -160, 100, -60, 165)
+	outdoor("HayBale", -128.5, 143.88, 90)
+	outdoor("HayBale", -145.5, 106.38, 90)
+	outdoor("HayBale", -87.5, 107.38, 90)
+	outdoor("HayBale", -69.62, 114)
+	outdoor("HayBale", -123, 106.88, 90)
+	outdoor("HayBale", -76.12, 154.5)
+	outdoor("Barrel", -154.12, 121.88)
+	outdoor("Barrel", -127.62, 157.88, 90)
+	outdoor("Barrel", -81.62, 146.88)
+	outdoor("Bench", -45, -18)
+	outdoor("Bench", 45, -18)
+	outdoor("Barrel", -112, -18)
+	outdoor("Barrel", 152, -18)
+	outdoor("HayBale", -60, 18)
+	outdoor("HayBale", 32, 18)
+	outdoor("Barrel", -86, -94.3)
+	outdoor("Barrel", 162.6, -43.4)
+	outdoor("Barrel", 43.7, -115)
+	outdoor("Barrel", -21.8, -157.9)
+	outdoor("Barrel", -54.4, 85.8)
+	outdoor("Barrel", 45.1, -72.1)
+	outdoor("Crate", -41.6, 153.9)
+	outdoor("Crate", -160, -131.2)
+	outdoor("Crate", 32.5, -130.8)
+	outdoor("Crate", 46, 165.7)
+	outdoor("HayBale", 169.2, 21.8)
+	outdoor("HayBale", 128.3, 85.8)
+	outdoor("HayBale", -116.7, 88.2)
+	outdoor("HayBale", 3.9, -168)
+	outdoor("Bench", -108, -172.3)
+	outdoor("Bench", 41.1, 154.3)
+	layout.paths = { rect(-180, -10, 180, 10), rect(96, -100, 104, -54) }
+	layout.pools = { rect(80, 110, 130, 140) }
+	layout.bushes = {
+		bush(-130, -150, 4, "Green"),
+		bush(-40, -150, 4, "Green"),
+		bush(30, -160, 3, "Orange"),
+		bush(175, -20, 3, "Green"),
+		bush(-175, 40, 3, "Green"),
+		bush(60, 160, 4, "Orange"),
+		bush(-100, 172, 4, "Green"),
+		bush(165, 120, 4, "Green"),
+		bush(0, 140, 4, "Orange"),
+		bush(-170, -110, 4, "Orange"),
+		bush(-37, 27, 1.6, "Cobweb"),
+	}
+	layout.humanSpawns = {
+		pt(-165, -80),
+		pt(-100, -110),
+		pt(-10, -110),
+		pt(40, -100),
+		pt(-140, 0),
+		pt(140, 0),
+		pt(-165, 85),
+		pt(-20, 100),
+		pt(40, 90),
+		pt(165, 85),
+		pt(150, 165),
+		pt(-20, 165),
+	}
+	layout.zombieSpawns = { pt(-174, 174), pt(174, -174) }
+	layout.start = pt(0, 0)
+	layout.wizardSpots = { pt(-170, -170), pt(170, -60), pt(-170, 172), pt(170, 172) }
+	for _, p in { pt(117, -132), pt(-110, 132.5) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
 -- END GENERATED MAPS --
 
 MapLayout.maps = {
@@ -2279,9 +2889,20 @@ MapLayout.maps = {
 	PumpkinFarm = buildPumpkinFarm(),
 	SpookyVillage = buildSpookyVillage(),
 	WitchWoods = buildWitchWoods(),
+	School = buildSchool(),
+	DustyGulch = buildDustyGulch(),
 } :: { [string]: Layout }
-MapLayout.names =
-	{ "Neighborhood", "Mansion", "ChristmasTown", "Haunted", "PumpkinFarm", "SpookyVillage", "WitchWoods" }
+MapLayout.names = {
+	"Neighborhood",
+	"Mansion",
+	"ChristmasTown",
+	"Haunted",
+	"PumpkinFarm",
+	"SpookyVillage",
+	"WitchWoods",
+	"School",
+	"DustyGulch",
+}
 MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood

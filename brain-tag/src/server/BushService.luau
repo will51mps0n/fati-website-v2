@@ -1,5 +1,5 @@
--- Flags characters standing in a bush (character attribute "InBush") so bots
--- can't see them. Clients work out the visual side (name tags, see-through
+-- Flags characters standing in a bush, or wearing the Magic Cloak (character
+-- attribute "InBush"), so bots can't see them. Clients work out the visual side (name tags, see-through
 -- canopy) themselves from the same shared geometry.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,7 +43,9 @@ function BushService.init()
 			local character = p.character
 			if character then
 				local root = Participants.body(p)
-				local hidden = root ~= nil and Bushes.coverAt(root.Position) ~= nil
+				local cloak = character:GetAttribute(Bushes.CLOAK_ATTRIBUTE)
+				local cloaked = typeof(cloak) == "number" and cloak > workspace:GetServerTimeNow()
+				local hidden = root ~= nil and (cloaked or Bushes.coverAt(root.Position) ~= nil)
 				if character:GetAttribute(Bushes.ATTRIBUTE) ~= hidden then
 					character:SetAttribute(Bushes.ATTRIBUTE, hidden)
 				end

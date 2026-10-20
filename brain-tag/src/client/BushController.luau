@@ -2,7 +2,8 @@
 -- see yourself (and anyone hiding with you), and the name tags of players
 -- hiding in other bushes disappear. On dark maps, name tags also show only
 -- for people close enough to see (DarknessController), and on roofed maps
--- only for people in the same room as you (Roofs).
+-- only for people in the same room as you (Roofs). Someone wearing the Magic
+-- Cloak fades away (you see yourself as a ghost) and loses their name tag.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +20,23 @@ local player = Players.LocalPlayer
 local INTERVAL = 0.1
 
 local faded: Model? = nil
+local ghosts: { [Model]: boolean } = {}
+local OTHERS_FADE = 0.93
+local SELF_FADE = 0.55
+
+local function cloaked(model: Instance): boolean
+	local untilTime = model:GetAttribute(Bushes.CLOAK_ATTRIBUTE)
+	return typeof(untilTime) == "number" and untilTime > workspace:GetServerTimeNow()
+end
+
+-- Fade a whole character (and what it holds) in or out.
+local function ghost(model: Model, amount: number)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.LocalTransparencyModifier = amount
+		end
+	end
+end
 
 local function fade(bush: Model?, amount: number)
 	if not bush then
@@ -56,6 +74,19 @@ local function step()
 		faded = mine
 	end
 
+	for model in ghosts do
+		if not model.Parent or not cloaked(model) then
+			ghost(model, 0)
+			ghosts[model] = nil
+		end
+	end
+	for _, model in characters() do
+		if model:IsA("Model") and model:GetAttribute("ParticipantId") and cloaked(model) then
+			ghost(model, if model == me then SELF_FADE else OTHERS_FADE)
+			ghosts[model] = true
+		end
+	end
+
 	for _, model in characters() do
 		if model:IsA("Model") and model:GetAttribute("ParticipantId") and model ~= me then
 			local head = model:FindFirstChild("Head")
@@ -64,6 +95,7 @@ local function step()
 			if tag and tag:IsA("BillboardGui") and root then
 				local theirs = Bushes.coverAt(root.Position)
 				local show = (theirs == nil or theirs == mine)
+					and not ghosts[model]
 					and DarknessController.sees(root.Position)
 					and (myRoot == nil or Roofs.canSee(myRoot.Position, root.Position))
 				if tag.Enabled ~= show then

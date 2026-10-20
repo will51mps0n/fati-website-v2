@@ -8,8 +8,9 @@ export type ItemKind =
 	| "Blast" -- click for a cone blast
 	| "Stream" -- hold to spray (water gun, leaf blower)
 	| "Trap" -- click to drop a trap at your feet
-	| "Consumable" -- click to use up
+	| "Consumable" -- click to use up (or use again later, if reusable)
 	| "Passive" -- just hold it
+	| "Summon" -- click to summon a piece of furniture in front of you
 
 export type Item = {
 	id: string,
@@ -40,7 +41,7 @@ export type Item = {
 	-- Fun extras (see ItemService and the client's Effects):
 	sound: string?, -- sound style played on use
 	fx: string?, -- little visual on hit or use
-	effect: string?, -- "Freeze" | "Bubble" | "Explode" | "Plunge" | "Slip"
+	effect: string?, -- "Freeze" | "Bubble" | "Explode" | "Plunge" | "Slip" | "Cloak"
 	projectile: string?, -- projectile look: "Potato" | "Pebble" | "Snowball" | "Bubble" | "Duck"
 	slowFactor: number?, -- Freeze: speed multiplier while frozen
 	effectSeconds: number?, -- how long Freeze/Bubble/Plunge lasts
@@ -49,6 +50,9 @@ export type Item = {
 	charges: number?, -- Trap: how many you can drop
 	speedBoost: number?, -- Consumable: speed multiplier
 	boostSeconds: number?,
+	reusable: boolean?, -- Consumable: stays in your hand (use again after the cooldown)
+	summon: string?, -- Summon: the furniture kind it brings
+	-- (Projectiles with `charges` are used up after that many shots.)
 }
 
 local Items: { [string]: Item } = {}
@@ -494,6 +498,175 @@ add({
 	boostSeconds = 8,
 })
 
+-- From the original braains.io shop (and a freeze gun) -------------------------
+
+add({
+	id = "FreezeGun",
+	name = "Freeze Gun",
+	kind = "Projectile",
+	description = "Fires an ice bolt that freezes a zombie solid for two seconds.",
+	price = 4500,
+	knockback = 10,
+	stun = 1.6, -- frozen solid...
+	cooldown = 3,
+	projectile = "Ice",
+	projectileSpeed = 110,
+	projectileRange = 90,
+	projectileRadius = 0.7,
+	effect = "Freeze",
+	slowFactor = 0.4, -- ...then thawing out slowly
+	effectSeconds = 3,
+})
+
+add({
+	id = "Glock",
+	name = "Glock",
+	kind = "Projectile",
+	description = "Rapid little shots that shove zombies back.",
+	price = 3500,
+	knockback = 38,
+	stun = 0.15,
+	cooldown = 0.3,
+	projectile = "Bullet",
+	projectileSpeed = 160,
+	projectileRange = 100,
+	projectileRadius = 0.4,
+})
+
+add({
+	id = "Crossbow",
+	name = "Crossbow",
+	kind = "Projectile",
+	description = "Came from a mysterious purple castle... Shoots light arrows fast, and can push objects.",
+	price = 3500,
+	knockback = 80,
+	stun = 0.4,
+	cooldown = 1.1,
+	projectile = "Arrow",
+	projectileSpeed = 140,
+	projectileRange = 120,
+	projectileRadius = 0.5,
+})
+
+add({
+	id = "Dynamite",
+	name = "Dynamite",
+	kind = "Projectile",
+	description = "Boom! 1 use, 1 big explosion. Throw it to troll, or to escape zombies.",
+	price = 2000,
+	knockback = 130,
+	stun = 0.9,
+	cooldown = 1,
+	projectile = "Dynamite",
+	projectileSpeed = 45,
+	projectileRange = 24,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 13,
+	charges = 1,
+})
+
+add({
+	id = "StackedDynamite",
+	name = "Stacked Dynamite",
+	kind = "Projectile",
+	description = "Three sticks of dynamite: three big explosions.",
+	price = 5000,
+	knockback = 130,
+	stun = 0.9,
+	cooldown = 1.5,
+	projectile = "Dynamite",
+	projectileSpeed = 45,
+	projectileRange = 24,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 13,
+	charges = 3,
+})
+
+add({
+	id = "Grenade",
+	name = "Grenade",
+	kind = "Projectile",
+	description = "Throw it far: it goes off where it lands. 1 use.",
+	price = 1800,
+	knockback = 110,
+	stun = 0.7,
+	cooldown = 1,
+	projectile = "Grenade",
+	projectileSpeed = 60,
+	projectileRange = 40,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 11,
+	charges = 1,
+})
+
+add({
+	id = "FartGun",
+	name = "Fart Gun",
+	kind = "Stream",
+	description = "Hold to spray a stinky green cloud that pushes zombies away.",
+	price = 4000,
+	reach = 14,
+	arc = 40,
+	knockback = 22,
+	stun = 0.15,
+	tick = 0.15,
+	charges = 50,
+	fx = "Fart",
+})
+
+add({
+	id = "Slap",
+	name = "SLAP",
+	kind = "Melee",
+	description = "A giant hand. Click to slap a zombie clean across the room.",
+	price = 3000,
+	reach = 5.5,
+	arc = 70,
+	knockback = 110,
+	stun = 0.6,
+	cooldown = 1,
+	fx = "Stars",
+})
+
+add({
+	id = "Broom",
+	name = "Broom",
+	kind = "Consumable",
+	description = "Click to ride it: 50% faster for 6 seconds. Ride again once it's rested.",
+	price = 7500,
+	cooldown = 10,
+	speedBoost = 1.5,
+	boostSeconds = 6,
+	reusable = true,
+})
+
+add({
+	id = "MagicCloak",
+	name = "The Magic Cloak",
+	kind = "Consumable",
+	description = "Click to vanish: nobody can see you (or your name) for 5 seconds.",
+	price = 6000,
+	cooldown = 18,
+	speedBoost = 1.1,
+	boostSeconds = 5,
+	effect = "Cloak",
+	effectSeconds = 5,
+	reusable = true,
+})
+
+add({
+	id = "BloodStaff",
+	name = "Blood Staff",
+	kind = "Summon",
+	description = "Click to summon a Blood Box in front of you: an instant barricade. Cooldown 10 seconds.",
+	price = 5000,
+	cooldown = 10,
+	summon = "BloodBox",
+})
+
 -- Display order in the shops.
 -- How each held melee weapon holds zombies and furniture back (ItemService's
 -- shaftStep and FurniturePush): { firmness, guard }. The bat is short but
@@ -515,10 +688,11 @@ local SOLIDITY: { [string]: { number } } = {
 	Lollipop = { 1.2, 1.0 },
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
+	Slap = { 1.0, 0.8 },
 }
--- Melee weapons only keep people away while you hold them out. The one
--- exception is the super rare, Robux-only Ancient Spear, which can strike.
-local HITTERS = { "AncientSpear" }
+-- Melee weapons only keep people away while you hold them out. The
+-- exceptions strike: the super rare, Robux-only Ancient Spear, and the SLAP.
+local HITTERS = { "AncientSpear", "Slap" } -- the SLAP is all about the hit
 for _, id in HITTERS do
 	local item = Items[id]
 	if item then
@@ -558,6 +732,17 @@ local SHOP_ORDER = {
 	"BubbleGun",
 	"LeafBlower",
 	"DuckLauncher",
+	"Grenade",
+	"Dynamite",
+	"Slap",
+	"Glock",
+	"Crossbow",
+	"FartGun",
+	"FreezeGun",
+	"StackedDynamite",
+	"BloodStaff",
+	"MagicCloak",
+	"Broom",
 	"Shotgun",
 }
 local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "InflatableHammer" }

@@ -7,6 +7,9 @@
 --   /map Haunted now ...and end this round to go there right away
 --   /endround        end this round now; the next one starts
 --   /maps            list the maps
+--   /addbot 5        add 5 Mario Clones (1 if no number)
+--   /removebots      remove all Mario Clones (/removebots 2: the last two)
+--   /bots            how many bots are playing
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,7 +17,7 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Announcer = require(script.Parent.Announcer)
-
+local BotService = require(script.Parent.BotService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureService = require(script.Parent.FurnitureService)
@@ -278,6 +281,49 @@ function ACTIONS.clearItems()
 	return true, "Ground items removed"
 end
 
+-- Bots ----------------------------------------------------------------------------------
+
+local function botSummary(): string
+	local bots = 0
+	for _, p in Participants.all() do
+		if p.isBot then
+			bots += 1
+		end
+	end
+	return string.format("%d bots playing (%d Mario Clones)", bots, BotService.cloneCount())
+end
+
+function ACTIONS.addBots(_admin, data)
+	local count = number(data.count, 1, 20) or 1
+	local added = BotService.addClones(count)
+	if added == 0 then
+		return false, "The server is full (" .. Config.MAX_PARTICIPANTS .. " players and bots)"
+	end
+	return true,
+		string.format("Added %d Mario Clone%s. %s", added, if added == 1 then "" else "s", botSummary())
+end
+
+function ACTIONS.removeBots(_admin, data)
+	local removed = BotService.removeClones(number(data.count, 1, 40))
+	if removed == 0 then
+		return false, "No Mario Clones to remove"
+	end
+	return true,
+		string.format("Removed %d Mario Clone%s. %s", removed, if removed == 1 then "" else "s", botSummary())
+end
+
+function ACTIONS.removeBot(_admin, data)
+	local p = if typeof(data.target) == "string" then Participants.get(data.target) else nil
+	if not p or not p.isBot then
+		return false, "Pick a bot as the target first"
+	end
+	local name = p.name
+	if not BotService.remove(p.id) then
+		return false, "That bot can't be removed"
+	end
+	return true, "Removed " .. name .. ". " .. botSummary()
+end
+
 local function handle(player: Player, action: unknown, data: unknown): (boolean, string)
 	if not AdminService.isAdmin(player) then
 		return false, "Not an admin"
@@ -349,6 +395,17 @@ local function setupChatCommands()
 	chatCommand("/endround", function(player, admin, _args)
 		local _, message = ACTIONS.endRound(admin, {})
 		Announcer.toast(player, message)
+	end)
+	chatCommand("/addbot", function(player, admin, args)
+		local _, message = ACTIONS.addBots(admin, { count = tonumber(args[1] or "1") or 1 })
+		Announcer.toast(player, message)
+	end)
+	chatCommand("/removebots", function(player, admin, args)
+		local _, message = ACTIONS.removeBots(admin, { count = tonumber(args[1] or "") })
+		Announcer.toast(player, message)
+	end)
+	chatCommand("/bots", function(player, _admin, _args)
+		Announcer.toast(player, botSummary())
 	end)
 	chatCommand("/map", function(player, admin, args)
 		local now = args[#args] ~= nil and string.lower(args[#args]) == "now"

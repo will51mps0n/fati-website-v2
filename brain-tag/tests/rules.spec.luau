@@ -160,6 +160,8 @@ test("item data is consistent", function()
 			expect(item.reach and item.arc and item.knockback and item.tick, id .. " stream stats")
 		elseif item.kind == "Trap" then
 			expect(item.charges and item.knockback and item.stun, id .. " trap stats")
+		elseif item.kind == "Summon" then
+			expect(item.summon and item.cooldown, id .. " summon stats")
 		end
 		if item.kind == "Projectile" then
 			expect(item.projectile ~= nil, id .. " has a projectile look")

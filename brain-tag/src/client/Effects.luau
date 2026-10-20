@@ -123,6 +123,15 @@ local BITS: { [string]: { colors: { string }, size: number, count: number, shape
 	},
 	Snow = { colors = { "FFFFFF", "E8F6FF" }, size = 0.35, count = 10, shape = Enum.PartType.Ball },
 	Peel = { colors = { "F7DC6F", "FFFFFF", "FFE14D" }, size = 0.4, count = 7, shape = Enum.PartType.Block },
+	Smoke = { colors = { "5A5A5A", "8C8C8C", "3A3A3A" }, size = 0.8, count = 12, shape = Enum.PartType.Ball },
+	Blood = {
+		colors = { "B3122A", "6E0F1C", "FF3B4F" },
+		size = 0.45,
+		count = 12,
+		shape = Enum.PartType.Block,
+	},
+	Magic = { colors = { "9B59B6", "D6B4FC", "FFFFFF" }, size = 0.4, count = 14, shape = Enum.PartType.Ball },
+	Fart = { colors = { "9ACD32", "C5E384", "6B8E23" }, size = 0.7, count = 6, shape = Enum.PartType.Ball },
 }
 
 local function bits(kind: string, position: Vector3, direction: Vector3?, spread: number?)
@@ -205,7 +214,10 @@ local SPRAY_COLORS = {
 		ColorSequenceKeypoint.new(0.5, Color3.fromHex("E8913A")),
 		ColorSequenceKeypoint.new(1, Color3.fromHex("C0392B")),
 	}),
+	FartGun = ColorSequence.new(Color3.fromHex("9ACD32"), Color3.fromHex("C5E384")),
 }
+local SPRAY_SPREAD = { LeafBlower = 18, FartGun = 26 }
+local SPRAY_SIZE = { LeafBlower = 0.9, FartGun = 1.4 }
 
 local function characters(): { Instance }
 	local list = workspace:GetChildren()
@@ -236,10 +248,10 @@ local function updateSprays()
 					created.Color = SPRAY_COLORS[spraying] or SPRAY_COLORS.WaterGun
 					created.EmissionDirection = Enum.NormalId.Front
 					created.Speed = NumberRange.new(28, 40)
-					created.SpreadAngle = Vector2.new(if spraying == "LeafBlower" then 18 else 6, 4)
+					created.SpreadAngle = Vector2.new(SPRAY_SPREAD[spraying] or 6, 4)
 					created.Lifetime = NumberRange.new(0.35, 0.5)
 					created.Rate = 70
-					created.Size = NumberSequence.new(if spraying == "LeafBlower" then 0.9 else 0.6, 0.2)
+					created.Size = NumberSequence.new(SPRAY_SIZE[spraying] or 0.6, 0.2)
 					created.LightEmission = 0.2
 					created.Parent = attachment
 					emitter = created
@@ -322,8 +334,11 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		elseif look == "Bubble" then
 			burst(data.position, "BFE9FF", 5)
 			playStyle("Pop", data.position)
-		elseif look == "Pebble" then
+		elseif look == "Pebble" or look == "Bullet" or look == "Arrow" then
 			burst(data.position, "8C8C8C", 2.5)
+		elseif look == "Ice" then
+			bits("Snow", data.position)
+			burst(data.position, "BFF0FF", 4)
 		else
 			burst(data.position, "C9A66B", 4)
 			Sounds.play("Splat", data.position)
@@ -435,9 +450,25 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		playStyle("Gulp", data.position)
 	end,
 	Boom = function(data)
-		bits("Feathers", data.position)
-		burst(data.position, "FFD93B", 16)
+		-- Ducks go off in feathers; dynamite and grenades in smoke.
+		bits(if data.look == "Duck" then "Feathers" else "Smoke", data.position)
+		burst(data.position, if data.look == "Duck" then "FFD93B" else "FF8A3D", (data.radius or 8) * 2)
 		Sounds.play("Boom", data.position)
+	end,
+	Cloak = function(data)
+		bits("Magic", data.position)
+		bits("Puff", data.position)
+		burst(data.position, "9B59B6", 9)
+		playStyle("Pop", data.position)
+	end,
+	Ride = function(data)
+		bits("Puff", data.position)
+		Sounds.play("Whoosh", data.position)
+	end,
+	Summon = function(data)
+		bits("Blood", data.position)
+		burst(data.position, "B3122A", 10)
+		Sounds.play("Drop", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)

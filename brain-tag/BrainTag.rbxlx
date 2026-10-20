@@ -44,6 +44,7 @@
 local Bushes = {}
 
 Bushes.ATTRIBUTE = "InBush" -- set on characters by the server
+Bushes.CLOAK_ATTRIBUTE = "CloakedUntil" -- server time the Magic Cloak wears off
 
 local cachedFolder: Instance? = nil
 local cached: { BasePart } = {}
@@ -931,8 +932,17 @@ Config.TURNING_SLOW = 0.6
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.
-Config.MAP_ROTATION =
-	{ "Neighborhood", "Haunted", "Mansion", "PumpkinFarm", "ChristmasTown", "SpookyVillage", "WitchWoods" }
+Config.MAP_ROTATION = {
+	"Neighborhood",
+	"Haunted",
+	"School",
+	"Mansion",
+	"PumpkinFarm",
+	"DustyGulch",
+	"ChristmasTown",
+	"SpookyVillage",
+	"WitchWoods",
+}
 Config.ROUNDS_PER_MAP = 2
 
 -- Movement and size ------------------------------------------------------------
@@ -1470,6 +1480,7 @@ local Specs: { [string]: Spec } = {
 	BoxStack = { w = 4.4, d = 2.8, h = 3, weight = "Medium" },
 	LongCrate = { w = 7, d = 3, h = 3, weight = "Medium" },
 	BigCrate = { w = 5, d = 5, h = 5, weight = "Heavy" },
+	BloodBox = { w = 4, d = 4, h = 4, weight = "Medium" }, -- summoned by the Blood Staff
 	Barrel = { w = 2.4, d = 2.4, h = 3, weight = "Medium" },
 	Bench = { w = 6, d = 2, h = 2.4, weight = "Medium" },
 	Lamp = { w = 1.8, d = 1.8, h = 5, weight = "Light" },
@@ -1630,6 +1641,11 @@ end
 
 local function see(spec: PieceSpec, transparency: number): PieceSpec
 	spec.transparency = transparency
+	return spec
+end
+
+local function glow(spec: PieceSpec): PieceSpec
+	spec.material = Enum.Material.Neon
 	return spec
 end
 
@@ -1909,6 +1925,98 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		blockAt(Vector3.new(0.45, 0.12, 1.0), 0.35, 0, -0.8, "F7DC6F", yaw(math.rad(120))),
 		blockAt(Vector3.new(0.45, 0.12, 1.0), -0.35, 0, -0.8, "F7DC6F", yaw(math.rad(-120))),
 	},
+	FreezeGun = {
+		blockAt(Vector3.new(0.9, 0.8, 2.0), 0, 0, -1.0, "2F6FC4"), -- body
+		blockAt(Vector3.new(0.35, 0.5, 0.4), 0, -0.5, -0.3, "1F4E8C"), -- grip
+		see(ballAt(0.8, 0, 0.6, -1.1, "BFF0FF"), 0.25), -- coolant tank
+		rod(1.5, 0.5, -2.75, "A9E4FF"), -- barrel
+		discAt(0.75, 0.12, 0, 0, -2.2, "E8FBFF"), -- cooling fins
+		discAt(0.75, 0.12, 0, 0, -2.7, "E8FBFF"),
+		see(glow(blockAt(Vector3.new(0.55, 0.55, 0.55), 0, 0, -3.65, "E8FBFF", DIAMOND)), 0.15), -- ice crystal
+	},
+	Glock = {
+		blockAt(Vector3.new(0.5, 0.45, 1.7), 0, 0.08, -0.95, "2B2D31"), -- slide
+		blockAt(Vector3.new(0.46, 0.25, 1.2), 0, -0.2, -0.75, "1C1D20"), -- frame
+		blockAt(Vector3.new(0.44, 0.7, 0.5), 0, -0.45, -0.15, "1C1D20", CFrame.Angles(-0.25, 0, 0)), -- grip
+		rod(0.1, 0.22, -1.82, "0E0E0E", 0, 0.08), -- muzzle
+		blockAt(Vector3.new(0.1, 0.08, 0.1), 0, 0.35, -1.65, "0E0E0E"), -- sight
+	},
+	Crossbow = {
+		blockAt(Vector3.new(0.4, 0.35, 2.8), 0, 0, -1.4, "6B3E1E"), -- stock
+		blockAt(Vector3.new(1.4, 0.2, 0.25), 0.65, 0.05, -2.3, "6A3FA0", yaw(-0.3)), -- the purple bow
+		blockAt(Vector3.new(1.4, 0.2, 0.25), -0.65, 0.05, -2.3, "6A3FA0", yaw(0.3)),
+		blockAt(Vector3.new(2.62, 0.05, 0.05), 0, 0.05, -2.08, "EEEEEE"), -- string
+		rod(2.2, 0.1, -2.3, "D9C29A", 0, 0.25), -- arrow
+		blockAt(Vector3.new(0.3, 0.1, 0.3), 0, 0.25, -3.45, "9AA3AD", DIAMOND),
+		blockAt(Vector3.new(0.4, 0.06, 0.3), 0, 0.25, -1.3, "8E44AD"), -- fletching
+	},
+	Dynamite = {
+		rod(1.8, 0.55, -1.1, "C0392B"),
+		rod(0.15, 0.57, -0.5, "F4EFE1"), -- paper bands
+		rod(0.15, 0.57, -1.7, "F4EFE1"),
+		rod(0.5, 0.08, -2.25, "3A3A3A"), -- fuse
+		glow(ballAt(0.25, 0, 0, -2.5, "FFC21A")), -- spark
+	},
+	StackedDynamite = {
+		rod(1.8, 0.5, -1.1, "C0392B", -0.5),
+		rod(1.8, 0.5, -1.1, "C0392B"),
+		rod(1.8, 0.5, -1.1, "C0392B", 0.5),
+		blockAt(Vector3.new(1.55, 0.54, 0.25), 0, 0, -0.6, "3A3A3A"), -- tape
+		blockAt(Vector3.new(1.55, 0.54, 0.25), 0, 0, -1.6, "3A3A3A"),
+		rod(0.6, 0.08, -2.3, "3A3A3A"),
+		glow(ballAt(0.25, 0, 0, -2.6, "FFC21A")),
+	},
+	Grenade = {
+		ballAt(1.1, 0, 0, -0.9, "4E6B3A"),
+		blockAt(Vector3.new(0.12, 1.12, 0.12), 0, 0, -0.9, "3E5530"), -- grooves
+		blockAt(Vector3.new(1.12, 0.12, 0.12), 0, 0, -0.9, "3E5530"),
+		rod(0.35, 0.4, -1.55, "5A5A5A"), -- top
+		blockAt(Vector3.new(0.15, 0.12, 0.9), 0.35, 0.15, -1.15, "6E6E6E", yaw(0.2)), -- lever
+		discAt(0.4, 0.06, -0.3, 0.1, -1.75, "C9C9C9"), -- pin ring
+	},
+	FartGun = {
+		blockAt(Vector3.new(0.9, 0.8, 1.8), 0, 0, -0.9, "7DBE3C"),
+		blockAt(Vector3.new(0.35, 0.5, 0.4), 0, -0.5, -0.3, "3E6B1E"),
+		see(ballAt(1.1, 0, 0.6, -0.8, "A7D46F"), 0.2), -- the gas tank
+		rod(1.2, 0.45, -2.4, "5A8F2B"),
+		rod(0.35, 0.85, -3.1, "5A8F2B"), -- trumpet mouth
+		rod(0.05, 0.6, -3.29, "2F4F1A"),
+	},
+	Slap = {
+		rod(0.8, 0.55, -0.3, "E8B88C"), -- wrist
+		blockAt(Vector3.new(1.6, 0.42, 1.5), 0, 0, -1.3, "F7D1AB"), -- palm
+		blockAt(Vector3.new(0.34, 0.38, 1.0), -0.6, 0, -2.5, "F7D1AB"), -- fingers
+		blockAt(Vector3.new(0.34, 0.38, 1.25), -0.2, 0, -2.62, "F7D1AB"),
+		blockAt(Vector3.new(0.34, 0.38, 1.2), 0.2, 0, -2.6, "F7D1AB"),
+		blockAt(Vector3.new(0.34, 0.38, 0.95), 0.6, 0, -2.47, "F7D1AB"),
+		blockAt(Vector3.new(0.36, 0.38, 0.9), 0.98, 0, -1.05, "F7D1AB", yaw(-0.7)), -- thumb
+		blockAt(Vector3.new(1.62, 0.44, 0.08), 0, 0, -1.95, "E8B88C"), -- knuckle line
+	},
+	Broom = {
+		rod(5, 0.28, -2.5, "A0703C"),
+		rod(0.35, 0.36, -5.05, "C0392B"), -- binding
+		blockAt(Vector3.new(1.0, 0.36, 0.5), 0, 0, -5.4, "D9B45A"), -- bristles
+		blockAt(Vector3.new(1.6, 0.32, 1.3), 0, 0, -6.2, "E2C26B"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), 0.45, 0, -6.2, "C9A54F"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), -0.45, 0, -6.2, "C9A54F"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), 0, 0, -6.2, "C9A54F"),
+	},
+	MagicCloak = {
+		blockAt(Vector3.new(1.7, 0.25, 2.1), 0, 0, -1.2, "3B1F66"), -- folded cloak
+		blockAt(Vector3.new(1.5, 0.27, 1.9), 0, 0.01, -1.2, "6A3FA0"),
+		blockAt(Vector3.new(1.7, 0.29, 0.18), 0, 0.02, -0.25, "F5D76E"), -- gold trim
+		blockAt(Vector3.new(1.7, 0.29, 0.18), 0, 0.02, -2.15, "F5D76E"),
+		glow(blockAt(Vector3.new(0.45, 0.31, 0.45), 0, 0.03, -1.2, "F5D76E", DIAMOND)), -- a star
+		glow(ballAt(0.18, 0.5, 0.18, -0.8, "FFFFFF")), -- sparkles
+		glow(ballAt(0.14, -0.45, 0.18, -1.7, "FFFFFF")),
+	},
+	BloodStaff = {
+		rod(5.2, 0.3, -2.6, "2B1A1A"),
+		rod(0.3, 0.42, -4.6, "7A1F1F"), -- band
+		blockAt(Vector3.new(0.18, 0.18, 0.9), 0.32, 0, -5.3, "2B1A1A", yaw(-0.5)), -- claws
+		blockAt(Vector3.new(0.18, 0.18, 0.9), -0.32, 0, -5.3, "2B1A1A", yaw(0.5)),
+		glow(blockAt(Vector3.new(0.8, 0.8, 0.8), 0, 0, -5.75, "D11F35", CFrame.Angles(0.6, 0.6, 0))), -- blood crystal
+	},
 	EnergyDrink = {
 		rod(1.2, 0.7, -0.8, "2ECC71"),
 		rod(0.4, 0.72, -0.8, "1C1C20"),
@@ -1982,8 +2090,9 @@ export type ItemKind =
 	| "Blast" -- click for a cone blast
 	| "Stream" -- hold to spray (water gun, leaf blower)
 	| "Trap" -- click to drop a trap at your feet
-	| "Consumable" -- click to use up
+	| "Consumable" -- click to use up (or use again later, if reusable)
 	| "Passive" -- just hold it
+	| "Summon" -- click to summon a piece of furniture in front of you
 
 export type Item = {
 	id: string,
@@ -2014,7 +2123,7 @@ export type Item = {
 	-- Fun extras (see ItemService and the client's Effects):
 	sound: string?, -- sound style played on use
 	fx: string?, -- little visual on hit or use
-	effect: string?, -- "Freeze" | "Bubble" | "Explode" | "Plunge" | "Slip"
+	effect: string?, -- "Freeze" | "Bubble" | "Explode" | "Plunge" | "Slip" | "Cloak"
 	projectile: string?, -- projectile look: "Potato" | "Pebble" | "Snowball" | "Bubble" | "Duck"
 	slowFactor: number?, -- Freeze: speed multiplier while frozen
 	effectSeconds: number?, -- how long Freeze/Bubble/Plunge lasts
@@ -2023,6 +2132,9 @@ export type Item = {
 	charges: number?, -- Trap: how many you can drop
 	speedBoost: number?, -- Consumable: speed multiplier
 	boostSeconds: number?,
+	reusable: boolean?, -- Consumable: stays in your hand (use again after the cooldown)
+	summon: string?, -- Summon: the furniture kind it brings
+	-- (Projectiles with `charges` are used up after that many shots.)
 }
 
 local Items: { [string]: Item } = {}
@@ -2468,6 +2580,175 @@ add({
 	boostSeconds = 8,
 })
 
+-- From the original braains.io shop (and a freeze gun) -------------------------
+
+add({
+	id = "FreezeGun",
+	name = "Freeze Gun",
+	kind = "Projectile",
+	description = "Fires an ice bolt that freezes a zombie solid for two seconds.",
+	price = 4500,
+	knockback = 10,
+	stun = 1.6, -- frozen solid...
+	cooldown = 3,
+	projectile = "Ice",
+	projectileSpeed = 110,
+	projectileRange = 90,
+	projectileRadius = 0.7,
+	effect = "Freeze",
+	slowFactor = 0.4, -- ...then thawing out slowly
+	effectSeconds = 3,
+})
+
+add({
+	id = "Glock",
+	name = "Glock",
+	kind = "Projectile",
+	description = "Rapid little shots that shove zombies back.",
+	price = 3500,
+	knockback = 38,
+	stun = 0.15,
+	cooldown = 0.3,
+	projectile = "Bullet",
+	projectileSpeed = 160,
+	projectileRange = 100,
+	projectileRadius = 0.4,
+})
+
+add({
+	id = "Crossbow",
+	name = "Crossbow",
+	kind = "Projectile",
+	description = "Came from a mysterious purple castle... Shoots light arrows fast, and can push objects.",
+	price = 3500,
+	knockback = 80,
+	stun = 0.4,
+	cooldown = 1.1,
+	projectile = "Arrow",
+	projectileSpeed = 140,
+	projectileRange = 120,
+	projectileRadius = 0.5,
+})
+
+add({
+	id = "Dynamite",
+	name = "Dynamite",
+	kind = "Projectile",
+	description = "Boom! 1 use, 1 big explosion. Throw it to troll, or to escape zombies.",
+	price = 2000,
+	knockback = 130,
+	stun = 0.9,
+	cooldown = 1,
+	projectile = "Dynamite",
+	projectileSpeed = 45,
+	projectileRange = 24,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 13,
+	charges = 1,
+})
+
+add({
+	id = "StackedDynamite",
+	name = "Stacked Dynamite",
+	kind = "Projectile",
+	description = "Three sticks of dynamite: three big explosions.",
+	price = 5000,
+	knockback = 130,
+	stun = 0.9,
+	cooldown = 1.5,
+	projectile = "Dynamite",
+	projectileSpeed = 45,
+	projectileRange = 24,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 13,
+	charges = 3,
+})
+
+add({
+	id = "Grenade",
+	name = "Grenade",
+	kind = "Projectile",
+	description = "Throw it far: it goes off where it lands. 1 use.",
+	price = 1800,
+	knockback = 110,
+	stun = 0.7,
+	cooldown = 1,
+	projectile = "Grenade",
+	projectileSpeed = 60,
+	projectileRange = 40,
+	projectileRadius = 0.6,
+	effect = "Explode",
+	radius = 11,
+	charges = 1,
+})
+
+add({
+	id = "FartGun",
+	name = "Fart Gun",
+	kind = "Stream",
+	description = "Hold to spray a stinky green cloud that pushes zombies away.",
+	price = 4000,
+	reach = 14,
+	arc = 40,
+	knockback = 22,
+	stun = 0.15,
+	tick = 0.15,
+	charges = 50,
+	fx = "Fart",
+})
+
+add({
+	id = "Slap",
+	name = "SLAP",
+	kind = "Melee",
+	description = "A giant hand. Click to slap a zombie clean across the room.",
+	price = 3000,
+	reach = 5.5,
+	arc = 70,
+	knockback = 110,
+	stun = 0.6,
+	cooldown = 1,
+	fx = "Stars",
+})
+
+add({
+	id = "Broom",
+	name = "Broom",
+	kind = "Consumable",
+	description = "Click to ride it: 50% faster for 6 seconds. Ride again once it's rested.",
+	price = 7500,
+	cooldown = 10,
+	speedBoost = 1.5,
+	boostSeconds = 6,
+	reusable = true,
+})
+
+add({
+	id = "MagicCloak",
+	name = "The Magic Cloak",
+	kind = "Consumable",
+	description = "Click to vanish: nobody can see you (or your name) for 5 seconds.",
+	price = 6000,
+	cooldown = 18,
+	speedBoost = 1.1,
+	boostSeconds = 5,
+	effect = "Cloak",
+	effectSeconds = 5,
+	reusable = true,
+})
+
+add({
+	id = "BloodStaff",
+	name = "Blood Staff",
+	kind = "Summon",
+	description = "Click to summon a Blood Box in front of you: an instant barricade. Cooldown 10 seconds.",
+	price = 5000,
+	cooldown = 10,
+	summon = "BloodBox",
+})
+
 -- Display order in the shops.
 -- How each held melee weapon holds zombies and furniture back (ItemService's
 -- shaftStep and FurniturePush): { firmness, guard }. The bat is short but
@@ -2489,10 +2770,11 @@ local SOLIDITY: { [string]: { number } } = {
 	Lollipop = { 1.2, 1.0 },
 	Katana = { 1.0, 0.35 },
 	InflatableHammer = { 0.5, 1.3 },
+	Slap = { 1.0, 0.8 },
 }
--- Melee weapons only keep people away while you hold them out. The one
--- exception is the super rare, Robux-only Ancient Spear, which can strike.
-local HITTERS = { "AncientSpear" }
+-- Melee weapons only keep people away while you hold them out. The
+-- exceptions strike: the super rare, Robux-only Ancient Spear, and the SLAP.
+local HITTERS = { "AncientSpear", "Slap" } -- the SLAP is all about the hit
 for _, id in HITTERS do
 	local item = Items[id]
 	if item then
@@ -2532,6 +2814,17 @@ local SHOP_ORDER = {
 	"BubbleGun",
 	"LeafBlower",
 	"DuckLauncher",
+	"Grenade",
+	"Dynamite",
+	"Slap",
+	"Glock",
+	"Crossbow",
+	"FartGun",
+	"FreezeGun",
+	"StackedDynamite",
+	"BloodStaff",
+	"MagicCloak",
+	"Broom",
 	"Shotgun",
 }
 local WIZARD_ORDER = { "GoldenDrumstick", "RarePotatoGun", "GoldenPan", "InflatableHammer" }
@@ -4912,6 +5205,616 @@ local function buildWitchWoods(): Layout
 	return layout
 end
 
+-- The School ------------------------------------------------------------------------------
+
+local SCHOOL: Plan = {
+	w = 200,
+	d = 110,
+	walls = {
+		wall(
+			0,
+			0,
+			200,
+			0,
+			{ { 21.5, 28.5 }, { 171.5, 178.5 } },
+			{ { 4, 18 }, { 32, 46 }, { 54, 96 }, { 104, 146 }, { 154, 168 }, { 182, 196 } }
+		),
+		wall(
+			0,
+			110,
+			200,
+			110,
+			{ { 31.5, 38.5 }, { 106.5, 113.5 } },
+			{ { 4, 26 }, { 44, 66 }, { 74, 102 }, { 118, 146 }, { 154, 171 } }
+		),
+		wall(0, 0, 0, 110, { { 51.5, 58.5 } }, { { 6, 40 }, { 70, 104 } }),
+		wall(200, 0, 200, 110, { { 51.5, 58.5 } }, { { 6, 40 }, { 80, 104 } }),
+		wall(0, 45, 200, 45, { { 21.5, 28.5 }, { 71.5, 78.5 }, { 121.5, 128.5 }, { 171.5, 178.5 } }),
+		wall(0, 65, 200, 65, {
+			{ 21.5, 28.5 },
+			{ 46.5, 53.5 },
+			{ 91.5, 98.5 },
+			{ 121.5, 128.5 },
+			{ 158.5, 165.5 },
+			{ 184, 191 },
+		}),
+		wall(50, 0, 50, 45, { { 18.5, 25.5 } }),
+		wall(100, 0, 100, 45),
+		wall(150, 0, 150, 45, { { 18.5, 25.5 } }),
+		wall(70, 65, 70, 110, { { 84.5, 91.5 } }),
+		wall(150, 65, 150, 110),
+		wall(175, 65, 175, 110),
+	},
+	rooms = {
+		room("Classroom A", "Wood", 0, 0, 50, 45),
+		room("Classroom B", "Wood", 50, 0, 100, 45),
+		room("Library", "Wood", 100, 0, 150, 45),
+		room("Science lab", "Tile", 150, 0, 200, 45),
+		room("Main hallway", "Tile", 0, 45, 200, 65),
+		room("Cafeteria", "Tile", 0, 65, 70, 110),
+		room("Gym", "Wood", 70, 65, 150, 110),
+		room("Office", "Wood", 150, 65, 175, 110),
+		room("Bathroom", "Tile", 175, 65, 200, 110),
+	},
+	furniture = {
+		piece("Desk", 46.38, 9.6, 270),
+		piece("Desk", 8.6, 41.38, 180),
+		piece("Desk", 33.6, 41.38, 180),
+		piece("Desk", 3.38, 31.6, 90),
+		piece("Desk", 3.38, 22.1, 90),
+		piece("Desk", 46.38, 35.6, 270),
+		piece("Chair", 39.03, 13.03),
+		piece("Chair", 18.03, 11.53, 90),
+		piece("Chair", 3.53, 5.53),
+		piece("Chair", 18.53, 17.53),
+		piece("Chair", 12.53, 10.53),
+		piece("Chair", 17.03, 23.03),
+		piece("Bookshelf", 42.15, 2.65),
+		piece("Table", 12.75, 32.02),
+		piece("TrashCan", 30.41, 28.41, 90),
+		piece("Plant", 5.92, 14.91, 90),
+		piece("Desk", 96.38, 18.1, 270),
+		piece("Desk", 81.6, 3.38),
+		piece("Desk", 96.38, 32.1, 270),
+		piece("Desk", 53.38, 32.6, 90),
+		piece("Desk", 58.6, 41.38, 180),
+		piece("Desk", 84.1, 41.38, 180),
+		piece("Chair", 86.53, 35.53),
+		piece("Chair", 64.03, 6.53, 90),
+		piece("Chair", 84.53, 13.53),
+		piece("Chair", 69.03, 16.03),
+		piece("Chair", 63.53, 28.53),
+		piece("Chair", 57.03, 6.53, 90),
+		piece("Aquarium", 72.1, 3.14),
+		piece("Bookshelf", 97.15, 7.15, 270),
+		piece("TrashCan", 80.91, 19.91, 90),
+		piece("Bookshelf", 135.65, 42.15, 180),
+		piece("Bookshelf", 140.15, 2.65),
+		piece("Bookshelf", 147.15, 12.15, 270),
+		piece("Bookshelf", 102.65, 31.65, 90),
+		piece("Bookshelf", 121.65, 2.65),
+		piece("Bookshelf", 147.15, 36.65, 270),
+		piece("Table", 135.25, 15.03),
+		piece("Table", 117.03, 12.25, 90),
+		piece("Chair", 118.03, 26.53),
+		piece("Chair", 124.53, 15.03),
+		piece("Chair", 119.03, 40.03),
+		piece("Chair", 105.53, 16.53, 90),
+		piece("Couch", 107.4, 41.22, 180),
+		piece("Armchair", 138.34, 30.84, 90),
+		piece("Lamp", 118.55, 31.55, 90),
+		piece("Table", 183.75, 16.52),
+		piece("Table", 183.75, 34.52),
+		piece("Table", 162.75, 8.53),
+		piece("Table", 160.53, 32.75, 90),
+		piece("Chair", 196.53, 22.03),
+		piece("Chair", 193.53, 32.53, 90),
+		piece("Chair", 196.03, 4.03, 90),
+		piece("Chair", 194.03, 13.03, 90),
+		piece("Sink", 161.15, 41.65, 180),
+		piece("Sink", 153.15, 32.15, 90),
+		piece("Fridge", 195.95, 39.95, 270),
+		piece("Aquarium", 153.15, 8.1, 90),
+		piece("Crate", 182.11, 8.11, 90),
+		piece("Wardrobe", 161.6, 48.14),
+		piece("Wardrobe", 46.1, 48.14),
+		piece("Wardrobe", 188.1, 48.14),
+		piece("Wardrobe", 176.1, 61.64, 180),
+		piece("Wardrobe", 7.6, 48.14),
+		piece("Wardrobe", 109.6, 61.64, 180),
+		piece("VendingMachine", 56.24, 48.88),
+		piece("VendingMachine", 151.74, 49.38),
+		piece("Bench", 66.1, 47.8),
+		piece("Bench", 85.1, 47.8),
+		piece("TrashCan", 15.91, 61.41, 90),
+		piece("TrashCan", 133.41, 47.91, 90),
+		piece("Plant", 15.91, 48.91),
+		piece("Table", 16.25, 81.53),
+		piece("Table", 43.02, 73.75, 90),
+		piece("Table", 57.25, 105.03),
+		piece("Table", 16.52, 97.75, 90),
+		piece("Table", 47.75, 96.03),
+		piece("Table", 63.25, 78.03),
+		piece("Bench", 2.8, 79.1, 90),
+		piece("Bench", 16.6, 67.8),
+		piece("Bench", 2.8, 97.1, 90),
+		piece("Bench", 61.6, 67.8),
+		piece("Bench", 32.6, 67.8),
+		piece("Bench", 6.6, 67.8),
+		piece("Fridge", 26.45, 105.95, 180),
+		piece("Fridge", 6.95, 105.95, 180),
+		piece("Stove", 66.45, 100.15, 270),
+		piece("Sink", 48.15, 106.65, 180),
+		piece("VendingMachine", 58.88, 95.24, 90),
+		piece("TrashCan", 7.92, 73.92),
+		piece("Treadmill", 83.18, 72.38, 90),
+		piece("Treadmill", 74.38, 79.18),
+		piece("Treadmill", 114.38, 72.18),
+		piece("Treadmill", 130.88, 87.68),
+		piece("Bench", 140.6, 67.8),
+		piece("Bench", 72.8, 103.6, 90),
+		piece("Bench", 105.1, 67.8),
+		piece("Box", 78.65, 99.65, 90),
+		piece("Box", 93.65, 105.65),
+		piece("Box", 137.15, 85.15),
+		piece("Crate", 143.61, 75.11, 90),
+		piece("Desk", 167.6, 106.38, 180),
+		piece("Desk", 153.38, 85.6, 90),
+		piece("Chair", 168.03, 85.03),
+		piece("Chair", 167.53, 94.53, 90),
+		piece("Bookshelf", 152.65, 98.65, 90),
+		piece("Wardrobe", 153.15, 70.1, 90),
+		piece("Plant", 171.91, 79.42, 90),
+		piece("Toilet", 178.61, 84.15, 90),
+		piece("Toilet", 193.15, 68.61),
+		piece("Toilet", 178.61, 90.15, 90),
+		piece("Sink", 196.65, 84.65, 270),
+		piece("Sink", 196.65, 92.15, 270),
+	},
+	items = {
+		pt(25, 22.5),
+		pt(75, 22.5),
+		pt(125, 22.5),
+		pt(175, 22.5),
+		pt(100, 55),
+		pt(35, 87.5),
+		pt(110, 87.5),
+		pt(162.5, 87.5),
+		pt(187.5, 87.5),
+	},
+}
+
+local PORTABLE: Plan = {
+	w = 36,
+	d = 24,
+	walls = {
+		wall(0, 0, 36, 0, nil, { { 4, 32 } }),
+		wall(0, 24, 36, 24, { { 14.5, 21.5 } }, { { 3, 11 }, { 25, 33 } }),
+		wall(0, 0, 0, 24, nil, { { 5, 19 } }),
+		wall(36, 0, 36, 24, nil, { { 5, 19 } }),
+	},
+	rooms = {
+		room("Portable classroom", "Wood", 0, 0, 36, 24),
+	},
+	furniture = {
+		piece("Desk", 32.38, 6.6, 270),
+		piece("Desk", 13.1, 3.38),
+		piece("Desk", 3.38, 17.1, 90),
+		piece("Chair", 26.53, 7.53, 90),
+		piece("Chair", 30.03, 15.03),
+		piece("Chair", 5.03, 5.53),
+		piece("Bookshelf", 26.65, 21.15, 180),
+	},
+	items = { pt(18, 12) },
+}
+
+local EQUIPMENT_SHED: Plan = {
+	w = 28,
+	d = 20,
+	walls = {
+		wall(0, 0, 28, 0, nil, { { 8, 20 } }),
+		wall(0, 20, 28, 20, { { 10.5, 17.5 } }),
+		wall(0, 0, 0, 20),
+		wall(28, 0, 28, 20),
+	},
+	rooms = {
+		room("Equipment shed", "Concrete", 0, 0, 28, 20),
+	},
+	furniture = {
+		piece("Crate", 4, 4),
+		piece("Barrel", 9, 3.8),
+		piece("Box", 23.5, 4),
+		piece("Box", 23.5, 7.5),
+		piece("Treadmill", 4.5, 13),
+	},
+	items = { pt(15, 11) },
+}
+
+local function buildSchool(): Layout
+	local layout = newLayout("School", "The School")
+	layout.theme = "Classic"
+	layout.bounds = rect(-180, -170, 180, 170)
+	addHouse(layout, "School", SCHOOL, -100, -150, false, "Blue", "Huge")
+	addHouse(layout, "PortableA", PORTABLE, -170, -20, false, "Orange", "Small")
+	addHouse(layout, "PortableB", PORTABLE, 134, -20, false, "Orange", "Small")
+	addHouse(layout, "Shed", EQUIPMENT_SHED, 130, -160, false, "Blue", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Playground", "Dirt", -125, 40, -45, 100)
+	outdoor("Bench", -52.35, 51.45, 90)
+	outdoor("Bench", -102.05, 82.65)
+	outdoor("Bench", -61.05, 89.65)
+	outdoor("TrashCan", -67.23, 46.77)
+	outdoor("TrashCan", -78.23, 86.27)
+	yardRoom("Sports field", "Dirt", 40, 30, 125, 100)
+	outdoor("Bench", 102.45, 81.15)
+	outdoor("Bench", 108.95, 92.65)
+	outdoor("Bench", 45.65, 44.95, 90)
+	outdoor("Bench", 118.45, 80.65)
+	outdoor("Crate", 58.95, 44.95, 90)
+	outdoor("Barrel", 87.88, 94.88)
+	outdoor("Car", -140, 125, 90)
+	outdoor("Car", -110, 125, 90)
+	outdoor("Car", 105, 125, 90)
+	outdoor("Car", 135, 125, 90)
+	outdoor("Bench", -30, -32)
+	outdoor("Bench", 30, -32)
+	outdoor("TrashCan", 0, -32)
+	outdoor("TrashCan", -13, 66)
+	outdoor("TrashCan", -142, 87.7)
+	outdoor("TrashCan", -58.5, -17.3)
+	outdoor("TrashCan", -62.6, 13.7)
+	outdoor("Bench", 147, 158.7)
+	outdoor("Bench", -115, -99.9)
+	outdoor("Bench", 157.5, -31.3)
+	outdoor("Plant", -96.9, 6.7)
+	outdoor("Plant", -12.7, -161.4)
+	outdoor("Plant", -147.2, 50.5)
+	outdoor("Plant", 88.2, 8.3)
+	outdoor("Plant", 133.3, 88)
+	outdoor("Plant", 157.3, -95)
+	outdoor("Crate", 99, -30.7)
+	outdoor("Crate", 138.9, 100.6)
+	outdoor("Crate", -147.3, -153.4)
+	layout.paths = { rect(-4, 20, 4, 112), rect(-156, 4, -148, 30), rect(148, 4, 156, 30) }
+	layout.patios = { rect(-40, -30, 40, 20) }
+	layout.road = {
+		sidewalks = { rect(-180, 112, 180, 118), rect(-180, 146, 180, 152) },
+		asphalt = { rect(-180, 118, 180, 146) },
+		centerLines = { rect(-180, 131.6, 180, 132.4) },
+		edgeLines = { rect(-180, 119, 180, 119.4), rect(-180, 144.6, 180, 145) },
+	}
+	layout.bushes = {
+		bush(-170, -160, 5, "Green"),
+		bush(-130, -160, 4, "Orange"),
+		bush(-170, -90, 4, "Green"),
+		bush(170, -100, 4, "Orange"),
+		bush(115, -60, 4, "Green"),
+		bush(-115, -60, 4, "Orange"),
+		bush(-170, 70, 4, "Green"),
+		bush(165, 50, 4, "Green"),
+		bush(-30, 85, 3, "Orange"),
+		bush(30, 70, 3, "Green"),
+		bush(-60, 162, 4, "Green"),
+		bush(60, 162, 4, "Orange"),
+	}
+	layout.humanSpawns = {
+		pt(-150, 40),
+		pt(-60, 25),
+		pt(60, 25),
+		pt(150, 40),
+		pt(-160, 95),
+		pt(-15, 95),
+		pt(160, 95),
+		pt(-135, -60),
+		pt(135, -60),
+		pt(-120, 162),
+		pt(120, 162),
+		pt(0, -25),
+	}
+	layout.zombieSpawns = { pt(-170, 132), pt(170, 132) }
+	layout.start = pt(0, 0)
+	layout.wizardSpots = { pt(-160, -120), pt(165, -130), pt(-170, 162), pt(170, 162) }
+	for _, p in { pt(-85, 70), pt(82.5, 65) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
+-- Dusty Gulch -----------------------------------------------------------------------------
+
+local SALOON: Plan = {
+	w = 60,
+	d = 44,
+	walls = {
+		wall(0, 0, 60, 0, nil, { { 4, 21 }, { 43, 56 } }),
+		wall(0, 44, 60, 44, { { 26.5, 33.5 } }, { { 4, 20 }, { 40, 56 } }),
+		wall(0, 0, 0, 44, nil, { { 19, 40 } }),
+		wall(60, 0, 60, 44, { { 20.5, 27.5 } }, { { 31, 40 } }),
+		wall(0, 16, 60, 16, { { 8.5, 15.5 }, { 28.5, 35.5 }, { 46.5, 53.5 } }),
+		wall(24, 0, 24, 16),
+		wall(40, 0, 40, 16),
+	},
+	rooms = {
+		room("Bar room", "Wood", 0, 16, 60, 44),
+		room("Kitchen", "Wood", 0, 0, 24, 16),
+		room("Storeroom", "Wood", 24, 0, 40, 16),
+		room("Poker room", "Wood", 40, 0, 60, 16),
+	},
+	furniture = {
+		piece("PoolTable", 15.9, 38.1),
+		piece("Piano", 4.24, 26.25, 90),
+		piece("Bookshelf", 41.65, 41.15, 180),
+		piece("Table", 53.75, 38.52),
+		piece("Table", 20.75, 21.52),
+		piece("Chair", 5.53, 38.53, 90),
+		piece("Chair", 40.03, 36.03, 90),
+		piece("Chair", 56.53, 31.03, 90),
+		piece("Stove", 5.65, 3.45),
+		piece("Sink", 18.15, 3.15),
+		piece("Barrel", 20.03, 11.03),
+		piece("Chair", 55.53, 9.53),
+		piece("Chair", 44.53, 5.03),
+		piece("Chair", 44.03, 10.53, 90),
+	},
+	items = { pt(30, 30) },
+}
+
+local SHERIFF: Plan = {
+	w = 40,
+	d = 30,
+	walls = {
+		wall(0, 0, 40, 0, nil, { { 4, 12 }, { 28, 36 } }),
+		wall(0, 30, 40, 30, { { 16.5, 23.5 } }, { { 3, 13 }, { 27, 37 } }),
+		wall(0, 0, 0, 30, nil, { { 15, 27 } }),
+		wall(40, 0, 40, 30, nil, { { 15, 27 } }),
+		wall(0, 12, 40, 12, { { 6.5, 13.5 }, { 26.5, 33.5 } }),
+		wall(20, 0, 20, 12),
+	},
+	rooms = {
+		room("Jail cell 1", "Concrete", 0, 0, 20, 12),
+		room("Jail cell 2", "Concrete", 20, 0, 40, 12),
+		room("Sheriff's office", "Wood", 0, 12, 40, 30),
+	},
+	furniture = {
+		piece("Bench", 2.8, 5.1, 90),
+		piece("Box", 16.14, 3.14),
+		piece("Bench", 22.8, 6.6, 90),
+		piece("Barrel", 36.53, 8.03, 90),
+		piece("Desk", 36.38, 22.6, 270),
+		piece("Chair", 21.53, 15.53, 90),
+		piece("Wardrobe", 3.14, 22.1, 90),
+	},
+	items = { pt(20, 21) },
+}
+
+local GENERAL_STORE: Plan = {
+	w = 40,
+	d = 30,
+	walls = {
+		wall(0, 0, 40, 0, nil, { { 4, 22 }, { 30, 36 } }),
+		wall(0, 30, 40, 30, { { 9.5, 16.5 } }, { { 19, 24 }, { 30, 37 } }),
+		wall(0, 0, 0, 30, nil, { { 6, 24 } }),
+		wall(40, 0, 40, 30, { { 11.5, 18.5 } }),
+		wall(26, 0, 26, 30, { { 11.5, 18.5 } }),
+	},
+	rooms = {
+		room("Store", "Wood", 0, 0, 26, 30),
+		room("Stockroom", "Wood", 26, 0, 40, 30),
+	},
+	furniture = {
+		piece("Table", 19.75, 4.53),
+		piece("Table", 21.02, 23.75, 90),
+		piece("Crate", 3.6, 24.61, 90),
+		piece("Barrel", 11.03, 8.03, 90),
+		piece("Barrel", 3.03, 4.03),
+		piece("Bookshelf", 2.65, 13.15, 90),
+		piece("Box", 7.64, 14.14),
+		piece("Wardrobe", 32.6, 3.14),
+		piece("Crate", 34.1, 21.11),
+		piece("Barrel", 29.03, 9.03),
+		piece("Box", 35.64, 9.14, 90),
+	},
+	items = { pt(13, 15) },
+}
+
+local BANK: Plan = {
+	w = 36,
+	d = 30,
+	walls = {
+		wall(0, 0, 36, 0),
+		wall(0, 30, 36, 30, { { 14.5, 21.5 } }, { { 3, 11 }, { 25, 33 } }),
+		wall(0, 0, 0, 30, nil, { { 15, 27 } }),
+		wall(36, 0, 36, 30, nil, { { 15, 27 } }),
+		wall(0, 12, 36, 12, { { 14.5, 21.5 } }),
+	},
+	rooms = {
+		room("Vault", "Concrete", 0, 0, 36, 12),
+		room("Lobby", "Wood", 0, 12, 36, 30),
+	},
+	furniture = {
+		piece("Crate", 6.6, 3.6, 90),
+		piece("Crate", 27.11, 5.1),
+		piece("Box", 12.64, 4.14),
+		piece("Desk", 32.38, 18.1, 270),
+		piece("Desk", 3.38, 23.6, 90),
+		piece("Chair", 10.53, 25.03),
+		piece("Chair", 24.03, 21.03),
+		piece("Bench", 5.1, 14.8),
+		piece("Plant", 12.41, 19.91, 90),
+	},
+	items = { pt(18, 21) },
+}
+
+local ADOBE_HOUSE: Plan = {
+	w = 30,
+	d = 24,
+	walls = {
+		wall(0, 0, 30, 0, nil, { { 3, 13 } }),
+		wall(0, 24, 30, 24, { { 4, 11 } }, { { 19, 28 } }),
+		wall(0, 0, 0, 24, nil, { { 6, 18 } }),
+		wall(30, 0, 30, 24, nil, { { 6, 18 } }),
+		wall(16, 0, 16, 24, { { 9, 16 } }),
+	},
+	rooms = {
+		room("Front room", "Wood", 0, 0, 16, 24),
+		room("Bedroom", "Wood", 16, 0, 30, 24),
+	},
+	furniture = {
+		piece("Table", 7.25, 5.03),
+		piece("Plant", 12.91, 19.91, 90),
+		piece("Dresser", 25.15, 2.85),
+	},
+	items = {},
+}
+
+local STABLE: Plan = {
+	w = 60,
+	d = 40,
+	walls = {
+		wall(0, 0, 60, 0, nil, { { 3, 12 }, { 18, 27 }, { 33, 42 }, { 48, 57 } }),
+		wall(0, 40, 60, 40, { { 26.5, 33.5 } }),
+		wall(0, 0, 0, 40, { { 23.5, 30.5 } }),
+		wall(60, 0, 60, 40, nil, { { 18, 36 } }),
+		wall(0, 14, 60, 14, { { 4, 11 }, { 19, 26 }, { 34, 41 }, { 49, 56 } }),
+		wall(15, 0, 15, 14),
+		wall(30, 0, 30, 14),
+		wall(45, 0, 45, 14),
+	},
+	rooms = {
+		room("Stall 1", "Wood", 0, 0, 15, 14),
+		room("Stall 2", "Wood", 15, 0, 30, 14),
+		room("Stall 3", "Wood", 30, 0, 45, 14),
+		room("Stall 4", "Wood", 45, 0, 60, 14),
+		room("Stable floor", "Wood", 0, 14, 60, 40),
+	},
+	furniture = {
+		piece("HayBale", 19.52, 33.14),
+		piece("HayBale", 45.52, 33.64),
+		piece("HayBale", 30.52, 20.14),
+		piece("HayBale", 11.64, 34.52, 90),
+		piece("HayBale", 38.14, 34.02, 90),
+		piece("Crate", 44.1, 21.11),
+		piece("Crate", 5.6, 35.11, 90),
+		piece("Barrel", 14.53, 19.53, 90),
+	},
+	items = { pt(30, 27) },
+}
+
+local function buildDustyGulch(): Layout
+	local layout = newLayout("DustyGulch", "Dusty Gulch")
+	layout.theme = "Desert"
+	layout.bounds = rect(-180, -180, 180, 180)
+	addHouse(layout, "Saloon", SALOON, -30, -68, false, "Orange", "Large")
+	addHouse(layout, "Sheriff", SHERIFF, -90, -54, false, "Blue", "Small")
+	addHouse(layout, "GeneralStore", GENERAL_STORE, 50, -54, false, "Orange", "Small")
+	addHouse(layout, "Bank", BANK, 110, -54, false, "Blue", "Small")
+	addHouse(layout, "AdobeN", ADOBE_HOUSE, -150, -48, false, "Orange", "Small")
+	addHouse(layout, "Stable", STABLE, -40, 24, true, "Orange", "Large")
+	addHouse(layout, "AdobeS1", ADOBE_HOUSE, -150, 24, true, "Blue", "Small")
+	addHouse(layout, "AdobeS2", ADOBE_HOUSE, -100, 24, true, "Orange", "Small")
+	addHouse(layout, "AdobeS3", ADOBE_HOUSE, 50, 24, true, "Blue", "Small")
+	addHouse(layout, "AdobeS4", ADOBE_HOUSE, 100, 24, true, "Orange", "Small")
+	-- Yards: wall-less rooms (graveyard, pumpkin patch) and outdoor pieces.
+	local function yardRoom(name: string, floor: string, x1: number, z1: number, x2: number, z2: number)
+		table.insert(layout.rooms, { name = name, floor = floor, rect = rect(x1, z1, x2, z2), house = "" })
+	end
+	local function outdoor(kind: string, x: number, z: number, rot: number?)
+		table.insert(layout.furniture, { kind = kind, x = x, z = z, rot = rot or 0, house = "" })
+	end
+	yardRoom("Boot Hill", "Dirt", 66, -170, 168, -100)
+	outdoor("Tombstone", 80, -155)
+	outdoor("Tombstone", 98, -155)
+	outdoor("Tombstone", 116, -155)
+	outdoor("Tombstone", 134, -155)
+	outdoor("Tombstone", 152, -155)
+	outdoor("Tombstone", 80, -138)
+	outdoor("Tombstone", 98, -138)
+	outdoor("Tombstone", 116, -138)
+	outdoor("Tombstone", 134, -138)
+	outdoor("Tombstone", 152, -138)
+	outdoor("Tombstone", 80, -121)
+	outdoor("Tombstone", 98, -121)
+	outdoor("Tombstone", 116, -121)
+	outdoor("Tombstone", 134, -121)
+	outdoor("Tombstone", 152, -121)
+	outdoor("Barrel", 123.38, -119.12)
+	outdoor("Bench", 143.45, -147.85)
+	yardRoom("Corral", "Dirt", -160, 100, -60, 165)
+	outdoor("HayBale", -128.5, 143.88, 90)
+	outdoor("HayBale", -145.5, 106.38, 90)
+	outdoor("HayBale", -87.5, 107.38, 90)
+	outdoor("HayBale", -69.62, 114)
+	outdoor("HayBale", -123, 106.88, 90)
+	outdoor("HayBale", -76.12, 154.5)
+	outdoor("Barrel", -154.12, 121.88)
+	outdoor("Barrel", -127.62, 157.88, 90)
+	outdoor("Barrel", -81.62, 146.88)
+	outdoor("Bench", -45, -18)
+	outdoor("Bench", 45, -18)
+	outdoor("Barrel", -112, -18)
+	outdoor("Barrel", 152, -18)
+	outdoor("HayBale", -60, 18)
+	outdoor("HayBale", 32, 18)
+	outdoor("Barrel", -86, -94.3)
+	outdoor("Barrel", 162.6, -43.4)
+	outdoor("Barrel", 43.7, -115)
+	outdoor("Barrel", -21.8, -157.9)
+	outdoor("Barrel", -54.4, 85.8)
+	outdoor("Barrel", 45.1, -72.1)
+	outdoor("Crate", -41.6, 153.9)
+	outdoor("Crate", -160, -131.2)
+	outdoor("Crate", 32.5, -130.8)
+	outdoor("Crate", 46, 165.7)
+	outdoor("HayBale", 169.2, 21.8)
+	outdoor("HayBale", 128.3, 85.8)
+	outdoor("HayBale", -116.7, 88.2)
+	outdoor("HayBale", 3.9, -168)
+	outdoor("Bench", -108, -172.3)
+	outdoor("Bench", 41.1, 154.3)
+	layout.paths = { rect(-180, -10, 180, 10), rect(96, -100, 104, -54) }
+	layout.pools = { rect(80, 110, 130, 140) }
+	layout.bushes = {
+		bush(-130, -150, 4, "Green"),
+		bush(-40, -150, 4, "Green"),
+		bush(30, -160, 3, "Orange"),
+		bush(175, -20, 3, "Green"),
+		bush(-175, 40, 3, "Green"),
+		bush(60, 160, 4, "Orange"),
+		bush(-100, 172, 4, "Green"),
+		bush(165, 120, 4, "Green"),
+		bush(0, 140, 4, "Orange"),
+		bush(-170, -110, 4, "Orange"),
+		bush(-37, 27, 1.6, "Cobweb"),
+	}
+	layout.humanSpawns = {
+		pt(-165, -80),
+		pt(-100, -110),
+		pt(-10, -110),
+		pt(40, -100),
+		pt(-140, 0),
+		pt(140, 0),
+		pt(-165, 85),
+		pt(-20, 100),
+		pt(40, 90),
+		pt(165, 85),
+		pt(150, 165),
+		pt(-20, 165),
+	}
+	layout.zombieSpawns = { pt(-174, 174), pt(174, -174) }
+	layout.start = pt(0, 0)
+	layout.wizardSpots = { pt(-170, -170), pt(170, -60), pt(-170, 172), pt(170, 172) }
+	for _, p in { pt(117, -132), pt(-110, 132.5) } do
+		table.insert(layout.itemSpots, p)
+	end
+	return layout
+end
+
 -- END GENERATED MAPS --
 
 MapLayout.maps = {
@@ -4922,9 +5825,20 @@ MapLayout.maps = {
 	PumpkinFarm = buildPumpkinFarm(),
 	SpookyVillage = buildSpookyVillage(),
 	WitchWoods = buildWitchWoods(),
+	School = buildSchool(),
+	DustyGulch = buildDustyGulch(),
 } :: { [string]: Layout }
-MapLayout.names =
-	{ "Neighborhood", "Mansion", "ChristmasTown", "Haunted", "PumpkinFarm", "SpookyVillage", "WitchWoods" }
+MapLayout.names = {
+	"Neighborhood",
+	"Mansion",
+	"ChristmasTown",
+	"Haunted",
+	"PumpkinFarm",
+	"SpookyVillage",
+	"WitchWoods",
+	"School",
+	"DustyGulch",
+}
 MapLayout.custom = {} :: { string } -- maps built in Studio, in the order they loaded
 
 local current: Layout = MapLayout.maps.Neighborhood
@@ -7245,6 +8159,9 @@ return Util
 --   /map Haunted now ...and end this round to go there right away
 --   /endround        end this round now; the next one starts
 --   /maps            list the maps
+--   /addbot 5        add 5 Mario Clones (1 if no number)
+--   /removebots      remove all Mario Clones (/removebots 2: the last two)
+--   /bots            how many bots are playing
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7252,7 +8169,7 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Announcer = require(script.Parent.Announcer)
-
+local BotService = require(script.Parent.BotService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurnitureService = require(script.Parent.FurnitureService)
@@ -7516,6 +8433,49 @@ function ACTIONS.clearItems()
 	return true, "Ground items removed"
 end
 
+-- Bots ----------------------------------------------------------------------------------
+
+local function botSummary(): string
+	local bots = 0
+	for _, p in Participants.all() do
+		if p.isBot then
+			bots += 1
+		end
+	end
+	return string.format("%d bots playing (%d Mario Clones)", bots, BotService.cloneCount())
+end
+
+function ACTIONS.addBots(_admin, data)
+	local count = number(data.count, 1, 20) or 1
+	local added = BotService.addClones(count)
+	if added == 0 then
+		return false, "The server is full (" .. Config.MAX_PARTICIPANTS .. " players and bots)"
+	end
+	return true,
+		string.format("Added %d Mario Clone%s. %s", added, if added == 1 then "" else "s", botSummary())
+end
+
+function ACTIONS.removeBots(_admin, data)
+	local removed = BotService.removeClones(number(data.count, 1, 40))
+	if removed == 0 then
+		return false, "No Mario Clones to remove"
+	end
+	return true,
+		string.format("Removed %d Mario Clone%s. %s", removed, if removed == 1 then "" else "s", botSummary())
+end
+
+function ACTIONS.removeBot(_admin, data)
+	local p = if typeof(data.target) == "string" then Participants.get(data.target) else nil
+	if not p or not p.isBot then
+		return false, "Pick a bot as the target first"
+	end
+	local name = p.name
+	if not BotService.remove(p.id) then
+		return false, "That bot can't be removed"
+	end
+	return true, "Removed " .. name .. ". " .. botSummary()
+end
+
 local function handle(player: Player, action: unknown, data: unknown): (boolean, string)
 	if not AdminService.isAdmin(player) then
 		return false, "Not an admin"
@@ -7587,6 +8547,17 @@ local function setupChatCommands()
 	chatCommand("/endround", function(player, admin, _args)
 		local _, message = ACTIONS.endRound(admin, {})
 		Announcer.toast(player, message)
+	end)
+	chatCommand("/addbot", function(player, admin, args)
+		local _, message = ACTIONS.addBots(admin, { count = tonumber(args[1] or "1") or 1 })
+		Announcer.toast(player, message)
+	end)
+	chatCommand("/removebots", function(player, admin, args)
+		local _, message = ACTIONS.removeBots(admin, { count = tonumber(args[1] or "") })
+		Announcer.toast(player, message)
+	end)
+	chatCommand("/bots", function(player, _admin, _args)
+		Announcer.toast(player, botSummary())
 	end)
 	chatCommand("/map", function(player, admin, args)
 		local now = args[#args] ~= nil and string.lower(args[#args]) == "now"
@@ -8317,6 +9288,14 @@ local function brain(p: Participant, level: Level, seed: number)
 	local barricade: Job? = nil
 	local waryOf: Participant? = nil
 	local waryUntil = 0
+	-- What the bot is up to, for the admin panel's bot list.
+	local lastDoing = ""
+	local function doing(text: string)
+		if text ~= lastDoing then
+			lastDoing = text
+			p.state:SetAttribute("BotDoing", text)
+		end
+	end
 	-- Zombies chasing alongside another zombie cut in from this side.
 	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 	-- People react a moment after they notice someone, each at their own
@@ -8681,6 +9660,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			pauseUntil = now + random:NextNumber(0, 5)
 		end
 		if phase == "Prep" and now < pauseUntil then
+			doing("Getting ready")
 			moveTo(humanoid, here)
 			continue
 		end
@@ -8808,6 +9788,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 			if best then
 				chasing[p.id] = best.p
+				doing("Chasing " .. best.p.name)
 				local d = Util.flatDistance(best.position, here)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
@@ -8841,6 +9822,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				end
 			elseif lastSeen and now - lastSeenAt < level.memory then
 				chasing[p.id] = nil
+				doing("Searching where they saw someone")
 				if not breach(lastSeen, root, humanoid) then
 					goTo(lastSeen, root, humanoid, true)
 					checkProgress(root, lastSeen, humanoid)
@@ -8849,6 +9831,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				chasing[p.id] = nil
 				lastSeen = nil
 				siege = nil
+				doing("Hunting")
 				wander()
 			end
 			if now - progressAt > level.stuck then
@@ -8869,6 +9852,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				then "Builder"
 				elseif roll < builders + level.hide * 0.7 then "Hider"
 				else "Runner"
+			p.state:SetAttribute("BotRole", role)
 			myBush = nil
 			myCorner = nil
 		end
@@ -8903,8 +9887,10 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- Armed: hold the weapon out toward a close zombie (it's solid) and swing.
 		local guarding = false
 		if closest and item then
+			-- (Thrown explosives wait until the zombie is in range; a broom,
+			-- cloak or blood box is for when one is right on top of us.)
 			local reach = if item.kind == "Projectile"
-				then 45
+				then (if item.effect == "Explode" then item.projectileRange or 30 else 45)
 				else (item.reach or 5) * Items.reachScale(p.scale) + 3
 			if closestDistance <= reach then
 				local aim = Util.flatUnit(closest.position + closest.velocity * 0.15 - here)
@@ -8946,6 +9932,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 				end
 				if dodgeSpot then
+					doing("Juking a zombie")
 					moveTo(humanoid, dodgeSpot)
 					pathGoal = nil
 					continue
@@ -8958,6 +9945,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- teammates goes and finds another one.
 		if #threats == 0 then
 			if relocate and now < relocateUntil then
+				doing("Getting out of a crowd")
 				goTo(relocate, root, humanoid, false)
 				continue
 			end
@@ -9005,6 +9993,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- doorways, shove furniture into them (two get behind a piece too
 		-- heavy for one), and lean on the barricade when a zombie knocks.
 		if role == "Builder" and (phase == "Prep" or phase == "Infection") then
+			doing(
+				if FurnitureService.holding(p.id) then "Dragging furniture to the fort" else "Building a fort"
+			)
 			if homeRound ~= round then
 				homeRound, home, barricade = round, nil, nil
 			end
@@ -9349,6 +10340,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					myBush = bush
 				end
 				if bush then
+					doing("Heading for a bush")
 					local spot = Vector3.new(bush.Position.X, here.Y, bush.Position.Z)
 					goTo(spot, root, humanoid, false)
 					checkProgress(root, spot, humanoid)
@@ -9357,6 +10349,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				local corner = myCorner or quietCorner(p, here)
 				myCorner = corner
 				if corner then
+					doing("Hiding in a corner")
 					goTo(corner, root, humanoid, false)
 					checkProgress(root, corner, humanoid)
 					continue
@@ -9364,8 +10357,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
+			doing("Hiding")
 			moveTo(humanoid, here) -- stay still and hope
 		elseif #threats > 0 then
+			doing("Running from zombies")
 			local bush = if hider and not hidden then nearestBush(here, 30) else nil
 			if bush and closest and Util.flatDistance(bush, here) < closestDistance * 0.8 then
 				goTo(bush, root, humanoid, false)
@@ -9441,6 +10436,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		elseif phase == "Prep" and not p.heldItem then
 			local spot = nearestItem(here, 90, p.id)
+			doing(if spot then "Getting an item" else "Exploring")
 			if spot then
 				if Util.flatDistance(spot, here) < Config.PICKUP_RADIUS then
 					ItemService.pickUp(p)
@@ -9452,6 +10448,9 @@ local function brain(p: Participant, level: Level, seed: number)
 				wander()
 			end
 		else
+			doing(
+				if role == "Runner" and phase == "Infection" then "Keeping away from zombies" else "Wandering"
+			)
 			wander()
 		end
 	end
@@ -9460,7 +10459,9 @@ end
 
 -- Roster ----------------------------------------------------------------------------------
 
-local active: { [number]: Participant } = {} -- roster index -> bot
+-- Bots playing now: "R<roster index>" for the regular roster, "C<n>" for
+-- the Mario Clones an admin adds.
+local active: { [string]: Participant } = {}
 local nextId = 0
 
 local function randomSkin(team: Skins.Team): string
@@ -9479,13 +10480,12 @@ local function dressedUp(): number
 	return count
 end
 
-local function addBot(index: number)
-	local entry = ROSTER[index]
-	local level = LEVELS[entry.level] or LEVELS[5]
+local function addBot(key: string, name: string, levelNumber: number)
+	local level = LEVELS[levelNumber] or LEVELS[5]
 	nextId += 1
 	local p = Participants.add({
 		id = "B" .. nextId,
-		name = entry.name,
+		name = name,
 		isBot = true,
 	})
 	if dressedUp() < Config.BOTS_WITH_SKINS and rng:NextNumber() < 0.35 then
@@ -9494,13 +10494,14 @@ local function addBot(index: number)
 		until p.humanSkin ~= Skins.DEFAULT_HUMAN
 	end
 	p.adminSpeed = level.speed
-	p.state:SetAttribute("BotLevel", entry.level)
+	p.state:SetAttribute("BotLevel", levelNumber)
+	p.state:SetAttribute("BotDoing", "Joining")
 	Participants.publish(p)
 	if p.character then
 		CharacterService.applyLook(p)
 	end
 	CharacterService.refreshSpeed(p)
-	active[index] = p
+	active[key] = p
 	-- A bot whose brain hits an error says so and starts thinking again,
 	-- instead of standing still for the rest of the game.
 	local seed = nextId * 97 + os.time()
@@ -9591,27 +10592,50 @@ local function drive()
 	end
 end
 
--- How many bots this round: a random count in range, leaving room for
--- real players.
+-- The numbers of the Mario Clones playing, lowest first.
+local function cloneNumbers(): { number }
+	local out = {}
+	for key in active do
+		if string.sub(key, 1, 1) == "C" then
+			table.insert(out, tonumber(string.sub(key, 2)) :: number)
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+local driving = false
+local function startDriving()
+	if not driving then
+		driving = true
+		RunService.Heartbeat:Connect(drive)
+	end
+end
+
+-- How many regular bots this round: a random count in range, leaving room
+-- for real players and the admin's clones.
 local function wanted(): number
 	local players = #Players:GetPlayers()
-	local room = math.max(0, Config.MAX_PARTICIPANTS - players)
+	local room = math.max(0, Config.MAX_PARTICIPANTS - players - #cloneNumbers())
 	return math.min(rng:NextInteger(Config.BOTS_MIN, Config.BOTS_MAX), room, #ROSTER)
 end
 
 local function rebalance()
 	local target = wanted()
 	local count = 0
-	for _ in active do
-		count += 1
+	for index = 1, #ROSTER do
+		if active["R" .. index] then
+			count += 1
+		end
 	end
 	-- Add in roster order (Mario Robles first), remove from the end.
 	for index = 1, #ROSTER do
 		if count >= target then
 			break
 		end
-		if not active[index] then
-			addBot(index)
+		if not active["R" .. index] then
+			local entry = ROSTER[index]
+			addBot("R" .. index, entry.name, entry.level)
 			count += 1
 		end
 	end
@@ -9619,13 +10643,69 @@ local function rebalance()
 		if count <= target then
 			break
 		end
-		local p = active[index]
+		local p = active["R" .. index]
 		if p then
-			active[index] = nil
+			active["R" .. index] = nil
 			Participants.remove(p)
 			count -= 1
 		end
 	end
+end
+
+-- Admin: add `count` more Mario Clones (Mario Clone 1, Mario Clone 2...),
+-- as smart as Mario Robles. They stay until removed, round after round.
+-- Returns how many joined (the server holds Config.MAX_PARTICIPANTS).
+function BotService.addClones(count: number): number
+	startDriving()
+	local added = 0
+	for _ = 1, math.clamp(math.floor(count), 0, 40) do
+		if #Participants.all() >= Config.MAX_PARTICIPANTS then
+			break
+		end
+		local n = 1 -- the lowest free number
+		while active["C" .. n] do
+			n += 1
+		end
+		addBot("C" .. n, "Mario Clone " .. n, 6)
+		added += 1
+	end
+	return added
+end
+
+-- Admin: remove the newest `count` Mario Clones (all of them if nil).
+function BotService.removeClones(count: number?): number
+	local numbers = cloneNumbers()
+	local removed = 0
+	for i = #numbers, 1, -1 do
+		if count and removed >= count then
+			break
+		end
+		local key = "C" .. numbers[i]
+		local p = active[key]
+		active[key] = nil
+		if p then
+			Participants.remove(p)
+			removed += 1
+		end
+	end
+	return removed
+end
+
+-- Admin: remove one bot by participant id (a clone or a regular bot; Mario
+-- Robles too, until the next round brings the roster back).
+function BotService.remove(id: string): boolean
+	for key, p in active do
+		if p.id == id then
+			active[key] = nil
+			Participants.remove(p)
+			return true
+		end
+	end
+	return false
+end
+
+function BotService.cloneCount(): number
+	return #cloneNumbers()
 end
 
 function BotService.start()
@@ -9633,7 +10713,7 @@ function BotService.start()
 		return
 	end
 	rebalance()
-	RunService.Heartbeat:Connect(drive)
+	startDriving()
 	print("[Bots] bots are playing. Set Config.BOTS = false to turn them off.")
 	-- A fresh mix of bots for every round.
 	local state = ReplicatedStorage:WaitForChild("BrainTagState")
@@ -9651,8 +10731,8 @@ return BotService
       <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">BushService</string>
-          <string name="Source"><![CDATA[-- Flags characters standing in a bush (character attribute "InBush") so bots
--- can't see them. Clients work out the visual side (name tags, see-through
+          <string name="Source"><![CDATA[-- Flags characters standing in a bush, or wearing the Magic Cloak (character
+-- attribute "InBush"), so bots can't see them. Clients work out the visual side (name tags, see-through
 -- canopy) themselves from the same shared geometry.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9696,7 +10776,9 @@ function BushService.init()
 			local character = p.character
 			if character then
 				local root = Participants.body(p)
-				local hidden = root ~= nil and Bushes.coverAt(root.Position) ~= nil
+				local cloak = character:GetAttribute(Bushes.CLOAK_ATTRIBUTE)
+				local cloaked = typeof(cloak) == "number" and cloak > workspace:GetServerTimeNow()
+				local hidden = root ~= nil and (cloaked or Bushes.coverAt(root.Position) ~= nil)
 				if character:GetAttribute(Bushes.ATTRIBUTE) ~= hidden then
 					character:SetAttribute(Bushes.ATTRIBUTE, hidden)
 				end
@@ -10872,6 +11954,19 @@ local DESIGNS: { [string]: Design } = {
 			c:top(0, c.d / 2 - 1.1, 2.2, 0.35, 0.07, 0.04, "2E2E2E") -- stencil
 		end,
 	},
+	-- The Blood Staff's summoned box: dark red, with glowing seams.
+	BloodBox = {
+		body = "6E0F1C",
+		draw = function(c)
+			local t = 0.35
+			c:top(0, -c.d / 2 + t / 2, c.w, t, 0.03, 0.06, "D11F35")
+			c:top(0, c.d / 2 - t / 2, c.w, t, 0.03, 0.06, "D11F35")
+			c:top(-c.w / 2 + t / 2, 0, t, c.d, 0.03, 0.06, "D11F35")
+			c:top(c.w / 2 - t / 2, 0, t, c.d, 0.03, 0.06, "D11F35")
+			c:top(0, 0, 1.4, 1.4, 0.05, 0.06, "FF3B4F", math.rad(45)) -- a glowing rune
+			c:top(0, 0, 0.7, 0.7, 0.07, 0.06, "6E0F1C", math.rad(45))
+		end,
+	},
 	Barrel = {
 		body = "8B5A2B",
 		transparentBody = true,
@@ -11534,33 +12629,74 @@ local function grant(piece: Piece, player: Player)
 	end
 end
 
+local function register(built: FurnitureBuilder.Built): Piece
+	local piece = built :: Piece
+	piece.owner = nil
+	piece.lastClaim = 0
+	piece.pushers = {}
+	piece.contestedUntil = 0
+	piece.tugOfWar = false
+	piece.burst = Vector3.zero
+	piece.burstUntil = 0
+	piece.burstLength = 1
+	piece.lastGood = built.home
+	piece.lastGoodAt = 0
+	table.insert(pieces, piece)
+	byBody[built.body] = piece
+	byModel[built.model] = piece
+	serverOwns(piece)
+	return piece
+end
+
+local function unregister(piece: Piece)
+	local index = table.find(pieces, piece)
+	if index then
+		table.remove(pieces, index)
+	end
+	byBody[piece.body] = nil
+	byModel[piece.model] = nil
+	for id, hold in holds do
+		if hold.piece == piece then
+			holds[id] = nil
+		end
+	end
+	piece.model:Destroy()
+end
+
+-- Summoned pieces (the Blood Staff's boxes), oldest first per summoner.
+local summoned: { [string]: { Piece } } = {}
+local SUMMON_LIMIT = 3
+
 function FurnitureService.build(layout: MapLayout.Layout)
 	folder = workspace:WaitForChild("Furniture") :: Folder
 	folder:ClearAllChildren()
 	table.clear(pieces)
 	table.clear(byBody)
 	table.clear(byModel)
+	table.clear(summoned)
 	for _, spot in layout.furniture do
 		local built = FurnitureBuilder.build(spot, folder)
 		if not built.decor then
-			local piece = built :: Piece
-			piece.owner = nil
-			piece.lastClaim = 0
-			piece.pushers = {}
-			piece.contestedUntil = 0
-			piece.tugOfWar = false
-			piece.burst = Vector3.zero
-			piece.burstUntil = 0
-			piece.burstLength = 1
-			piece.lastGood = built.home
-			piece.lastGoodAt = 0
-			table.insert(pieces, piece)
-			byBody[built.body] = piece
-			byModel[built.model] = piece
-			serverOwns(piece)
+			register(built)
 		end
 	end
 	overlap.FilterDescendantsInstances = { folder }
+end
+
+-- A new piece of furniture appears at (x, z), pushable like any other. Each
+-- summoner keeps at most SUMMON_LIMIT; a new one replaces their oldest. They
+-- all vanish when the furniture resets (next round).
+function FurnitureService.summon(kind: string, x: number, z: number, rot: number, by: string): BasePart
+	local mine = summoned[by] or {}
+	summoned[by] = mine
+	if #mine >= SUMMON_LIMIT then
+		unregister(table.remove(mine, 1) :: Piece)
+	end
+	local piece =
+		register(FurnitureBuilder.build({ kind = kind, x = x, z = z, rot = rot, house = "" }, folder))
+	piece.model:SetAttribute("Summoned", true)
+	table.insert(mine, piece)
+	return piece.body
 end
 
 -- A sudden shove (shotgun blast, potato hit): the server takes the piece and
@@ -11656,6 +12792,12 @@ end
 
 function FurnitureService.resetAll()
 	table.clear(holds)
+	for _, list in summoned do
+		for _, piece in list do
+			unregister(piece)
+		end
+	end
+	table.clear(summoned)
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0
@@ -12051,12 +13193,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local FurnitureService = require(script.Parent.FurnitureService)
+local FurnitureSpecs = require(ReplicatedStorage.Shared.FurnitureSpecs)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapBuilder = require(script.Parent.MapBuilder)
@@ -12359,6 +13503,53 @@ local function breakWallAhead(p: Participant, aim: Vector3, reach: number): bool
 	return false
 end
 
+-- The Blood Staff: a box appears in front of you, if there's room for it
+-- (not in a wall, other furniture or someone). No room: the cooldown is
+-- refunded.
+local function summon(p: Participant, item: Items.Item, aim: Vector3)
+	local root = Participants.body(p)
+	local kind = item.summon
+	if not root or not kind then
+		return
+	end
+	local spec = FurnitureSpecs.get(kind)
+	local half = math.max(spec.w, spec.d) / 2
+	local gap = root.Size.X / 2 + half + 0.8
+	local wall = workspace:Raycast(root.Position, aim * (gap + half), Combat.wallParams())
+	if wall then
+		gap = (wall.Position - root.Position).Magnitude - half - 0.3 -- up against the wall
+	end
+	local center = root.Position + aim * gap
+	local floor = MapLayout.HEIGHTS.Floor
+	local box = CFrame.new(center.X, floor + spec.h / 2 + 0.05, center.Z)
+	local blocked = gap < root.Size.X / 2 + half * 0.7
+	if not blocked then
+		-- Lifted off the floor, so only walls, furniture and people count.
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ignored: { Instance } = { groundFolder }
+		if p.character then
+			table.insert(ignored, p.character)
+		end
+		params.FilterDescendantsInstances = ignored
+		for _, part in workspace:GetPartBoundsInBox(box, Vector3.new(spec.w, spec.h - 0.3, spec.d), params) do
+			if part.CanCollide then
+				blocked = true
+				break
+			end
+		end
+	end
+	if blocked then
+		p.itemReadyAt = os.clock() + 0.3
+		if p.player then
+			Announcer.toast(p.player, "No room for a Blood Box here")
+		end
+		return
+	end
+	local body = FurnitureService.summon(kind, center.X, center.Z, math.deg(math.atan2(-aim.X, -aim.Z)), p.id)
+	Announcer.fx("Summon", { position = body.Position })
+end
+
 local function use(p: Participant, item: Items.Item, aim: Vector3)
 	local root = Participants.body(p)
 	if not root then
@@ -12405,6 +13596,14 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
+		if item.charges then -- dynamite and grenades run out
+			setCharges(p, (p.heldCharges or 1) - 1)
+			if (p.heldCharges or 0) <= 0 then
+				ItemService.take(p)
+			end
+		end
+	elseif kind == "Summon" then
+		summon(p, item, aim)
 	elseif kind == "Trap" then
 		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
@@ -12414,14 +13613,27 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		end
 	elseif kind == "Consumable" and item.speedBoost then
 		CharacterService.speedEffect(p, item.speedBoost, item.boostSeconds or 8)
-		ItemService.take(p)
-		Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		if not item.reusable then
+			ItemService.take(p)
+		end
+		local message = "Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds"
+		if item.effect == "Cloak" then
+			local seconds = item.effectSeconds or 5
+			if p.character then
+				-- Everyone's screen hides you until then (BushController);
+				-- bots and the server treat you as hidden (BushService).
+				p.character:SetAttribute(Bushes.CLOAK_ATTRIBUTE, workspace:GetServerTimeNow() + seconds)
+			end
+			Announcer.fx("Cloak", { position = root.Position })
+			message = "You vanished! Invisible for " .. seconds .. " seconds"
+		elseif item.id == "Broom" then
+			Announcer.fx("Ride", { position = root.Position })
+			message = "Riding the broom! Faster for " .. (item.boostSeconds or 8) .. " seconds"
+		else
+			Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		end
 		if p.player then
-			Announcer.toast(
-				p.player,
-				"Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds",
-				Config.COLORS.Good
-			)
+			Announcer.toast(p.player, message, Config.COLORS.Good)
 		end
 	elseif kind == "Consumable" then
 		local before = p.immunity
@@ -14836,6 +16048,85 @@ local function buildLook(item: Items.Item): Model
 			canQuery = false,
 			parent = model,
 		})
+	elseif look == "Ice" then
+		ball(model, d, Vector3.zero, "BFF0FF", 0.15)
+		local shard = Parts.make({
+			name = "Shard",
+			size = Vector3.new(0.45, 0.45, 1.2) * d,
+			cframe = CFrame.Angles(0, 0, math.rad(45)),
+			color = "E8FBFF",
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		shard.Transparency = 0.2
+	elseif look == "Bullet" then
+		local bullet = Parts.make({
+			name = "Bullet",
+			size = Vector3.new(0.5, 0.5, 1.4) * d,
+			cframe = CFrame.identity,
+			color = "D4A84B",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = bullet
+	elseif look == "Arrow" then
+		local shaft = Parts.make({
+			name = "Shaft",
+			size = Vector3.new(0.14, 0.14, 2.6),
+			cframe = CFrame.identity,
+			color = "D9C29A",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = shaft
+		Parts.make({
+			name = "Tip",
+			size = Vector3.new(0.35, 0.12, 0.35),
+			cframe = CFrame.new(0, 0, -1.35) * CFrame.Angles(0, math.rad(45), 0),
+			color = "9AA3AD",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		Parts.make({
+			name = "Fletching",
+			size = Vector3.new(0.5, 0.06, 0.5),
+			cframe = CFrame.new(0, 0, 1.15),
+			color = "8E44AD",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	elseif look == "Dynamite" then
+		local stick = Parts.make({
+			name = "Stick",
+			shape = Enum.PartType.Cylinder,
+			size = Vector3.new(1.8, 0.55, 0.55),
+			cframe = CFrame.Angles(0, math.rad(90), 0),
+			color = "C0392B",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = stick
+		Parts.make({
+			name = "Spark",
+			shape = Enum.PartType.Ball,
+			size = Vector3.one * 0.35,
+			cframe = CFrame.new(0, 0, 1.15),
+			color = "FFC21A",
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	elseif look == "Grenade" then
+		ball(model, d, Vector3.zero, "4E6B3A")
+		ball(model, d * 0.35, Vector3.new(0, d * 0.45, 0), "5A5A5A")
 	else
 		ball(model, d, Vector3.zero, if item.isRare then "B98A4E" else "C9A66B")
 		ball(model, d * 0.25, Vector3.new(d * 0.2, d * 0.3, 0), "8B6A43")
@@ -14857,7 +16148,7 @@ local function impact(shot: Shot, at: Vector3, target: Participant?, hitPart: In
 			local away = Util.flatUnit(body.Position - at) or dir
 			FurnitureService.shove(body, away * 18, 0.35)
 		end
-		Announcer.fx("Boom", { position = at })
+		Announcer.fx("Boom", { position = at, look = item.projectile, radius = item.radius })
 		return
 	end
 	if target then
@@ -14922,8 +16213,11 @@ local function step(dt: number)
 				end
 				finish(shot)
 			else
-				-- Ducks and potatoes tumble a little as they fly.
-				local spin = CFrame.Angles(0, shot.traveled * 0.15, 0)
+				-- Ducks and potatoes tumble a little as they fly; arrows,
+				-- bullets and ice bolts fly straight.
+				local look = item.projectile
+				local straight = look == "Arrow" or look == "Bullet" or look == "Ice"
+				local spin = if straight then CFrame.identity else CFrame.Angles(0, shot.traveled * 0.15, 0)
 				shot.model:PivotTo(CFrame.lookAt(shot.position, shot.position + shot.direction) * spin)
 			end
 		end
@@ -16324,7 +17618,8 @@ return WorldSetup
 -- see yourself (and anyone hiding with you), and the name tags of players
 -- hiding in other bushes disappear. On dark maps, name tags also show only
 -- for people close enough to see (DarknessController), and on roofed maps
--- only for people in the same room as you (Roofs).
+-- only for people in the same room as you (Roofs). Someone wearing the Magic
+-- Cloak fades away (you see yourself as a ghost) and loses their name tag.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16341,6 +17636,23 @@ local player = Players.LocalPlayer
 local INTERVAL = 0.1
 
 local faded: Model? = nil
+local ghosts: { [Model]: boolean } = {}
+local OTHERS_FADE = 0.93
+local SELF_FADE = 0.55
+
+local function cloaked(model: Instance): boolean
+	local untilTime = model:GetAttribute(Bushes.CLOAK_ATTRIBUTE)
+	return typeof(untilTime) == "number" and untilTime > workspace:GetServerTimeNow()
+end
+
+-- Fade a whole character (and what it holds) in or out.
+local function ghost(model: Model, amount: number)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.LocalTransparencyModifier = amount
+		end
+	end
+end
 
 local function fade(bush: Model?, amount: number)
 	if not bush then
@@ -16378,6 +17690,19 @@ local function step()
 		faded = mine
 	end
 
+	for model in ghosts do
+		if not model.Parent or not cloaked(model) then
+			ghost(model, 0)
+			ghosts[model] = nil
+		end
+	end
+	for _, model in characters() do
+		if model:IsA("Model") and model:GetAttribute("ParticipantId") and cloaked(model) then
+			ghost(model, if model == me then SELF_FADE else OTHERS_FADE)
+			ghosts[model] = true
+		end
+	end
+
 	for _, model in characters() do
 		if model:IsA("Model") and model:GetAttribute("ParticipantId") and model ~= me then
 			local head = model:FindFirstChild("Head")
@@ -16386,6 +17711,7 @@ local function step()
 			if tag and tag:IsA("BillboardGui") and root then
 				local theirs = Bushes.coverAt(root.Position)
 				local show = (theirs == nil or theirs == mine)
+					and not ghosts[model]
 					and DarknessController.sees(root.Position)
 					and (myRoot == nil or Roofs.canSee(myRoot.Position, root.Position))
 				if tag.Enabled ~= show then
@@ -16931,6 +18257,15 @@ local BITS: { [string]: { colors: { string }, size: number, count: number, shape
 	},
 	Snow = { colors = { "FFFFFF", "E8F6FF" }, size = 0.35, count = 10, shape = Enum.PartType.Ball },
 	Peel = { colors = { "F7DC6F", "FFFFFF", "FFE14D" }, size = 0.4, count = 7, shape = Enum.PartType.Block },
+	Smoke = { colors = { "5A5A5A", "8C8C8C", "3A3A3A" }, size = 0.8, count = 12, shape = Enum.PartType.Ball },
+	Blood = {
+		colors = { "B3122A", "6E0F1C", "FF3B4F" },
+		size = 0.45,
+		count = 12,
+		shape = Enum.PartType.Block,
+	},
+	Magic = { colors = { "9B59B6", "D6B4FC", "FFFFFF" }, size = 0.4, count = 14, shape = Enum.PartType.Ball },
+	Fart = { colors = { "9ACD32", "C5E384", "6B8E23" }, size = 0.7, count = 6, shape = Enum.PartType.Ball },
 }
 
 local function bits(kind: string, position: Vector3, direction: Vector3?, spread: number?)
@@ -17013,7 +18348,10 @@ local SPRAY_COLORS = {
 		ColorSequenceKeypoint.new(0.5, Color3.fromHex("E8913A")),
 		ColorSequenceKeypoint.new(1, Color3.fromHex("C0392B")),
 	}),
+	FartGun = ColorSequence.new(Color3.fromHex("9ACD32"), Color3.fromHex("C5E384")),
 }
+local SPRAY_SPREAD = { LeafBlower = 18, FartGun = 26 }
+local SPRAY_SIZE = { LeafBlower = 0.9, FartGun = 1.4 }
 
 local function characters(): { Instance }
 	local list = workspace:GetChildren()
@@ -17044,10 +18382,10 @@ local function updateSprays()
 					created.Color = SPRAY_COLORS[spraying] or SPRAY_COLORS.WaterGun
 					created.EmissionDirection = Enum.NormalId.Front
 					created.Speed = NumberRange.new(28, 40)
-					created.SpreadAngle = Vector2.new(if spraying == "LeafBlower" then 18 else 6, 4)
+					created.SpreadAngle = Vector2.new(SPRAY_SPREAD[spraying] or 6, 4)
 					created.Lifetime = NumberRange.new(0.35, 0.5)
 					created.Rate = 70
-					created.Size = NumberSequence.new(if spraying == "LeafBlower" then 0.9 else 0.6, 0.2)
+					created.Size = NumberSequence.new(SPRAY_SIZE[spraying] or 0.6, 0.2)
 					created.LightEmission = 0.2
 					created.Parent = attachment
 					emitter = created
@@ -17130,8 +18468,11 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		elseif look == "Bubble" then
 			burst(data.position, "BFE9FF", 5)
 			playStyle("Pop", data.position)
-		elseif look == "Pebble" then
+		elseif look == "Pebble" or look == "Bullet" or look == "Arrow" then
 			burst(data.position, "8C8C8C", 2.5)
+		elseif look == "Ice" then
+			bits("Snow", data.position)
+			burst(data.position, "BFF0FF", 4)
 		else
 			burst(data.position, "C9A66B", 4)
 			Sounds.play("Splat", data.position)
@@ -17243,9 +18584,25 @@ local HANDLERS: { [string]: (data: { [string]: any }) -> () } = {
 		playStyle("Gulp", data.position)
 	end,
 	Boom = function(data)
-		bits("Feathers", data.position)
-		burst(data.position, "FFD93B", 16)
+		-- Ducks go off in feathers; dynamite and grenades in smoke.
+		bits(if data.look == "Duck" then "Feathers" else "Smoke", data.position)
+		burst(data.position, if data.look == "Duck" then "FFD93B" else "FF8A3D", (data.radius or 8) * 2)
 		Sounds.play("Boom", data.position)
+	end,
+	Cloak = function(data)
+		bits("Magic", data.position)
+		bits("Puff", data.position)
+		burst(data.position, "9B59B6", 9)
+		playStyle("Pop", data.position)
+	end,
+	Ride = function(data)
+		bits("Puff", data.position)
+		Sounds.play("Whoosh", data.position)
+	end,
+	Summon = function(data)
+		bits("Blood", data.position)
+		burst(data.position, "B3122A", 10)
+		Sounds.play("Drop", data.position)
 	end,
 	WallBreak = function(data)
 		debris(data.cframe, data.size)
@@ -18780,6 +20137,8 @@ return Sounds
               <string name="Source"><![CDATA[-- The admin panel (F2, or the ADMIN button on the left). Only shown to
 -- admins; the server checks every request again (see AdminService).
 --   Target: one player or everyone
+--   Bots:   add Mario Clones, remove them, and a live list of every bot
+--           (team, role and what it is doing; click one to target it)
 --   Items:  give any item (or drop it in front of you)
 --   Speed, points, immunity, team, bring / go to / respawn
 --   Round:  skip phase, add time, next map, reset furniture, clear items
@@ -18960,6 +20319,142 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 		end
 	end
 
+	-- Bots ----------------------------------------------------------------------------------
+	heading("Bots: add Mario Clones (as smart as Mario Robles). Click a bot to target it")
+	local botSummary = UIKit.label({
+		LayoutOrder = nextOrder(),
+		Size = UDim2.new(1, -8, 0, 20),
+		TextSize = 15,
+		TextColor3 = UIKit.MUTED,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 21,
+		Parent = scroll,
+	})
+	local botRow = row()
+	for _, n in { 1, 5, 10 } do
+		button(botRow, "+" .. n .. " Mario Clone" .. (if n > 1 then "s" else ""), nil, function()
+			send("addBots", { count = n })
+		end)
+	end
+	button(botRow, "Remove last clone", GRAY, function()
+		send("removeBots", { count = 1 })
+	end)
+	button(botRow, "Remove all clones", ADMIN_RED, function()
+		send("removeBots")
+	end)
+	button(botRow, "Remove target bot", ADMIN_RED, function()
+		send("removeBot")
+	end)
+	local botList = UIKit.new("Frame", {
+		LayoutOrder = nextOrder(),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ZIndex = 21,
+		Parent = scroll,
+	}, { UIKit.list(Enum.FillDirection.Vertical, 2) })
+
+	local TEAM_COLORS = { Human = Color3.fromRGB(110, 170, 255), Zombie = Color3.fromRGB(120, 200, 90) }
+	type BotLine = { frame: TextButton, cells: { TextLabel } }
+	local botLines: { [string]: BotLine } = {}
+	local function cell(line: TextButton, x: number, width: number, align: Enum.TextXAlignment?): TextLabel
+		return UIKit.label({
+			Position = UDim2.new(x, 6, 0, 0),
+			Size = UDim2.new(width, -8, 1, 0),
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = align or Enum.TextXAlignment.Left,
+			ZIndex = 23,
+			Parent = line,
+		})
+	end
+	local function refreshBots()
+		local bots = {}
+		for _, entry in ClientState.participants:GetChildren() do
+			if entry:GetAttribute("IsBot") == true then
+				table.insert(bots, entry)
+			end
+		end
+		-- Humans first, then zombies; by name within a team.
+		table.sort(bots, function(a, b)
+			local ta, tb = a:GetAttribute("Team") == "Zombie", b:GetAttribute("Team") == "Zombie"
+			if ta ~= tb then
+				return tb
+			end
+			return tostring(a:GetAttribute("DisplayName")) < tostring(b:GetAttribute("DisplayName"))
+		end)
+		local zombies, clones = 0, 0
+		local seen = {}
+		for i, entry in bots do
+			local id = entry.Name
+			seen[id] = true
+			local line = botLines[id]
+			if not line then
+				local frame = UIKit.new("TextButton", {
+					Text = "",
+					AutoButtonColor = true,
+					BackgroundColor3 = GRAY,
+					BorderSizePixel = 0,
+					Size = UDim2.new(1, 0, 0, 24),
+					ZIndex = 22,
+					Parent = botList,
+				})
+				UIKit.corner(6).Parent = frame
+				local made: BotLine = {
+					frame = frame,
+					cells = {
+						cell(frame, 0, 0.3),
+						cell(frame, 0.3, 0.12),
+						cell(frame, 0.42, 0.12),
+						cell(frame, 0.54, 0.34),
+						cell(frame, 0.88, 0.12, Enum.TextXAlignment.Right),
+					},
+				}
+				frame.Activated:Connect(function()
+					target = id
+					refreshTargets()
+					status.Text = "Target: " .. tostring(entry:GetAttribute("DisplayName"))
+					status.TextColor3 = UIKit.MUTED
+				end)
+				botLines[id] = made
+				line = made
+			end
+			local name = tostring(entry:GetAttribute("DisplayName") or id)
+			local team = tostring(entry:GetAttribute("Team") or "Human")
+			if team == "Zombie" then
+				zombies += 1
+			end
+			if string.sub(name, 1, 12) == "Mario Clone " then
+				clones += 1
+			end
+			local level = entry:GetAttribute("BotLevel")
+			local role = if team == "Zombie" then "-" else tostring(entry:GetAttribute("BotRole") or "-")
+			local cells = line.cells
+			cells[1].Text = name .. (if level then " (Lv " .. tostring(level) .. ")" else "")
+			cells[2].Text = team
+			cells[2].TextColor3 = TEAM_COLORS[team] or UIKit.WHITE
+			cells[3].Text = role
+			cells[4].Text = tostring(entry:GetAttribute("BotDoing") or "")
+			cells[5].Text = tostring(entry:GetAttribute("Score") or 0)
+			line.frame.LayoutOrder = i
+			line.frame.BackgroundColor3 = if id == target then Color3.fromRGB(60, 120, 70) else GRAY
+		end
+		for id, line in botLines do
+			if not seen[id] then
+				line.frame:Destroy()
+				botLines[id] = nil
+			end
+		end
+		botSummary.Text = string.format(
+			"%d bots: %d human, %d zombie. %d Mario Clone%s.  (Chat: /addbot 5, /removebots, /bots)",
+			#bots,
+			#bots - zombies,
+			zombies,
+			clones,
+			if clones == 1 then "" else "s"
+		)
+	end
+
 	-- Items -------------------------------------------------------------------------------
 	heading("Give item (click)")
 	local toGround = false
@@ -19115,12 +20610,15 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	end
 
 	local lastCount = -1
+	local botsAt = 0
 	local panel: Panel = {
 		open = function()
 			if isAdmin() then
 				lastCount = #ClientState.rows()
 				refreshTargets()
 				refreshMaps()
+				refreshBots()
+				botsAt = os.clock()
 				window.Visible = true
 			end
 		end,
@@ -19137,6 +20635,10 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 				if count ~= lastCount then
 					lastCount = count
 					refreshTargets()
+				end
+				if os.clock() - botsAt > 0.4 then
+					botsAt = os.clock()
+					refreshBots()
 				end
 			end
 		end,
@@ -19446,6 +20948,10 @@ function BottomCenter.build(parent: Instance, touchMode: boolean): () -> ()
 						elseif item.kind == "Trap" then "[Click] drop one"
 						elseif item.kind == "Melee" and item.hits then "[Click] swing  - hold it out to block"
 						elseif item.kind == "Melee" then "Hold it toward zombies to keep them back"
+						elseif item.kind == "Summon" then "[Click] summon a Blood Box"
+						elseif item.kind == "Projectile" and item.effect == "Explode" then "[Click] throw"
+						elseif item.kind == "Projectile" then "[Click] shoot"
+						elseif item.reusable then "[Click] use (again after a rest)"
 						else "[Click] use"
 					text = verb .. "   [F] grab   [G] drop   [1-3] switch"
 				end

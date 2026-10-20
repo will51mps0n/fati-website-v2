@@ -1,5 +1,6 @@
-"""Generates the hand-planned maps into MapLayout.luau: Christmas Town and
-the Halloween maps (Haunted House, Pumpkin Farm, Spooky Village, Witch Woods).
+"""Generates the hand-planned maps into MapLayout.luau: Christmas Town, the
+Halloween maps (Haunted House, Pumpkin Farm, Spooky Village, Witch Woods),
+the School and the Wild West town (Dusty Gulch).
 
 Walls, doors, windows, secret walls, rooms and outdoor things are written
 by hand below; furniture is fitted into each room automatically (against
@@ -37,6 +38,7 @@ SPECS = {
     "Tombstone": (3.2, 1.4), "Coffin": (3, 7), "Candelabra": (1.6, 1.6), "Cauldron": (3.6, 3.6),
     "Pumpkin": (2.4, 2.4), "JackOLantern": (2.6, 2.6), "HayBale": (5, 2.6),
     "ChristmasTree": (5, 5), "Present": (2, 2), "Snowman": (3.4, 3.4), "Scarecrow": (3.4, 1.6),
+    "VendingMachine": (4.5, 3), "Treadmill": (3, 7), "Car": (9, 16),
 }
 AGAINST_WALL = {"Bookshelf", "Wardrobe", "Dresser", "Bed", "Piano", "Fridge", "Stove", "Sink", "Bathtub",
                 "Toilet", "Washer", "Aquarium", "Couch", "Bench", "Desk", "Picture"}
@@ -809,6 +811,217 @@ def witch_woods(rng):
     return m
 
 
+# --- School ----------------------------------------------------------------------------------
+
+def school_building():
+    p = Plan("SCHOOL", 200, 110)
+    # Outside walls: back doors into two classrooms, the cafeteria and gym open
+    # onto the front, and the main hallway runs right through, side to side.
+    p.wall(0, 0, 200, 0, gaps=[(21.5, 28.5), (171.5, 178.5)],
+           windows=[(4, 18), (32, 46), (54, 96), (104, 146), (154, 168), (182, 196)])
+    p.wall(0, 110, 200, 110, gaps=[(31.5, 38.5), (106.5, 113.5)],
+           windows=[(4, 26), (44, 66), (74, 102), (118, 146), (154, 171)])
+    p.wall(0, 0, 0, 110, gaps=[(51.5, 58.5)], windows=[(6, 40), (70, 104)])
+    p.wall(200, 0, 200, 110, gaps=[(51.5, 58.5)], windows=[(6, 40), (80, 104)])
+    # The hallway.
+    p.wall(0, 45, 200, 45, gaps=[(21.5, 28.5), (71.5, 78.5), (121.5, 128.5), (171.5, 178.5)])
+    p.wall(0, 65, 200, 65, gaps=[(21.5, 28.5), (46.5, 53.5), (91.5, 98.5), (121.5, 128.5), (158.5, 165.5),
+                                 (184, 191)])
+    # Classrooms, library and lab along the back; cafeteria, gym, office and
+    # bathroom along the front.
+    p.wall(50, 0, 50, 45, gaps=[(18.5, 25.5)])
+    p.wall(100, 0, 100, 45)
+    p.wall(150, 0, 150, 45, gaps=[(18.5, 25.5)])
+    p.wall(70, 65, 70, 110, gaps=[(84.5, 91.5)])
+    p.wall(150, 65, 150, 110)
+    p.wall(175, 65, 175, 110)
+    desks = ["Desk"] * 6 + ["Chair"] * 6
+    p.room("Classroom A", "Wood", 0, 0, 50, 45, desks + ["Bookshelf", "Table", "TrashCan", "Plant"])
+    p.room("Classroom B", "Wood", 50, 0, 100, 45, desks + ["Aquarium", "Bookshelf", "TrashCan"])
+    p.room("Library", "Wood", 100, 0, 150, 45,
+           ["Bookshelf"] * 6 + ["Table", "Table", "Chair", "Chair", "Chair", "Chair", "Couch", "Armchair", "Lamp"])
+    p.room("Science lab", "Tile", 150, 0, 200, 45,
+           ["Table"] * 4 + ["Chair"] * 4 + ["Sink", "Sink", "Fridge", "Aquarium", "Crate"])
+    p.room("Main hallway", "Tile", 0, 45, 200, 65,
+           ["Wardrobe"] * 6 + ["VendingMachine", "VendingMachine", "Bench", "Bench", "TrashCan", "TrashCan", "Plant"])
+    p.room("Cafeteria", "Tile", 0, 65, 70, 110,
+           ["Table"] * 6 + ["Bench"] * 6 + ["Fridge", "Fridge", "Stove", "Sink", "VendingMachine", "TrashCan"])
+    p.room("Gym", "Wood", 70, 65, 150, 110, ["Treadmill"] * 4 + ["Bench"] * 3 + ["Box"] * 3 + ["Crate"])
+    p.room("Office", "Wood", 150, 65, 175, 110, ["Desk", "Desk", "Chair", "Chair", "Bookshelf", "Wardrobe", "Plant"])
+    p.room("Bathroom", "Tile", 175, 65, 200, 110, ["Toilet", "Toilet", "Toilet", "Sink", "Sink"])
+    return p
+
+
+def portable():
+    p = Plan("PORTABLE", 36, 24)
+    p.wall(0, 0, 36, 0, windows=[(4, 32)])
+    p.wall(0, 24, 36, 24, gaps=[(14.5, 21.5)], windows=[(3, 11), (25, 33)])
+    p.wall(0, 0, 0, 24, windows=[(5, 19)])
+    p.wall(36, 0, 36, 24, windows=[(5, 19)])
+    p.room("Portable classroom", "Wood", 0, 0, 36, 24, ["Desk", "Desk", "Desk", "Chair", "Chair", "Chair", "Bookshelf"])
+    return p
+
+
+def equipment_shed():
+    p = Plan("EQUIPMENT_SHED", 28, 20)
+    p.wall(0, 0, 28, 0, windows=[(8, 20)])
+    p.wall(0, 20, 28, 20, gaps=[(10.5, 17.5)])
+    p.wall(0, 0, 0, 20)
+    p.wall(28, 0, 28, 20)
+    p.room("Equipment shed", "Concrete", 0, 0, 28, 20)
+    p.fixed += [("Crate", 4, 4, 0), ("Barrel", 9, 3.8, 0), ("Box", 23.5, 4, 0), ("Box", 23.5, 7.5, 0),
+                ("Treadmill", 4.5, 13, 0)]
+    p.items.append((15, 11))
+    return p
+
+
+def school():
+    m = Map("buildSchool", "School", "The School", "Classic", False, (-180, -170, 180, 170))
+    m.houses.append(("School", school_building(), -100, -150, False, "Blue", "Huge"))
+    m.houses.append(("PortableA", portable(), -170, -20, False, "Orange", "Small"))
+    m.houses.append(("PortableB", portable(), 134, -20, False, "Orange", "Small"))
+    m.houses.append(("Shed", equipment_shed(), 130, -160, False, "Blue", "Small"))
+    m.road = {
+        "sidewalks": [rect(-180, 112, 180, 118), rect(-180, 146, 180, 152)],
+        "asphalt": [rect(-180, 118, 180, 146)],
+        "centerLines": [rect(-180, 131.6, 180, 132.4)],
+        "edgeLines": [rect(-180, 119, 180, 119.4), rect(-180, 144.6, 180, 145)],
+    }
+    # The bus lot: cars parked along the kerb, too heavy for anyone small.
+    m.yard_pieces += [("Car", x, 125, 90) for x in (-140, -110, 105, 135)]
+    m.yard_pieces += [("Bench", -30, -32, 0), ("Bench", 30, -32, 0), ("TrashCan", 0, -32, 0)]
+    m.patios = [rect(-40, -30, 40, 20)]
+    m.paths = [rect(-4, 20, 4, 112), rect(-156, 4, -148, 30), rect(148, 4, 156, 30)]
+    m.yard_rooms.append(("Playground", "Dirt", (-125, 40, -45, 100), ["Bench"] * 3 + ["TrashCan"] * 2, []))
+    m.yard_rooms.append(("Sports field", "Dirt", (40, 30, 125, 100), ["Bench"] * 4 + ["Crate", "Barrel"], []))
+    m.yard_scatter = ["TrashCan"] * 4 + ["Bench"] * 3 + ["Plant"] * 6 + ["Crate"] * 3
+    m.bushes = [(-170, -160, 5, "Green"), (-130, -160, 4, "Orange"), (-170, -90, 4, "Green"), (170, -100, 4, "Orange"),
+                (115, -60, 4, "Green"), (-115, -60, 4, "Orange"), (-170, 70, 4, "Green"), (165, 50, 4, "Green"),
+                (-30, 85, 3, "Orange"), (30, 70, 3, "Green"), (-60, 162, 4, "Green"), (60, 162, 4, "Orange")]
+    m.human = [(-150, 40), (-60, 25), (60, 25), (150, 40), (-160, 95), (-15, 95), (160, 95), (-135, -60),
+               (135, -60), (-120, 162), (120, 162), (0, -25)]
+    m.zombie = [(-170, 132), (170, 132)]
+    m.start = (0, 0)
+    m.wizard = [(-160, -120), (165, -130), (-170, 162), (170, 162)]
+    return m
+
+
+# --- Wild West: Dusty Gulch ---------------------------------------------------------------------
+
+def saloon():
+    p = Plan("SALOON", 60, 44)
+    p.wall(0, 0, 60, 0, windows=[(4, 21), (43, 56)])
+    p.wall(0, 44, 60, 44, gaps=[(26.5, 33.5)], windows=[(4, 20), (40, 56)])
+    p.wall(0, 0, 0, 44, windows=[(19, 40)])
+    p.wall(60, 0, 60, 44, gaps=[(20.5, 27.5)], windows=[(31, 40)])
+    p.wall(0, 16, 60, 16, gaps=[(8.5, 15.5), (28.5, 35.5), (46.5, 53.5)])
+    p.wall(24, 0, 24, 16)
+    p.wall(40, 0, 40, 16)
+    p.room("Bar room", "Wood", 0, 16, 60, 44,
+           ["PoolTable", "Piano", "Bookshelf", "Table", "Table", "Table"] + ["Chair"] * 6 + ["Barrel", "Barrel"])
+    p.room("Kitchen", "Wood", 0, 0, 24, 16, ["Stove", "Sink", "Barrel"])
+    p.room("Storeroom", "Wood", 24, 0, 40, 16, ["Crate", "Crate", "Barrel", "Box"])
+    p.room("Poker room", "Wood", 40, 0, 60, 16, ["Table", "Chair", "Chair", "Chair"])
+    return p
+
+
+def sheriff():
+    p = Plan("SHERIFF", 40, 30)
+    p.wall(0, 0, 40, 0, windows=[(4, 12), (28, 36)])
+    p.wall(0, 30, 40, 30, gaps=[(16.5, 23.5)], windows=[(3, 13), (27, 37)])
+    p.wall(0, 0, 0, 30, windows=[(15, 27)])
+    p.wall(40, 0, 40, 30, windows=[(15, 27)])
+    p.wall(0, 12, 40, 12, gaps=[(6.5, 13.5), (26.5, 33.5)])
+    p.wall(20, 0, 20, 12)
+    p.room("Jail cell 1", "Concrete", 0, 0, 20, 12, ["Bench", "Box"])
+    p.room("Jail cell 2", "Concrete", 20, 0, 40, 12, ["Bench", "Barrel"])
+    p.room("Sheriff's office", "Wood", 0, 12, 40, 30, ["Desk", "Chair", "Wardrobe", "Bookshelf", "Crate"])
+    return p
+
+
+def general_store():
+    p = Plan("GENERAL_STORE", 40, 30)
+    p.wall(0, 0, 40, 0, windows=[(4, 22), (30, 36)])
+    p.wall(0, 30, 40, 30, gaps=[(9.5, 16.5)], windows=[(19, 24), (30, 37)])
+    p.wall(0, 0, 0, 30, windows=[(6, 24)])
+    p.wall(40, 0, 40, 30, gaps=[(11.5, 18.5)])
+    p.wall(26, 0, 26, 30, gaps=[(11.5, 18.5)])
+    p.room("Store", "Wood", 0, 0, 26, 30, ["Table", "Table", "Crate", "Barrel", "Barrel", "Bookshelf", "Box", "Box"])
+    p.room("Stockroom", "Wood", 26, 0, 40, 30, ["Wardrobe", "Crate", "Crate", "Barrel", "Box"])
+    return p
+
+
+def bank():
+    p = Plan("BANK", 36, 30)
+    p.wall(0, 0, 36, 0)
+    p.wall(0, 30, 36, 30, gaps=[(14.5, 21.5)], windows=[(3, 11), (25, 33)])
+    p.wall(0, 0, 0, 30, windows=[(15, 27)])
+    p.wall(36, 0, 36, 30, windows=[(15, 27)])
+    p.wall(0, 12, 36, 12, gaps=[(14.5, 21.5)])
+    p.room("Vault", "Concrete", 0, 0, 36, 12, ["Crate", "Crate", "Box", "Box"])
+    p.room("Lobby", "Wood", 0, 12, 36, 30, ["Desk", "Desk", "Chair", "Chair", "Bench", "Plant"])
+    return p
+
+
+def stable():
+    p = Plan("STABLE", 60, 40)
+    p.wall(0, 0, 60, 0, windows=[(3, 12), (18, 27), (33, 42), (48, 57)])
+    p.wall(0, 40, 60, 40, gaps=[(26.5, 33.5)])
+    p.wall(0, 0, 0, 40, gaps=[(23.5, 30.5)])
+    p.wall(60, 0, 60, 40, windows=[(18, 36)])
+    p.wall(0, 14, 60, 14, gaps=[(4, 11), (19, 26), (34, 41), (49, 56)])
+    for x in (15, 30, 45):
+        p.wall(x, 0, x, 14)
+    for i in range(4):
+        p.room("Stall %d" % (i + 1), "Wood", i * 15, 0, i * 15 + 15, 14, ["HayBale"])
+    p.room("Stable floor", "Wood", 0, 14, 60, 40, ["HayBale"] * 5 + ["Crate", "Crate", "Barrel", "Barrel", "Wardrobe"])
+    p.cobwebs.append((57, 37, 1.6))
+    return p
+
+
+def adobe_house():
+    p = Plan("ADOBE_HOUSE", 30, 24)
+    p.wall(0, 0, 30, 0, windows=[(3, 13)])
+    p.wall(0, 24, 30, 24, gaps=[(4, 11)], windows=[(19, 28)])
+    p.wall(0, 0, 0, 24, windows=[(6, 18)])
+    p.wall(30, 0, 30, 24, windows=[(6, 18)])
+    p.wall(16, 0, 16, 24, gaps=[(9, 16)])
+    p.room("Front room", "Wood", 0, 0, 16, 24, ["Table", "Chair", "Chair", "Barrel", "Plant"])
+    p.room("Bedroom", "Wood", 16, 0, 30, 24, ["Bed", "Dresser"])
+    return p
+
+
+def ghost_town():
+    m = Map("buildDustyGulch", "DustyGulch", "Dusty Gulch", "Desert", False, (-180, -180, 180, 180))
+    # North side of Main Street, fronts facing the street.
+    m.houses.append(("Saloon", saloon(), -30, -68, False, "Orange", "Large"))
+    m.houses.append(("Sheriff", sheriff(), -90, -54, False, "Blue", "Small"))
+    m.houses.append(("GeneralStore", general_store(), 50, -54, False, "Orange", "Small"))
+    m.houses.append(("Bank", bank(), 110, -54, False, "Blue", "Small"))
+    m.houses.append(("AdobeN", adobe_house(), -150, -48, False, "Orange", "Small"))
+    # South side.
+    m.houses.append(("Stable", stable(), -40, 24, True, "Orange", "Large"))
+    for i, ox in enumerate((-150, -100, 50, 100), 1):
+        m.houses.append(("AdobeS%d" % i, adobe_house(), ox, 24, True, "Blue" if i % 2 else "Orange", "Small"))
+    graves = [("Tombstone", x, z, 0) for z in (-155, -138, -121) for x in (80, 98, 116, 134, 152)]
+    m.yard_rooms.append(("Boot Hill", "Dirt", (66, -170, 168, -100), ["Barrel", "Bench"], graves))
+    m.yard_rooms.append(("Corral", "Dirt", (-160, 100, -60, 165), ["HayBale"] * 6 + ["Barrel"] * 3, []))
+    m.pools = [rect(80, 110, 130, 140)]  # a muddy watering hole
+    m.paths = [rect(-180, -10, 180, 10), rect(96, -100, 104, -54)]
+    m.yard_pieces += [("Bench", -45, -18, 0), ("Bench", 45, -18, 0), ("Barrel", -112, -18, 0), ("Barrel", 152, -18, 0),
+                      ("HayBale", -60, 18, 0), ("HayBale", 32, 18, 0)]
+    m.yard_scatter = ["Barrel"] * 6 + ["Crate"] * 4 + ["HayBale"] * 4 + ["Bench"] * 2
+    m.bushes = [(-130, -150, 4, "Green"), (-40, -150, 4, "Green"), (30, -160, 3, "Orange"), (175, -20, 3, "Green"),
+                (-175, 40, 3, "Green"), (60, 160, 4, "Orange"), (-100, 172, 4, "Green"), (165, 120, 4, "Green"),
+                (0, 140, 4, "Orange"), (-170, -110, 4, "Orange")]
+    m.human = [(-165, -80), (-100, -110), (-10, -110), (40, -100), (-140, 0), (140, 0), (-165, 85), (-20, 100),
+               (40, 90), (165, 85), (150, 165), (-20, 165)]
+    m.zombie = [(-174, 174), (174, -174)]
+    m.start = (0, 0)
+    m.wizard = [(-170, -170), (170, -60), (-170, 172), (170, 172)]
+    return m
+
+
 def place_yards(m, rng):
     houses = [m.house_rect(h) for h in m.houses]
     reserved = [around(x, z, 4) for x, z in m.human + m.zombie + m.wizard + [m.start]]
@@ -972,6 +1185,7 @@ def main():
     emitted = {}
     maps = [christmas(), haunted()]
     maps += [pumpkin_farm(random.Random(77)), spooky_village(), witch_woods(random.Random(5))]
+    maps += [school(), ghost_town()]
     for m in maps:
         lines.append("-- %s %s" % (m.title, "-" * max(4, 88 - len(m.title))))
         lines.append("")

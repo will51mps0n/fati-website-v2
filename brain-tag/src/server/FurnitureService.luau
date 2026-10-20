@@ -116,33 +116,74 @@ local function grant(piece: Piece, player: Player)
 	end
 end
 
+local function register(built: FurnitureBuilder.Built): Piece
+	local piece = built :: Piece
+	piece.owner = nil
+	piece.lastClaim = 0
+	piece.pushers = {}
+	piece.contestedUntil = 0
+	piece.tugOfWar = false
+	piece.burst = Vector3.zero
+	piece.burstUntil = 0
+	piece.burstLength = 1
+	piece.lastGood = built.home
+	piece.lastGoodAt = 0
+	table.insert(pieces, piece)
+	byBody[built.body] = piece
+	byModel[built.model] = piece
+	serverOwns(piece)
+	return piece
+end
+
+local function unregister(piece: Piece)
+	local index = table.find(pieces, piece)
+	if index then
+		table.remove(pieces, index)
+	end
+	byBody[piece.body] = nil
+	byModel[piece.model] = nil
+	for id, hold in holds do
+		if hold.piece == piece then
+			holds[id] = nil
+		end
+	end
+	piece.model:Destroy()
+end
+
+-- Summoned pieces (the Blood Staff's boxes), oldest first per summoner.
+local summoned: { [string]: { Piece } } = {}
+local SUMMON_LIMIT = 3
+
 function FurnitureService.build(layout: MapLayout.Layout)
 	folder = workspace:WaitForChild("Furniture") :: Folder
 	folder:ClearAllChildren()
 	table.clear(pieces)
 	table.clear(byBody)
 	table.clear(byModel)
+	table.clear(summoned)
 	for _, spot in layout.furniture do
 		local built = FurnitureBuilder.build(spot, folder)
 		if not built.decor then
-			local piece = built :: Piece
-			piece.owner = nil
-			piece.lastClaim = 0
-			piece.pushers = {}
-			piece.contestedUntil = 0
-			piece.tugOfWar = false
-			piece.burst = Vector3.zero
-			piece.burstUntil = 0
-			piece.burstLength = 1
-			piece.lastGood = built.home
-			piece.lastGoodAt = 0
-			table.insert(pieces, piece)
-			byBody[built.body] = piece
-			byModel[built.model] = piece
-			serverOwns(piece)
+			register(built)
 		end
 	end
 	overlap.FilterDescendantsInstances = { folder }
+end
+
+-- A new piece of furniture appears at (x, z), pushable like any other. Each
+-- summoner keeps at most SUMMON_LIMIT; a new one replaces their oldest. They
+-- all vanish when the furniture resets (next round).
+function FurnitureService.summon(kind: string, x: number, z: number, rot: number, by: string): BasePart
+	local mine = summoned[by] or {}
+	summoned[by] = mine
+	if #mine >= SUMMON_LIMIT then
+		unregister(table.remove(mine, 1) :: Piece)
+	end
+	local piece =
+		register(FurnitureBuilder.build({ kind = kind, x = x, z = z, rot = rot, house = "" }, folder))
+	piece.model:SetAttribute("Summoned", true)
+	table.insert(mine, piece)
+	return piece.body
 end
 
 -- A sudden shove (shotgun blast, potato hit): the server takes the piece and
@@ -238,6 +279,12 @@ end
 
 function FurnitureService.resetAll()
 	table.clear(holds)
+	for _, list in summoned do
+		for _, piece in list do
+			unregister(piece)
+		end
+	end
+	table.clear(summoned)
 	for _, piece in pieces do
 		serverOwns(piece)
 		piece.contestedUntil = 0

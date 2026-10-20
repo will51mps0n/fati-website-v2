@@ -8,12 +8,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Announcer = require(script.Parent.Announcer)
+local Bushes = require(ReplicatedStorage.Shared.Bushes)
 local CharacterService = require(script.Parent.CharacterService)
 local CharacterLook = require(ReplicatedStorage.Shared.CharacterLook)
 local Combat = require(script.Parent.Combat)
 local Config = require(ReplicatedStorage.Shared.Config)
 local FurniturePush = require(ReplicatedStorage.Shared.FurniturePush)
 local FurnitureService = require(script.Parent.FurnitureService)
+local FurnitureSpecs = require(ReplicatedStorage.Shared.FurnitureSpecs)
 local ItemModels = require(ReplicatedStorage.Shared.ItemModels)
 local Items = require(ReplicatedStorage.Shared.Items)
 local MapBuilder = require(script.Parent.MapBuilder)
@@ -316,6 +318,53 @@ local function breakWallAhead(p: Participant, aim: Vector3, reach: number): bool
 	return false
 end
 
+-- The Blood Staff: a box appears in front of you, if there's room for it
+-- (not in a wall, other furniture or someone). No room: the cooldown is
+-- refunded.
+local function summon(p: Participant, item: Items.Item, aim: Vector3)
+	local root = Participants.body(p)
+	local kind = item.summon
+	if not root or not kind then
+		return
+	end
+	local spec = FurnitureSpecs.get(kind)
+	local half = math.max(spec.w, spec.d) / 2
+	local gap = root.Size.X / 2 + half + 0.8
+	local wall = workspace:Raycast(root.Position, aim * (gap + half), Combat.wallParams())
+	if wall then
+		gap = (wall.Position - root.Position).Magnitude - half - 0.3 -- up against the wall
+	end
+	local center = root.Position + aim * gap
+	local floor = MapLayout.HEIGHTS.Floor
+	local box = CFrame.new(center.X, floor + spec.h / 2 + 0.05, center.Z)
+	local blocked = gap < root.Size.X / 2 + half * 0.7
+	if not blocked then
+		-- Lifted off the floor, so only walls, furniture and people count.
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ignored: { Instance } = { groundFolder }
+		if p.character then
+			table.insert(ignored, p.character)
+		end
+		params.FilterDescendantsInstances = ignored
+		for _, part in workspace:GetPartBoundsInBox(box, Vector3.new(spec.w, spec.h - 0.3, spec.d), params) do
+			if part.CanCollide then
+				blocked = true
+				break
+			end
+		end
+	end
+	if blocked then
+		p.itemReadyAt = os.clock() + 0.3
+		if p.player then
+			Announcer.toast(p.player, "No room for a Blood Box here")
+		end
+		return
+	end
+	local body = FurnitureService.summon(kind, center.X, center.Z, math.deg(math.atan2(-aim.X, -aim.Z)), p.id)
+	Announcer.fx("Summon", { position = body.Position })
+end
+
 local function use(p: Participant, item: Items.Item, aim: Vector3)
 	local root = Participants.body(p)
 	if not root then
@@ -362,6 +411,14 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 	elseif kind == "Projectile" then
 		Projectiles.fire(p, item, aim)
 		Announcer.fx("Shoot", { character = p.character, item = item.id })
+		if item.charges then -- dynamite and grenades run out
+			setCharges(p, (p.heldCharges or 1) - 1)
+			if (p.heldCharges or 0) <= 0 then
+				ItemService.take(p)
+			end
+		end
+	elseif kind == "Summon" then
+		summon(p, item, aim)
 	elseif kind == "Trap" then
 		Traps.place(root.Position - aim * (root.Size.X / 2 + 0.6), item, p)
 		Announcer.fx("Drop", { position = root.Position })
@@ -371,14 +428,27 @@ local function use(p: Participant, item: Items.Item, aim: Vector3)
 		end
 	elseif kind == "Consumable" and item.speedBoost then
 		CharacterService.speedEffect(p, item.speedBoost, item.boostSeconds or 8)
-		ItemService.take(p)
-		Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		if not item.reusable then
+			ItemService.take(p)
+		end
+		local message = "Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds"
+		if item.effect == "Cloak" then
+			local seconds = item.effectSeconds or 5
+			if p.character then
+				-- Everyone's screen hides you until then (BushController);
+				-- bots and the server treat you as hidden (BushService).
+				p.character:SetAttribute(Bushes.CLOAK_ATTRIBUTE, workspace:GetServerTimeNow() + seconds)
+			end
+			Announcer.fx("Cloak", { position = root.Position })
+			message = "You vanished! Invisible for " .. seconds .. " seconds"
+		elseif item.id == "Broom" then
+			Announcer.fx("Ride", { position = root.Position })
+			message = "Riding the broom! Faster for " .. (item.boostSeconds or 8) .. " seconds"
+		else
+			Announcer.fx("Gulp", { position = root.Position, character = p.character })
+		end
 		if p.player then
-			Announcer.toast(
-				p.player,
-				"Zoom! Faster for " .. (item.boostSeconds or 8) .. " seconds",
-				Config.COLORS.Good
-			)
+			Announcer.toast(p.player, message, Config.COLORS.Good)
 		end
 	elseif kind == "Consumable" then
 		local before = p.immunity

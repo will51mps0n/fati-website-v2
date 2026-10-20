@@ -21,8 +21,17 @@ Config.TURNING_SLOW = 0.6
 Config.ZOMBIE_RETURN_COOLDOWN = 5 -- seconds between Z presses
 
 -- Maps take turns. Each name is a layout in MapLayout.luau.
-Config.MAP_ROTATION =
-	{ "Neighborhood", "Haunted", "Mansion", "PumpkinFarm", "ChristmasTown", "SpookyVillage", "WitchWoods" }
+Config.MAP_ROTATION = {
+	"Neighborhood",
+	"Haunted",
+	"School",
+	"Mansion",
+	"PumpkinFarm",
+	"DustyGulch",
+	"ChristmasTown",
+	"SpookyVillage",
+	"WitchWoods",
+}
 Config.ROUNDS_PER_MAP = 2
 
 -- Movement and size ------------------------------------------------------------

@@ -1,6 +1,8 @@
 -- The admin panel (F2, or the ADMIN button on the left). Only shown to
 -- admins; the server checks every request again (see AdminService).
 --   Target: one player or everyone
+--   Bots:   add Mario Clones, remove them, and a live list of every bot
+--           (team, role and what it is doing; click one to target it)
 --   Items:  give any item (or drop it in front of you)
 --   Speed, points, immunity, team, bring / go to / respawn
 --   Round:  skip phase, add time, next map, reset furniture, clear items
@@ -181,6 +183,142 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 		end
 	end
 
+	-- Bots ----------------------------------------------------------------------------------
+	heading("Bots: add Mario Clones (as smart as Mario Robles). Click a bot to target it")
+	local botSummary = UIKit.label({
+		LayoutOrder = nextOrder(),
+		Size = UDim2.new(1, -8, 0, 20),
+		TextSize = 15,
+		TextColor3 = UIKit.MUTED,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 21,
+		Parent = scroll,
+	})
+	local botRow = row()
+	for _, n in { 1, 5, 10 } do
+		button(botRow, "+" .. n .. " Mario Clone" .. (if n > 1 then "s" else ""), nil, function()
+			send("addBots", { count = n })
+		end)
+	end
+	button(botRow, "Remove last clone", GRAY, function()
+		send("removeBots", { count = 1 })
+	end)
+	button(botRow, "Remove all clones", ADMIN_RED, function()
+		send("removeBots")
+	end)
+	button(botRow, "Remove target bot", ADMIN_RED, function()
+		send("removeBot")
+	end)
+	local botList = UIKit.new("Frame", {
+		LayoutOrder = nextOrder(),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ZIndex = 21,
+		Parent = scroll,
+	}, { UIKit.list(Enum.FillDirection.Vertical, 2) })
+
+	local TEAM_COLORS = { Human = Color3.fromRGB(110, 170, 255), Zombie = Color3.fromRGB(120, 200, 90) }
+	type BotLine = { frame: TextButton, cells: { TextLabel } }
+	local botLines: { [string]: BotLine } = {}
+	local function cell(line: TextButton, x: number, width: number, align: Enum.TextXAlignment?): TextLabel
+		return UIKit.label({
+			Position = UDim2.new(x, 6, 0, 0),
+			Size = UDim2.new(width, -8, 1, 0),
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = align or Enum.TextXAlignment.Left,
+			ZIndex = 23,
+			Parent = line,
+		})
+	end
+	local function refreshBots()
+		local bots = {}
+		for _, entry in ClientState.participants:GetChildren() do
+			if entry:GetAttribute("IsBot") == true then
+				table.insert(bots, entry)
+			end
+		end
+		-- Humans first, then zombies; by name within a team.
+		table.sort(bots, function(a, b)
+			local ta, tb = a:GetAttribute("Team") == "Zombie", b:GetAttribute("Team") == "Zombie"
+			if ta ~= tb then
+				return tb
+			end
+			return tostring(a:GetAttribute("DisplayName")) < tostring(b:GetAttribute("DisplayName"))
+		end)
+		local zombies, clones = 0, 0
+		local seen = {}
+		for i, entry in bots do
+			local id = entry.Name
+			seen[id] = true
+			local line = botLines[id]
+			if not line then
+				local frame = UIKit.new("TextButton", {
+					Text = "",
+					AutoButtonColor = true,
+					BackgroundColor3 = GRAY,
+					BorderSizePixel = 0,
+					Size = UDim2.new(1, 0, 0, 24),
+					ZIndex = 22,
+					Parent = botList,
+				})
+				UIKit.corner(6).Parent = frame
+				local made: BotLine = {
+					frame = frame,
+					cells = {
+						cell(frame, 0, 0.3),
+						cell(frame, 0.3, 0.12),
+						cell(frame, 0.42, 0.12),
+						cell(frame, 0.54, 0.34),
+						cell(frame, 0.88, 0.12, Enum.TextXAlignment.Right),
+					},
+				}
+				frame.Activated:Connect(function()
+					target = id
+					refreshTargets()
+					status.Text = "Target: " .. tostring(entry:GetAttribute("DisplayName"))
+					status.TextColor3 = UIKit.MUTED
+				end)
+				botLines[id] = made
+				line = made
+			end
+			local name = tostring(entry:GetAttribute("DisplayName") or id)
+			local team = tostring(entry:GetAttribute("Team") or "Human")
+			if team == "Zombie" then
+				zombies += 1
+			end
+			if string.sub(name, 1, 12) == "Mario Clone " then
+				clones += 1
+			end
+			local level = entry:GetAttribute("BotLevel")
+			local role = if team == "Zombie" then "-" else tostring(entry:GetAttribute("BotRole") or "-")
+			local cells = line.cells
+			cells[1].Text = name .. (if level then " (Lv " .. tostring(level) .. ")" else "")
+			cells[2].Text = team
+			cells[2].TextColor3 = TEAM_COLORS[team] or UIKit.WHITE
+			cells[3].Text = role
+			cells[4].Text = tostring(entry:GetAttribute("BotDoing") or "")
+			cells[5].Text = tostring(entry:GetAttribute("Score") or 0)
+			line.frame.LayoutOrder = i
+			line.frame.BackgroundColor3 = if id == target then Color3.fromRGB(60, 120, 70) else GRAY
+		end
+		for id, line in botLines do
+			if not seen[id] then
+				line.frame:Destroy()
+				botLines[id] = nil
+			end
+		end
+		botSummary.Text = string.format(
+			"%d bots: %d human, %d zombie. %d Mario Clone%s.  (Chat: /addbot 5, /removebots, /bots)",
+			#bots,
+			#bots - zombies,
+			zombies,
+			clones,
+			if clones == 1 then "" else "s"
+		)
+	end
+
 	-- Items -------------------------------------------------------------------------------
 	heading("Give item (click)")
 	local toGround = false
@@ -336,12 +474,15 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 	end
 
 	local lastCount = -1
+	local botsAt = 0
 	local panel: Panel = {
 		open = function()
 			if isAdmin() then
 				lastCount = #ClientState.rows()
 				refreshTargets()
 				refreshMaps()
+				refreshBots()
+				botsAt = os.clock()
 				window.Visible = true
 			end
 		end,
@@ -358,6 +499,10 @@ function AdminPanel.build(parent: Instance, toast: (string, string?) -> ()): Pan
 				if count ~= lastCount then
 					lastCount = count
 					refreshTargets()
+				end
+				if os.clock() - botsAt > 0.4 then
+					botsAt = os.clock()
+					refreshBots()
 				end
 			end
 		end,

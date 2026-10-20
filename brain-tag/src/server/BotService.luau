@@ -648,6 +648,14 @@ local function brain(p: Participant, level: Level, seed: number)
 	local barricade: Job? = nil
 	local waryOf: Participant? = nil
 	local waryUntil = 0
+	-- What the bot is up to, for the admin panel's bot list.
+	local lastDoing = ""
+	local function doing(text: string)
+		if text ~= lastDoing then
+			lastDoing = text
+			p.state:SetAttribute("BotDoing", text)
+		end
+	end
 	-- Zombies chasing alongside another zombie cut in from this side.
 	local cutSide = if random:NextNumber() < 0.5 then 1 else -1
 	-- People react a moment after they notice someone, each at their own
@@ -1012,6 +1020,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			pauseUntil = now + random:NextNumber(0, 5)
 		end
 		if phase == "Prep" and now < pauseUntil then
+			doing("Getting ready")
 			moveTo(humanoid, here)
 			continue
 		end
@@ -1139,6 +1148,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 			if best then
 				chasing[p.id] = best.p
+				doing("Chasing " .. best.p.name)
 				local d = Util.flatDistance(best.position, here)
 				local lead = best.velocity * level.lead * math.clamp(d / 25, 0, 1)
 				local goal = best.position + lead
@@ -1172,6 +1182,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				end
 			elseif lastSeen and now - lastSeenAt < level.memory then
 				chasing[p.id] = nil
+				doing("Searching where they saw someone")
 				if not breach(lastSeen, root, humanoid) then
 					goTo(lastSeen, root, humanoid, true)
 					checkProgress(root, lastSeen, humanoid)
@@ -1180,6 +1191,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				chasing[p.id] = nil
 				lastSeen = nil
 				siege = nil
+				doing("Hunting")
 				wander()
 			end
 			if now - progressAt > level.stuck then
@@ -1200,6 +1212,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				then "Builder"
 				elseif roll < builders + level.hide * 0.7 then "Hider"
 				else "Runner"
+			p.state:SetAttribute("BotRole", role)
 			myBush = nil
 			myCorner = nil
 		end
@@ -1234,8 +1247,10 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- Armed: hold the weapon out toward a close zombie (it's solid) and swing.
 		local guarding = false
 		if closest and item then
+			-- (Thrown explosives wait until the zombie is in range; a broom,
+			-- cloak or blood box is for when one is right on top of us.)
 			local reach = if item.kind == "Projectile"
-				then 45
+				then (if item.effect == "Explode" then item.projectileRange or 30 else 45)
 				else (item.reach or 5) * Items.reachScale(p.scale) + 3
 			if closestDistance <= reach then
 				local aim = Util.flatUnit(closest.position + closest.velocity * 0.15 - here)
@@ -1277,6 +1292,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					end
 				end
 				if dodgeSpot then
+					doing("Juking a zombie")
 					moveTo(humanoid, dodgeSpot)
 					pathGoal = nil
 					continue
@@ -1289,6 +1305,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- teammates goes and finds another one.
 		if #threats == 0 then
 			if relocate and now < relocateUntil then
+				doing("Getting out of a crowd")
 				goTo(relocate, root, humanoid, false)
 				continue
 			end
@@ -1336,6 +1353,9 @@ local function brain(p: Participant, level: Level, seed: number)
 		-- doorways, shove furniture into them (two get behind a piece too
 		-- heavy for one), and lean on the barricade when a zombie knocks.
 		if role == "Builder" and (phase == "Prep" or phase == "Infection") then
+			doing(
+				if FurnitureService.holding(p.id) then "Dragging furniture to the fort" else "Building a fort"
+			)
 			if homeRound ~= round then
 				homeRound, home, barricade = round, nil, nil
 			end
@@ -1680,6 +1700,7 @@ local function brain(p: Participant, level: Level, seed: number)
 					myBush = bush
 				end
 				if bush then
+					doing("Heading for a bush")
 					local spot = Vector3.new(bush.Position.X, here.Y, bush.Position.Z)
 					goTo(spot, root, humanoid, false)
 					checkProgress(root, spot, humanoid)
@@ -1688,6 +1709,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				local corner = myCorner or quietCorner(p, here)
 				myCorner = corner
 				if corner then
+					doing("Hiding in a corner")
 					goTo(corner, root, humanoid, false)
 					checkProgress(root, corner, humanoid)
 					continue
@@ -1695,8 +1717,10 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 		if hidden and (not closest or closestDistance > Config.BUSH_REVEAL_DISTANCE + 4) then
+			doing("Hiding")
 			moveTo(humanoid, here) -- stay still and hope
 		elseif #threats > 0 then
+			doing("Running from zombies")
 			local bush = if hider and not hidden then nearestBush(here, 30) else nil
 			if bush and closest and Util.flatDistance(bush, here) < closestDistance * 0.8 then
 				goTo(bush, root, humanoid, false)
@@ -1772,6 +1796,7 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		elseif phase == "Prep" and not p.heldItem then
 			local spot = nearestItem(here, 90, p.id)
+			doing(if spot then "Getting an item" else "Exploring")
 			if spot then
 				if Util.flatDistance(spot, here) < Config.PICKUP_RADIUS then
 					ItemService.pickUp(p)
@@ -1783,6 +1808,9 @@ local function brain(p: Participant, level: Level, seed: number)
 				wander()
 			end
 		else
+			doing(
+				if role == "Runner" and phase == "Infection" then "Keeping away from zombies" else "Wandering"
+			)
 			wander()
 		end
 	end
@@ -1791,7 +1819,9 @@ end
 
 -- Roster ----------------------------------------------------------------------------------
 
-local active: { [number]: Participant } = {} -- roster index -> bot
+-- Bots playing now: "R<roster index>" for the regular roster, "C<n>" for
+-- the Mario Clones an admin adds.
+local active: { [string]: Participant } = {}
 local nextId = 0
 
 local function randomSkin(team: Skins.Team): string
@@ -1810,13 +1840,12 @@ local function dressedUp(): number
 	return count
 end
 
-local function addBot(index: number)
-	local entry = ROSTER[index]
-	local level = LEVELS[entry.level] or LEVELS[5]
+local function addBot(key: string, name: string, levelNumber: number)
+	local level = LEVELS[levelNumber] or LEVELS[5]
 	nextId += 1
 	local p = Participants.add({
 		id = "B" .. nextId,
-		name = entry.name,
+		name = name,
 		isBot = true,
 	})
 	if dressedUp() < Config.BOTS_WITH_SKINS and rng:NextNumber() < 0.35 then
@@ -1825,13 +1854,14 @@ local function addBot(index: number)
 		until p.humanSkin ~= Skins.DEFAULT_HUMAN
 	end
 	p.adminSpeed = level.speed
-	p.state:SetAttribute("BotLevel", entry.level)
+	p.state:SetAttribute("BotLevel", levelNumber)
+	p.state:SetAttribute("BotDoing", "Joining")
 	Participants.publish(p)
 	if p.character then
 		CharacterService.applyLook(p)
 	end
 	CharacterService.refreshSpeed(p)
-	active[index] = p
+	active[key] = p
 	-- A bot whose brain hits an error says so and starts thinking again,
 	-- instead of standing still for the rest of the game.
 	local seed = nextId * 97 + os.time()
@@ -1922,27 +1952,50 @@ local function drive()
 	end
 end
 
--- How many bots this round: a random count in range, leaving room for
--- real players.
+-- The numbers of the Mario Clones playing, lowest first.
+local function cloneNumbers(): { number }
+	local out = {}
+	for key in active do
+		if string.sub(key, 1, 1) == "C" then
+			table.insert(out, tonumber(string.sub(key, 2)) :: number)
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+local driving = false
+local function startDriving()
+	if not driving then
+		driving = true
+		RunService.Heartbeat:Connect(drive)
+	end
+end
+
+-- How many regular bots this round: a random count in range, leaving room
+-- for real players and the admin's clones.
 local function wanted(): number
 	local players = #Players:GetPlayers()
-	local room = math.max(0, Config.MAX_PARTICIPANTS - players)
+	local room = math.max(0, Config.MAX_PARTICIPANTS - players - #cloneNumbers())
 	return math.min(rng:NextInteger(Config.BOTS_MIN, Config.BOTS_MAX), room, #ROSTER)
 end
 
 local function rebalance()
 	local target = wanted()
 	local count = 0
-	for _ in active do
-		count += 1
+	for index = 1, #ROSTER do
+		if active["R" .. index] then
+			count += 1
+		end
 	end
 	-- Add in roster order (Mario Robles first), remove from the end.
 	for index = 1, #ROSTER do
 		if count >= target then
 			break
 		end
-		if not active[index] then
-			addBot(index)
+		if not active["R" .. index] then
+			local entry = ROSTER[index]
+			addBot("R" .. index, entry.name, entry.level)
 			count += 1
 		end
 	end
@@ -1950,13 +2003,69 @@ local function rebalance()
 		if count <= target then
 			break
 		end
-		local p = active[index]
+		local p = active["R" .. index]
 		if p then
-			active[index] = nil
+			active["R" .. index] = nil
 			Participants.remove(p)
 			count -= 1
 		end
 	end
+end
+
+-- Admin: add `count` more Mario Clones (Mario Clone 1, Mario Clone 2...),
+-- as smart as Mario Robles. They stay until removed, round after round.
+-- Returns how many joined (the server holds Config.MAX_PARTICIPANTS).
+function BotService.addClones(count: number): number
+	startDriving()
+	local added = 0
+	for _ = 1, math.clamp(math.floor(count), 0, 40) do
+		if #Participants.all() >= Config.MAX_PARTICIPANTS then
+			break
+		end
+		local n = 1 -- the lowest free number
+		while active["C" .. n] do
+			n += 1
+		end
+		addBot("C" .. n, "Mario Clone " .. n, 6)
+		added += 1
+	end
+	return added
+end
+
+-- Admin: remove the newest `count` Mario Clones (all of them if nil).
+function BotService.removeClones(count: number?): number
+	local numbers = cloneNumbers()
+	local removed = 0
+	for i = #numbers, 1, -1 do
+		if count and removed >= count then
+			break
+		end
+		local key = "C" .. numbers[i]
+		local p = active[key]
+		active[key] = nil
+		if p then
+			Participants.remove(p)
+			removed += 1
+		end
+	end
+	return removed
+end
+
+-- Admin: remove one bot by participant id (a clone or a regular bot; Mario
+-- Robles too, until the next round brings the roster back).
+function BotService.remove(id: string): boolean
+	for key, p in active do
+		if p.id == id then
+			active[key] = nil
+			Participants.remove(p)
+			return true
+		end
+	end
+	return false
+end
+
+function BotService.cloneCount(): number
+	return #cloneNumbers()
 end
 
 function BotService.start()
@@ -1964,7 +2073,7 @@ function BotService.start()
 		return
 	end
 	rebalance()
-	RunService.Heartbeat:Connect(drive)
+	startDriving()
 	print("[Bots] bots are playing. Set Config.BOTS = false to turn them off.")
 	-- A fresh mix of bots for every round.
 	local state = ReplicatedStorage:WaitForChild("BrainTagState")

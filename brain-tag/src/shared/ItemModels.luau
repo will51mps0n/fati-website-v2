@@ -88,6 +88,11 @@ local function see(spec: PieceSpec, transparency: number): PieceSpec
 	return spec
 end
 
+local function glow(spec: PieceSpec): PieceSpec
+	spec.material = Enum.Material.Neon
+	return spec
+end
+
 local function yaw(radians: number): CFrame
 	return CFrame.Angles(0, radians, 0)
 end
@@ -363,6 +368,98 @@ local DESIGNS: { [string]: { PieceSpec } } = {
 		blockAt(Vector3.new(0.45, 0.12, 1.0), 0, 0, -1.4, "F7DC6F"),
 		blockAt(Vector3.new(0.45, 0.12, 1.0), 0.35, 0, -0.8, "F7DC6F", yaw(math.rad(120))),
 		blockAt(Vector3.new(0.45, 0.12, 1.0), -0.35, 0, -0.8, "F7DC6F", yaw(math.rad(-120))),
+	},
+	FreezeGun = {
+		blockAt(Vector3.new(0.9, 0.8, 2.0), 0, 0, -1.0, "2F6FC4"), -- body
+		blockAt(Vector3.new(0.35, 0.5, 0.4), 0, -0.5, -0.3, "1F4E8C"), -- grip
+		see(ballAt(0.8, 0, 0.6, -1.1, "BFF0FF"), 0.25), -- coolant tank
+		rod(1.5, 0.5, -2.75, "A9E4FF"), -- barrel
+		discAt(0.75, 0.12, 0, 0, -2.2, "E8FBFF"), -- cooling fins
+		discAt(0.75, 0.12, 0, 0, -2.7, "E8FBFF"),
+		see(glow(blockAt(Vector3.new(0.55, 0.55, 0.55), 0, 0, -3.65, "E8FBFF", DIAMOND)), 0.15), -- ice crystal
+	},
+	Glock = {
+		blockAt(Vector3.new(0.5, 0.45, 1.7), 0, 0.08, -0.95, "2B2D31"), -- slide
+		blockAt(Vector3.new(0.46, 0.25, 1.2), 0, -0.2, -0.75, "1C1D20"), -- frame
+		blockAt(Vector3.new(0.44, 0.7, 0.5), 0, -0.45, -0.15, "1C1D20", CFrame.Angles(-0.25, 0, 0)), -- grip
+		rod(0.1, 0.22, -1.82, "0E0E0E", 0, 0.08), -- muzzle
+		blockAt(Vector3.new(0.1, 0.08, 0.1), 0, 0.35, -1.65, "0E0E0E"), -- sight
+	},
+	Crossbow = {
+		blockAt(Vector3.new(0.4, 0.35, 2.8), 0, 0, -1.4, "6B3E1E"), -- stock
+		blockAt(Vector3.new(1.4, 0.2, 0.25), 0.65, 0.05, -2.3, "6A3FA0", yaw(-0.3)), -- the purple bow
+		blockAt(Vector3.new(1.4, 0.2, 0.25), -0.65, 0.05, -2.3, "6A3FA0", yaw(0.3)),
+		blockAt(Vector3.new(2.62, 0.05, 0.05), 0, 0.05, -2.08, "EEEEEE"), -- string
+		rod(2.2, 0.1, -2.3, "D9C29A", 0, 0.25), -- arrow
+		blockAt(Vector3.new(0.3, 0.1, 0.3), 0, 0.25, -3.45, "9AA3AD", DIAMOND),
+		blockAt(Vector3.new(0.4, 0.06, 0.3), 0, 0.25, -1.3, "8E44AD"), -- fletching
+	},
+	Dynamite = {
+		rod(1.8, 0.55, -1.1, "C0392B"),
+		rod(0.15, 0.57, -0.5, "F4EFE1"), -- paper bands
+		rod(0.15, 0.57, -1.7, "F4EFE1"),
+		rod(0.5, 0.08, -2.25, "3A3A3A"), -- fuse
+		glow(ballAt(0.25, 0, 0, -2.5, "FFC21A")), -- spark
+	},
+	StackedDynamite = {
+		rod(1.8, 0.5, -1.1, "C0392B", -0.5),
+		rod(1.8, 0.5, -1.1, "C0392B"),
+		rod(1.8, 0.5, -1.1, "C0392B", 0.5),
+		blockAt(Vector3.new(1.55, 0.54, 0.25), 0, 0, -0.6, "3A3A3A"), -- tape
+		blockAt(Vector3.new(1.55, 0.54, 0.25), 0, 0, -1.6, "3A3A3A"),
+		rod(0.6, 0.08, -2.3, "3A3A3A"),
+		glow(ballAt(0.25, 0, 0, -2.6, "FFC21A")),
+	},
+	Grenade = {
+		ballAt(1.1, 0, 0, -0.9, "4E6B3A"),
+		blockAt(Vector3.new(0.12, 1.12, 0.12), 0, 0, -0.9, "3E5530"), -- grooves
+		blockAt(Vector3.new(1.12, 0.12, 0.12), 0, 0, -0.9, "3E5530"),
+		rod(0.35, 0.4, -1.55, "5A5A5A"), -- top
+		blockAt(Vector3.new(0.15, 0.12, 0.9), 0.35, 0.15, -1.15, "6E6E6E", yaw(0.2)), -- lever
+		discAt(0.4, 0.06, -0.3, 0.1, -1.75, "C9C9C9"), -- pin ring
+	},
+	FartGun = {
+		blockAt(Vector3.new(0.9, 0.8, 1.8), 0, 0, -0.9, "7DBE3C"),
+		blockAt(Vector3.new(0.35, 0.5, 0.4), 0, -0.5, -0.3, "3E6B1E"),
+		see(ballAt(1.1, 0, 0.6, -0.8, "A7D46F"), 0.2), -- the gas tank
+		rod(1.2, 0.45, -2.4, "5A8F2B"),
+		rod(0.35, 0.85, -3.1, "5A8F2B"), -- trumpet mouth
+		rod(0.05, 0.6, -3.29, "2F4F1A"),
+	},
+	Slap = {
+		rod(0.8, 0.55, -0.3, "E8B88C"), -- wrist
+		blockAt(Vector3.new(1.6, 0.42, 1.5), 0, 0, -1.3, "F7D1AB"), -- palm
+		blockAt(Vector3.new(0.34, 0.38, 1.0), -0.6, 0, -2.5, "F7D1AB"), -- fingers
+		blockAt(Vector3.new(0.34, 0.38, 1.25), -0.2, 0, -2.62, "F7D1AB"),
+		blockAt(Vector3.new(0.34, 0.38, 1.2), 0.2, 0, -2.6, "F7D1AB"),
+		blockAt(Vector3.new(0.34, 0.38, 0.95), 0.6, 0, -2.47, "F7D1AB"),
+		blockAt(Vector3.new(0.36, 0.38, 0.9), 0.98, 0, -1.05, "F7D1AB", yaw(-0.7)), -- thumb
+		blockAt(Vector3.new(1.62, 0.44, 0.08), 0, 0, -1.95, "E8B88C"), -- knuckle line
+	},
+	Broom = {
+		rod(5, 0.28, -2.5, "A0703C"),
+		rod(0.35, 0.36, -5.05, "C0392B"), -- binding
+		blockAt(Vector3.new(1.0, 0.36, 0.5), 0, 0, -5.4, "D9B45A"), -- bristles
+		blockAt(Vector3.new(1.6, 0.32, 1.3), 0, 0, -6.2, "E2C26B"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), 0.45, 0, -6.2, "C9A54F"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), -0.45, 0, -6.2, "C9A54F"),
+		blockAt(Vector3.new(0.12, 0.34, 1.3), 0, 0, -6.2, "C9A54F"),
+	},
+	MagicCloak = {
+		blockAt(Vector3.new(1.7, 0.25, 2.1), 0, 0, -1.2, "3B1F66"), -- folded cloak
+		blockAt(Vector3.new(1.5, 0.27, 1.9), 0, 0.01, -1.2, "6A3FA0"),
+		blockAt(Vector3.new(1.7, 0.29, 0.18), 0, 0.02, -0.25, "F5D76E"), -- gold trim
+		blockAt(Vector3.new(1.7, 0.29, 0.18), 0, 0.02, -2.15, "F5D76E"),
+		glow(blockAt(Vector3.new(0.45, 0.31, 0.45), 0, 0.03, -1.2, "F5D76E", DIAMOND)), -- a star
+		glow(ballAt(0.18, 0.5, 0.18, -0.8, "FFFFFF")), -- sparkles
+		glow(ballAt(0.14, -0.45, 0.18, -1.7, "FFFFFF")),
+	},
+	BloodStaff = {
+		rod(5.2, 0.3, -2.6, "2B1A1A"),
+		rod(0.3, 0.42, -4.6, "7A1F1F"), -- band
+		blockAt(Vector3.new(0.18, 0.18, 0.9), 0.32, 0, -5.3, "2B1A1A", yaw(-0.5)), -- claws
+		blockAt(Vector3.new(0.18, 0.18, 0.9), -0.32, 0, -5.3, "2B1A1A", yaw(0.5)),
+		glow(blockAt(Vector3.new(0.8, 0.8, 0.8), 0, 0, -5.75, "D11F35", CFrame.Angles(0.6, 0.6, 0))), -- blood crystal
 	},
 	EnergyDrink = {
 		rod(1.2, 0.7, -0.8, "2ECC71"),

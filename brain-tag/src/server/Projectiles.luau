@@ -76,6 +76,85 @@ local function buildLook(item: Items.Item): Model
 			canQuery = false,
 			parent = model,
 		})
+	elseif look == "Ice" then
+		ball(model, d, Vector3.zero, "BFF0FF", 0.15)
+		local shard = Parts.make({
+			name = "Shard",
+			size = Vector3.new(0.45, 0.45, 1.2) * d,
+			cframe = CFrame.Angles(0, 0, math.rad(45)),
+			color = "E8FBFF",
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		shard.Transparency = 0.2
+	elseif look == "Bullet" then
+		local bullet = Parts.make({
+			name = "Bullet",
+			size = Vector3.new(0.5, 0.5, 1.4) * d,
+			cframe = CFrame.identity,
+			color = "D4A84B",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = bullet
+	elseif look == "Arrow" then
+		local shaft = Parts.make({
+			name = "Shaft",
+			size = Vector3.new(0.14, 0.14, 2.6),
+			cframe = CFrame.identity,
+			color = "D9C29A",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = shaft
+		Parts.make({
+			name = "Tip",
+			size = Vector3.new(0.35, 0.12, 0.35),
+			cframe = CFrame.new(0, 0, -1.35) * CFrame.Angles(0, math.rad(45), 0),
+			color = "9AA3AD",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		Parts.make({
+			name = "Fletching",
+			size = Vector3.new(0.5, 0.06, 0.5),
+			cframe = CFrame.new(0, 0, 1.15),
+			color = "8E44AD",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	elseif look == "Dynamite" then
+		local stick = Parts.make({
+			name = "Stick",
+			shape = Enum.PartType.Cylinder,
+			size = Vector3.new(1.8, 0.55, 0.55),
+			cframe = CFrame.Angles(0, math.rad(90), 0),
+			color = "C0392B",
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+		model.PrimaryPart = stick
+		Parts.make({
+			name = "Spark",
+			shape = Enum.PartType.Ball,
+			size = Vector3.one * 0.35,
+			cframe = CFrame.new(0, 0, 1.15),
+			color = "FFC21A",
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			parent = model,
+		})
+	elseif look == "Grenade" then
+		ball(model, d, Vector3.zero, "4E6B3A")
+		ball(model, d * 0.35, Vector3.new(0, d * 0.45, 0), "5A5A5A")
 	else
 		ball(model, d, Vector3.zero, if item.isRare then "B98A4E" else "C9A66B")
 		ball(model, d * 0.25, Vector3.new(d * 0.2, d * 0.3, 0), "8B6A43")
@@ -97,7 +176,7 @@ local function impact(shot: Shot, at: Vector3, target: Participant?, hitPart: In
 			local away = Util.flatUnit(body.Position - at) or dir
 			FurnitureService.shove(body, away * 18, 0.35)
 		end
-		Announcer.fx("Boom", { position = at })
+		Announcer.fx("Boom", { position = at, look = item.projectile, radius = item.radius })
 		return
 	end
 	if target then
@@ -162,8 +241,11 @@ local function step(dt: number)
 				end
 				finish(shot)
 			else
-				-- Ducks and potatoes tumble a little as they fly.
-				local spin = CFrame.Angles(0, shot.traveled * 0.15, 0)
+				-- Ducks and potatoes tumble a little as they fly; arrows,
+				-- bullets and ice bolts fly straight.
+				local look = item.projectile
+				local straight = look == "Arrow" or look == "Bullet" or look == "Ice"
+				local spin = if straight then CFrame.identity else CFrame.Angles(0, shot.traveled * 0.15, 0)
 				shot.model:PivotTo(CFrame.lookAt(shot.position, shot.position + shot.direction) * spin)
 			end
 		end

@@ -5,6 +5,7 @@
 local Bushes = {}
 
 Bushes.ATTRIBUTE = "InBush" -- set on characters by the server
+Bushes.CLOAK_ATTRIBUTE = "CloakedUntil" -- server time the Magic Cloak wears off
 
 local cachedFolder: Instance? = nil
 local cached: { BasePart } = {}
