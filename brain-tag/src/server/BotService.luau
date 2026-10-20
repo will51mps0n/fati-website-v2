@@ -223,6 +223,7 @@ type Fort = {
 }
 local forts: { [MapLayout.Room]: Fort } = {}
 local bushTaken: { [BasePart]: string } = {} -- leaves -> the hider bot that picked it
+local cornerTaken: { [string]: string } = {} -- room corner "x,z" -> the hider bot hiding there
 local bushChecked: { [BasePart]: number } = {} -- leaves -> when a zombie last went to look
 local teamsRound = -1
 
@@ -232,6 +233,7 @@ local function teamsFor(round: number)
 		table.clear(forts)
 		table.clear(bushTaken)
 		table.clear(bushChecked)
+		table.clear(cornerTaken)
 	end
 end
 
@@ -337,16 +339,31 @@ local function nearestBush(from: Vector3, range: number): Vector3?
 end
 
 -- The nearest bush no other hider has picked, away from the zombies.
+-- How many other people stand within `radius` of a spot.
+local function crowdAt(spot: Vector3, radius: number, except: Participant): number
+	local n = 0
+	for _, list in { seenHumans, seenZombies } do
+		for _, entry in list do
+			if entry.p ~= except and Util.flatDistance(entry.position, spot) < radius then
+				n += 1
+			end
+		end
+	end
+	return n
+end
+
 local function freeBush(p: Participant, from: Vector3): BasePart?
 	local best: BasePart? = nil
-	local bestDistance = 160
+	local bestScore = 160
 	for _, leaves in Bushes.leaves() do
 		local owner = bushTaken[leaves]
 		if owner and owner ~= p.id then
 			continue
 		end
 		local d = Util.flatDistance(leaves.Position, from)
-		if d >= bestDistance then
+		-- A bush with people standing round it gives you away.
+		local score = d + 30 * crowdAt(leaves.Position, 12, p)
+		if score >= bestScore then
 			continue
 		end
 		local safe = true
@@ -357,11 +374,60 @@ local function freeBush(p: Participant, from: Vector3): BasePart?
 			end
 		end
 		if safe then
-			best, bestDistance = leaves, d
+			best, bestScore = leaves, score
 		end
 	end
 	if best then
 		bushTaken[best] = p.id
+	end
+	return best
+end
+
+-- No bush to be had: a quiet corner of a room, away from its doorways and
+-- from everyone else (on dark maps, a dark room is as good as a bush).
+local function quietCorner(p: Participant, from: Vector3): Vector3?
+	local best: Vector3? = nil
+	local bestScore = math.huge
+	local inset = 2.5 * p.scale + 1.5
+	for _, room in MapLayout.current().rooms do
+		if room.house == "" then
+			continue
+		end
+		local r = MapLayout.roomInterior(room)
+		if r.x2 - r.x1 < inset * 2 + 2 or r.z2 - r.z1 < inset * 2 + 2 then
+			continue
+		end
+		for _, c in
+			{
+				{ r.x1 + inset, r.z1 + inset },
+				{ r.x2 - inset, r.z1 + inset },
+				{ r.x1 + inset, r.z2 - inset },
+				{ r.x2 - inset, r.z2 - inset },
+			}
+		do
+			local spot = Vector3.new(c[1], from.Y, c[2])
+			local key = string.format("%d,%d", math.floor(c[1]), math.floor(c[2]))
+			if cornerTaken[key] and cornerTaken[key] ~= p.id then
+				continue
+			end
+			local nearDoor = false
+			for _, door in doors() do
+				if Util.flatDistance(Vector3.new(door.x, from.Y, door.z), spot) < 8 then
+					nearDoor = true
+					break
+				end
+			end
+			if nearDoor or #FurnitureService.findInBox(CFrame.new(spot), Vector3.new(3, 4, 3)) > 0 then
+				continue
+			end
+			local score = Util.flatDistance(spot, from) + 40 * crowdAt(spot, 14, p)
+			if score < bestScore then
+				best, bestScore = spot, score
+			end
+		end
+	end
+	if best then
+		cornerTaken[string.format("%d,%d", math.floor(best.X), math.floor(best.Z))] = p.id
 	end
 	return best
 end
@@ -573,6 +639,10 @@ local function brain(p: Participant, level: Level, seed: number)
 	local role: "Builder" | "Hider" | "Runner" = "Runner"
 	local roleRound = -1
 	local myBush: BasePart? = nil
+	local myCorner: Vector3? = nil -- a quiet room corner, when there's no bush
+	local crowdedSince = 0 -- squeezed in with two or more others since then
+	local relocate: Vector3? = nil -- stepping out of a crowd to here
+	local relocateUntil = 0
 	local home: MapLayout.Room? = nil
 	local homeRound = -1
 	local barricade: Job? = nil
@@ -1131,6 +1201,7 @@ local function brain(p: Participant, level: Level, seed: number)
 				elseif roll < builders + level.hide * 0.7 then "Hider"
 				else "Runner"
 			myBush = nil
+			myCorner = nil
 		end
 		if phase == "Prep" and armedRound ~= round then
 			armedRound = round -- one roll per round: only some bots start armed
@@ -1213,6 +1284,54 @@ local function brain(p: Participant, level: Level, seed: number)
 			end
 		end
 
+		-- Squeezed in with others for a couple of seconds (and no zombie
+		-- about)? Step out of the crowd; a builder in a room with too many
+		-- teammates goes and finds another one.
+		if #threats == 0 then
+			if relocate and now < relocateUntil then
+				goTo(relocate, root, humanoid, false)
+				continue
+			end
+			relocate = nil
+			local near, centroid = 0, Vector3.zero
+			for _, entry in seenHumans do
+				if entry.p ~= p and Util.flatDistance(entry.position, here) < 5.5 * p.scale then
+					near += 1
+					centroid += entry.position
+				end
+			end
+			if near < 2 or FurnitureService.holding(p.id) then
+				crowdedSince = 0
+			elseif crowdedSince == 0 then
+				crowdedSince = now
+			elseif now - crowdedSince > 1.8 then
+				crowdedSince = 0
+				local away = Util.flatUnit(here - centroid / near)
+					or Vector3.new(
+						math.cos(random:NextNumber(0, 6.28)),
+						0,
+						math.sin(random:NextNumber(0, 6.28))
+					)
+				for _ = 1, 6 do
+					local dir = CFrame.Angles(0, random:NextNumber(-1, 1), 0):VectorToWorldSpace(away)
+					local spot = here + dir * random:NextNumber(9, 16)
+					if inBounds(spot, 4) and Combat.clearWide(here, spot, radius()) then
+						relocate, relocateUntil = spot, now + 2.5
+						break
+					end
+				end
+				local myHome = home
+				if myHome and count(fortOf(myHome).members, now, 3) > 2 then
+					fortOf(myHome).members[p.id] = nil
+					home, barricade = nil, nil
+				end
+				if relocate then
+					goTo(relocate, root, humanoid, false)
+					continue
+				end
+			end
+		end
+
 		-- Builders team up in a fort: they hole up in one room, split its
 		-- doorways, shove furniture into them (two get behind a piece too
 		-- heavy for one), and lean on the barricade when a zombie knocks.
@@ -1225,9 +1344,10 @@ local function brain(p: Participant, level: Level, seed: number)
 				and home ~= nil
 				and roomAt(closest.position.X, closest.position.Z) == home
 			if not home and phase == "Prep" then
-				-- The nearest good room, but join teammates already holing up
-				-- somewhere close (up to three to a fort). Claimed at once, so
-				-- the builders picking right after us see it.
+				-- The nearest good room, but join a teammate already holing up
+				-- somewhere close (two to a room, about three to a house, so
+				-- they spread out). Claimed at once, so the builders picking
+				-- right after us see it.
 				local best: MapLayout.Room? = nil
 				local bestScore = math.huge
 				for _, room in MapLayout.current().rooms do
@@ -1236,9 +1356,16 @@ local function brain(p: Participant, level: Level, seed: number)
 						Util.flatDistance(Vector3.new((r.x1 + r.x2) / 2, here.Y, (r.z1 + r.z2) / 2), here)
 					if room.house ~= "" and d < 160 and goodHideout(room) then
 						local mates = count(fortOf(room).members, now, 3)
+						local houseMates = 0
+						for other, fort in forts do
+							if other.house == room.house then
+								houseMates += count(fort.members, now, 3)
+							end
+						end
 						local score = d
-							- (if mates > 0 and mates < 3 then 40 else 0)
-							+ (if mates >= 3 then 400 else 0)
+							- (if mates == 1 then 30 else 0)
+							+ (if mates >= 2 then 400 else 0)
+							+ (if houseMates >= 3 then 250 else 0)
 						if score < bestScore then
 							best, bestScore = room, score
 						end
@@ -1515,7 +1642,7 @@ local function brain(p: Participant, level: Level, seed: number)
 						table.sort(ids)
 						local index = table.find(ids, p.id) or 1
 						local angle = index / math.max(1, #ids) * math.pi * 2
-						local ring = if #ids > 1 then 3 * p.scale else 0
+						local ring = if #ids > 1 then 4 * p.scale else 0
 						local spot = middle
 							+ (if away.Magnitude > 0.1 then away.Unit else Vector3.zero) * 4
 							+ Vector3.new(math.cos(angle), 0, math.sin(angle)) * ring
@@ -1542,6 +1669,7 @@ local function brain(p: Participant, level: Level, seed: number)
 		if role == "Hider" then
 			if #threats > 0 and not hidden then
 				myBush = nil
+				myCorner = nil
 			elseif
 				not hidden
 				and (phase == "Infection" or (phase == "Prep" and RoundManager.secondsLeft() < 15))
@@ -1555,6 +1683,13 @@ local function brain(p: Participant, level: Level, seed: number)
 					local spot = Vector3.new(bush.Position.X, here.Y, bush.Position.Z)
 					goTo(spot, root, humanoid, false)
 					checkProgress(root, spot, humanoid)
+					continue
+				end
+				local corner = myCorner or quietCorner(p, here)
+				myCorner = corner
+				if corner then
+					goTo(corner, root, humanoid, false)
+					checkProgress(root, corner, humanoid)
 					continue
 				end
 			end
@@ -1745,9 +1880,26 @@ local function drive()
 		end
 		local move = if toGoal.Magnitude > 0.6 then toGoal.Unit else nil
 		local speed = humanoid.WalkSpeed * FurnitureService.dragFactor(p)
+		-- Personal space (humans): ease away from anyone we're pressed
+		-- against, so bots slide past each other instead of jamming. Zombies
+		-- don't: a queue of them leaning on each other is how they shove.
+		local apart = Vector3.zero
+		if p.team == "Human" then
+			local mine = Config.CHARACTER.ShellDiameter / 2 * p.scale
+			for _, other in Participants.all() do
+				local oRoot = if other ~= p and other.team == "Human" then Participants.body(other) else nil
+				if oRoot then
+					local rel = Util.flat(root.Position - oRoot.Position)
+					local gap = rel.Magnitude - (mine + Config.CHARACTER.ShellDiameter / 2 * other.scale + 1)
+					if gap < 0 and rel.Magnitude > 0.05 then
+						apart += rel.Unit * math.min(-gap * 5, 8)
+					end
+				end
+			end
+		end
 		if move and speed > 0 then
 			stopped[humanoid] = nil
-			root.AssemblyLinearVelocity = Vector3.new(move.X * speed, v.Y, move.Z * speed)
+			root.AssemblyLinearVelocity = Vector3.new(move.X * speed + apart.X, v.Y, move.Z * speed + apart.Z)
 			-- Not aiming a weapon: turn quickly toward where we walk. A spin,
 			-- not a teleport of the rotation, so it replicates smoothly.
 			local look = Util.flatUnit(root.CFrame.LookVector)
@@ -1760,8 +1912,12 @@ local function drive()
 			-- Humanoid too so it doesn't keep nudging toward the old spot.
 			stopped[humanoid] = true
 			humanoid:MoveTo(root.Position)
-			root.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
+			root.AssemblyLinearVelocity = Vector3.new(apart.X, v.Y, apart.Z)
 			root.AssemblyAngularVelocity = Vector3.zero
+		elseif apart.Magnitude > 0.3 then
+			root.AssemblyLinearVelocity = Vector3.new(apart.X, v.Y, apart.Z) -- standing: make room
+		elseif math.abs(v.X) + math.abs(v.Z) > 0.05 then
+			root.AssemblyLinearVelocity = Vector3.new(0, v.Y, 0)
 		end
 	end
 end
